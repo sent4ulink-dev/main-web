@@ -6,6 +6,7 @@ import Lenis from './vendor/lenis.js';
 import { initEarthScene } from './earth-scene.js';
 import { initFinale } from './finale.js';
 import { onRealResize, pinnedHeight } from './viewport.js';
+import { tilt, initTilt } from './tilt.js';
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -874,10 +875,11 @@ function initBridge(){
     }
 
     // the lattice: every dot's height, size and glow come from the wave; the cursor and any shockwaves push and light them too
-    const N = Math.max(12, Math.round(W / 24)), sx = W / N, sy = H * 0.058;
+    const lite = document.body.classList.contains('lite');   // fewer dots on a phone
+    const N = lite ? Math.max(10, Math.round(W / 30)) : Math.max(12, Math.round(W / 24)), sx = W / N, sy = H * 0.058, rowStep = lite ? 2 : 1;
     for (let c = 0; c < N; c++){
       const x0 = (c + 0.5) * sx, col = tint(x0 / W), e = env(x0);
-      for (let r = -ROWS; r <= ROWS; r++){
+      for (let r = -ROWS; r <= ROWS; r += rowStep){
         const s = Math.sin(phase(x0) + r * 0.34), depth = 1 - Math.abs(r) / (ROWS + 2) * 0.55;
         let b = 0.5 + 0.5 * s, x = x0, y = cy + r * sy + A * e * s * (1 - Math.abs(r) / (ROWS + 2) * 0.4);
         if (ptr.lens > 0.01){
@@ -932,7 +934,7 @@ function initBridge(){
     // paper planes fly along the middle ribbon in a V, faster than the wave itself, so they climb and dive with it;
     // near the cursor they bend toward it
     const speed = OMEGA / K * 2.2, span = W + 260;
-    for (let i = 0; i < 5; i++){
+    for (let i = 0; i < (lite ? 3 : 5); i++){
       const rank = Math.ceil(i / 2), side = i === 0 ? 0 : (i % 2 ? 1 : -1), off = side * rank * 15;
       const yAt = xq => {
         const base = ribbonY(xq, MID) + off;
@@ -963,6 +965,11 @@ function initBridge(){
     if (!active){ raf = 0; return; }
     if (minGap && last && now - last < minGap){ raf = requestAnimationFrame(frame); return; }
     const dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016; last = now; clock += dt;
+    if (tilt.active){                                       // on a phone the lean of the phone rolls the light around the band, like a marble
+      ptr.x = W * (0.5 + tilt.x * 0.42); ptr.y = H * (0.5 + tilt.y * 0.3); ptr.inside = true;
+      if (ptr.sx < -999){ ptr.sx = ptr.x; ptr.sy = ptr.y; }
+      energy = Math.min(1, energy + Math.hypot(ptr.x - ptr.sx, ptr.y - ptr.sy) * 0.0016);   // a quick lean stirs the wave up
+    }
     // ease the cursor's light and the drag's momentum
     ptr.sx += (ptr.x - ptr.sx) * (1 - Math.exp(-dt / 0.06)); ptr.sy += (ptr.y - ptr.sy) * (1 - Math.exp(-dt / 0.06));
     ptr.lens += ((ptr.inside ? 1 : 0) - ptr.lens) * (1 - Math.exp(-dt / 0.18));
@@ -975,40 +982,42 @@ function initBridge(){
   resize();
   if (reduceMotion){ draw(1.2, 0.5, 0); window.addEventListener('resize', () => { resize(); draw(1.2, 0.5, 0); }); return; }
 
-  // ---- playing with it
-  const place = e => { const r = canvas.getBoundingClientRect(); ptr.x = e.clientX - r.left; ptr.y = e.clientY - r.top; };
-  hit.addEventListener('pointerenter', e => { place(e); ptr.sx = ptr.x; ptr.sy = ptr.y; ptr.inside = true; ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = e.timeStamp; });
-  hit.addEventListener('pointerleave', () => { if (!ptr.down) ptr.inside = false; });
-  hit.addEventListener('pointerdown', e => {
-    place(e); ptr.sx = ptr.x; ptr.sy = ptr.y; ptr.inside = true; ptr.down = true; ptr.moved = 0; ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = e.timeStamp;
-    try { hit.setPointerCapture(e.pointerId); } catch {}          // keeps the drag going if the pointer leaves the band
-    hit.classList.add('is-drag');
-  });
-  hit.addEventListener('pointermove', e => {
-    place(e);
-    const dx = e.clientX - ptr.lx, dy = e.clientY - ptr.ly, dtm = Math.max(e.timeStamp - ptr.lt, 8);
-    ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = e.timeStamp;
-    energy = Math.min(1, energy + Math.hypot(dx, dy) / dtm * 0.02);     // quick movement stirs the wave up
-    if (!ptr.down) return;
-    ptr.moved += Math.hypot(dx, dy);
-    if (ptr.moved > 6){                                                  // it is a drag, not a click
-      userPhase += dx * 0.011;
-      userVel = clamp(0.6 * userVel + 0.4 * (dx * 0.011 / (dtm / 1000)), -9, 9);
-      userAmp = clamp(userAmp - dy * 0.004, -0.45, 0.9);
-    }
-  });
-  const release = (e, cancelled) => {
-    if (!ptr.down) return;
-    ptr.down = false; hit.classList.remove('is-drag');
-    if (!cancelled && ptr.moved < 6){                                    // a click: shockwave + a plane
-      shocks.push({ x: ptr.x, y: ptr.y, t: clock }); shocks = shocks.slice(-6);
-      flyers.push({ x: ptr.x, y0: ptr.y, age: 0, trail: [] }); flyers = flyers.slice(-8);
-      energy = 1;
-    }
-    if (e.pointerType !== 'mouse') ptr.inside = false;
-  };
-  hit.addEventListener('pointerup', e => release(e, false));
-  hit.addEventListener('pointercancel', e => release(e, true));
+  // ---- playing with it: a mouse on a desktop. On a phone the tilt does it (see tilt.js) and the band leaves the page free to scroll
+  if (!window.matchMedia('(hover: none)').matches){
+    const place = e => { const r = canvas.getBoundingClientRect(); ptr.x = e.clientX - r.left; ptr.y = e.clientY - r.top; };
+    hit.addEventListener('pointerenter', e => { place(e); ptr.sx = ptr.x; ptr.sy = ptr.y; ptr.inside = true; ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = e.timeStamp; });
+    hit.addEventListener('pointerleave', () => { if (!ptr.down) ptr.inside = false; });
+    hit.addEventListener('pointerdown', e => {
+      place(e); ptr.sx = ptr.x; ptr.sy = ptr.y; ptr.inside = true; ptr.down = true; ptr.moved = 0; ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = e.timeStamp;
+      try { hit.setPointerCapture(e.pointerId); } catch {}          // keeps the drag going if the pointer leaves the band
+      hit.classList.add('is-drag');
+    });
+    hit.addEventListener('pointermove', e => {
+      place(e);
+      const dx = e.clientX - ptr.lx, dy = e.clientY - ptr.ly, dtm = Math.max(e.timeStamp - ptr.lt, 8);
+      ptr.lx = e.clientX; ptr.ly = e.clientY; ptr.lt = e.timeStamp;
+      energy = Math.min(1, energy + Math.hypot(dx, dy) / dtm * 0.02);     // quick movement stirs the wave up
+      if (!ptr.down) return;
+      ptr.moved += Math.hypot(dx, dy);
+      if (ptr.moved > 6){                                                  // it is a drag, not a click
+        userPhase += dx * 0.011;
+        userVel = clamp(0.6 * userVel + 0.4 * (dx * 0.011 / (dtm / 1000)), -9, 9);
+        userAmp = clamp(userAmp - dy * 0.004, -0.45, 0.9);
+      }
+    });
+    const release = (e, cancelled) => {
+      if (!ptr.down) return;
+      ptr.down = false; hit.classList.remove('is-drag');
+      if (!cancelled && ptr.moved < 6){                                    // a click: shockwave + a plane
+        shocks.push({ x: ptr.x, y: ptr.y, t: clock }); shocks = shocks.slice(-6);
+        flyers.push({ x: ptr.x, y0: ptr.y, age: 0, trail: [] }); flyers = flyers.slice(-8);
+        energy = 1;
+      }
+      if (e.pointerType !== 'mouse') ptr.inside = false;
+    };
+    hit.addEventListener('pointerup', e => release(e, false));
+    hit.addEventListener('pointercancel', e => release(e, true));
+  }
 
   let rt = 0;
   onRealResize(resize, 200);
@@ -1241,7 +1250,6 @@ function initOffscreenPause(){
 }
 
 function initPerfGuard(){
-  if (reduceMotion) return;
   // ?lite forces the lite mode and ?nolite keeps it off (handy for testing). It is a class on <body>: the smooth-scroll library rewrites the class list of <html>.
   const query = new URLSearchParams(location.search);
   if (query.has('nolite')) return;
@@ -1249,6 +1257,7 @@ function initPerfGuard(){
   if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700){   // phones and tablets: lighter from the start
     document.body.classList.add('lite'); window.dispatchEvent(new CustomEvent('sent4u:lite')); return;
   }
+  if (reduceMotion) return;                                 // the timing test below is for computers that haven't asked for less motion
   let attempts = 0;
   function sample(){
     const gaps = []; let last = 0;
@@ -1529,6 +1538,12 @@ function initPhoneSection(){
   const smooth = t => t * t * (3 - 2 * t);
   const seg = (p, a, b) => clamp((p - a) / (b - a), 0, 1);
 
+  // On a phone (the lite mode) the phone mockup is one flat card: a stack of 3D layers with clipped, fading screens inside is just what a
+  // phone's GPU drops (it showed up as screens that never appeared). The phone's own tilt takes the mouse's place.
+  let flat = document.body.classList.contains('lite');
+  window.addEventListener('sent4u:lite', () => { flat = true; });
+  const wordsBox = $('.phone-words');
+
   // backdrop: one saturated tint per tool, blended as the phone swings between them
   const TINTS = ['#3d2bd6', '#9bb477', '#0b0508', '#2a7bde'].map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))); // send · Pixel · Pinky · WinXP
   const STATUS_INK = ['#fff', '#20351b', '#fff', '#fff']; // phone status-bar colour per screen
@@ -1692,19 +1707,25 @@ function initPhoneSection(){
   }
 
   // ---- one frame ----
-  let idx = -2, mx = 0, my = 0, tmx = 0, tmy = 0;
+  let idx = -2, mx = 0, my = 0, tmx = 0, tmy = 0, lastTint = '';
   function render(p, now){
     const w = weightsAt(p);
-    sticky.style.backgroundColor = tintAt(w, p);
+    const tint = tintAt(w, p);
+    if (tint !== lastTint){ lastTint = tint; sticky.style.backgroundColor = tint; }
     glowWhite.style.opacity = 1 - w[2] * 0.9;
     glowPink.style.opacity = w[2];
     gridEl.style.opacity = w[1] * 0.3;
     const q = poseAt(p);
     const bob = reduceMotion ? 0 : Math.sin(now * 0.0012) * 6;
-    phone.style.transform =
-      `translate3d(${q.x}px,${q.y + bob}px,0) rotateX(${q.rx - my * 4}deg) rotateY(${q.ry + mx * 5}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
-
-    planeEls.forEach(({ el, vx, vy, rot }) => { el.style.transform = `translate3d(${p * vx}px,${p * vy}px,0) rotate(${rot}deg)`; });
+    if (flat){
+      phone.style.transform =
+        `perspective(1200px) translate3d(${q.x}px,${q.y + bob}px,0) rotateX(${(-my * 14).toFixed(2)}deg) rotateY(${(mx * 18).toFixed(2)}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
+      if (wordsBox) wordsBox.style.transform = `translate3d(${(-mx * 18).toFixed(1)}px,${(-my * 10).toFixed(1)}px,0)`;   // the big words sit further back
+    } else {
+      phone.style.transform =
+        `translate3d(${q.x}px,${q.y + bob}px,0) rotateX(${q.rx - my * 4}deg) rotateY(${q.ry + mx * 5}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
+      planeEls.forEach(({ el, vx, vy, rot }) => { el.style.transform = `translate3d(${p * vx}px,${p * vy}px,0) rotate(${rot}deg)`; });
+    }
 
     const io = seg(p, 0.07, 0.14);
     intro.style.opacity = 1 - io;
@@ -1715,7 +1736,8 @@ function initPhoneSection(){
     // pills: burst out of the phone → scatter → dock along the bottom as the nav
     const appear = seg(p, 0.08, 0.15), fly = smooth(seg(p, 0.15, 0.25)), dock = smooth(seg(p, 0.28, 0.35));
     const cy = H / 2 + q.y, cx = W / 2;
-    linksEl.style.opacity = fly * (1 - smooth(seg(p, 0.25, 0.31)));
+    const linkOp = fly * (1 - smooth(seg(p, 0.25, 0.31)));
+    linksEl.style.opacity = linkOp;
     pills.forEach((el, k) => {
       const sc = scatter[k];
       const wob = reduceMotion ? 0 : Math.sin(now * 0.0011 + k * 1.7) * 6 * (1 - dock);
@@ -1725,10 +1747,12 @@ function initPhoneSection(){
       el.style.opacity = appear;
       el.style.transform = `translate(-50%,-50%) translate3d(${x}px,${y}px,0) rotate(${sc.r * fly * (1 - dock)}deg) scale(${s})`;
       el.classList.toggle('is-live', appear > 0.8);
-      const ln = lines[k];
-      ln.setAttribute('x1', cx); ln.setAttribute('y1', cy);
-      ln.setAttribute('x2', cx + x); ln.setAttribute('y2', H / 2 + y);
-      ln.style.strokeDashoffset = reduceMotion ? 0 : -now * 0.02;
+      if (linkOp > 0.01){   // the dotted lines are only redrawn while they can be seen
+        const ln = lines[k];
+        ln.setAttribute('x1', cx); ln.setAttribute('y1', cy);
+        ln.setAttribute('x2', cx + x); ln.setAttribute('y2', H / 2 + y);
+        ln.style.strokeDashoffset = reduceMotion || flat ? 0 : -now * 0.02;
+      }
     });
 
     // copy + giant word for each tool
@@ -1766,7 +1790,8 @@ function initPhoneSection(){
     // exponential smoothing that doesn't depend on the frame rate (≈ .14 per frame at 60fps)
     const dt = last ? now - last : 16.7; last = now;
     pS = pS < 0 || reduceMotion ? p : pS + (p - pS) * (1 - Math.exp(-dt / 110));
-    const k = 1 - Math.exp(-dt / 265);
+    if (tilt.active){ tmx = tilt.x; tmy = tilt.y; }   // a phone: its lean stands in for the mouse
+    const k = 1 - Math.exp(-dt / (tilt.active ? 120 : 265));
     mx += (tmx - mx) * k; my += (tmy - my) * k;
     render(pS, now);
     raf = requestAnimationFrame(frame);
@@ -1796,6 +1821,7 @@ function initPhoneSection(){
 
 /* ---------------- Boot ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
+  initTilt();
   prepareHero();
   initSmoothScroll();
   initCursor();

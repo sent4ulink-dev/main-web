@@ -9,8 +9,10 @@
    The land outlines are Natural Earth (public domain). */
 
 import { onRealResize } from './viewport.js';
+import { tilt } from './tilt.js';
 
 const DEG = Math.PI / 180;
+const phone = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700;   // fewer, slightly bigger dots and a lower frame rate
 const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
 const lerp = (a, b, t) => a + (b - a) * t;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -48,7 +50,7 @@ function initGlobe(sec, reduceMotion) {
   let PX = new Float32Array(0), PY = new Float32Array(0), PZ = new Float32Array(0), ready = false;
   let yaw = 0.7, pitch = 0.42, focus = null, pointerYaw = 0, pointerTarget = 0, scrub = 0;
   let clock = 0, last = 0, active = false, raf = 0, nextArc = 0.5;
-  let arcs = [], pulses = [], flights = [], stars = [], backdrop = null, minGap = 30;
+  let arcs = [], pulses = [], flights = [], stars = [], backdrop = null, minGap = phone ? 45 : 30;
   const claimed = new Set();
   const light = (() => { const v = [-0.42, 0.52, 0.74], n = Math.hypot(...v); return v.map(c => c / n); })();
 
@@ -78,7 +80,7 @@ function initGlobe(sec, reduceMotion) {
       const x = clamp(Math.floor((lon + 180) / 360 * MW), 0, MW - 1), y = clamp(Math.floor((90 - lat) / 180 * MH), 0, MH - 1);
       return data[(y * MW + x) * 4] > 128;
     };
-    const xs = [], ys = [], zs = [], STEP = 1.25;
+    const xs = [], ys = [], zs = [], STEP = phone ? 2 : 1.25;
     for (let lat = -84; lat <= 84; lat += STEP) {
       const c = Math.cos(lat * DEG), lonStep = STEP / Math.max(c, 0.05);
       for (let lon = -180; lon < 180; lon += lonStep) {
@@ -169,7 +171,7 @@ function initGlobe(sec, reduceMotion) {
 
     // land: only the dots that face us and land inside the picture, grouped by how brightly they are lit
     if (ready) {
-      const N = PX.length, dotR = clamp(R / 640 * 1.5, 1.1, 2.1), paths = Array.from({ length: 6 }, () => new Path2D());
+      const N = PX.length, dotR = clamp(R / 640 * 1.5, 1.1, 2.1) * (phone ? 1.35 : 1), paths = Array.from({ length: 6 }, () => new Path2D());
       for (let i = 0; i < N; i++) {
         const x = PX[i], y = PY[i], z = PZ[i];
         const x1 = x * cY + z * sY, z1 = -x * sY + z * cY, y2 = y * cP - z1 * sP, z2 = y * sP + z1 * cP;
@@ -256,6 +258,7 @@ function initGlobe(sec, reduceMotion) {
     if (!flights.length && last && now - last < minGap) { raf = requestAnimationFrame(frame); return; }   // ~30 fps is plenty for a slow turn; a flight gets every frame
     const dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016; last = now; clock += dt;
     if (focus) yaw += wrapAngle(focus.target - yaw) * (1 - Math.exp(-dt / 0.32)); else yaw += 0.05 * dt;   // it turns slowly, or brings a city to the front
+    if (tilt.active) pointerTarget = tilt.x * 1.6;   // a phone: its lean turns the globe like the mouse does
     pointerYaw += (pointerTarget - pointerYaw) * (1 - Math.exp(-dt / 0.4));
     const r = sec.getBoundingClientRect(), vh = window.innerHeight;
     scrub = clamp((vh - r.top) / (vh + r.height), 0, 1) * 1.1;

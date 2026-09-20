@@ -1,6 +1,7 @@
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { onRealResize } from './viewport.js';
+import { tilt } from './tilt.js';
 
 /* ---------------- Dot-matrix Earth · messages flying between real cities · Moon · Satellite ----------------
    The Earth is procedural: land is read from Natural Earth's public-domain 110m outlines
@@ -472,8 +473,9 @@ function createMessageNetwork(parent, planeGeo, dotUniforms, onSend){
 export async function initEarthScene({ canvas, reduceMotion }){
   if (!canvas || !canvas.getContext) return;
 
+  const coarse = window.matchMedia('(pointer: coarse)').matches;   // a phone or tablet: fewer pixels, fewer triangles, 30 fps
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setPixelRatio(window.matchMedia('(pointer: coarse)').matches ? 1 : Math.min(window.devicePixelRatio || 1, 1.25)); // the canvas is huge: more pixels than this cost a lot and show little
+  renderer.setPixelRatio(coarse ? 1 : Math.min(window.devicePixelRatio || 1, 1.25)); // the canvas is huge: more pixels than this cost a lot and show little
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
@@ -508,7 +510,7 @@ export async function initEarthScene({ canvas, reduceMotion }){
   earth.rotation.y = -107 * Math.PI / 180 + 0.5; // open on Mongolia / East Asia
   root.add(earth);
 
-  const body = new THREE.Mesh(new THREE.SphereGeometry(R * 0.985, 96, 96), bodyMaterial(PALETTE.earth));
+  const body = new THREE.Mesh(new THREE.SphereGeometry(R * 0.985, coarse ? 56 : 96, coarse ? 56 : 96), bodyMaterial(PALETTE.earth));
   earth.add(body);
 
   try {
@@ -619,11 +621,15 @@ export async function initEarthScene({ canvas, reduceMotion }){
 
   const clock = new THREE.Clock();
   let running = false, raf = 0;
-  function frame(){
+  let lastDraw = 0;
+  function frame(now){
     if (!running){ raf = 0; return; }
-    placeLabel();
+    if (coarse && now - lastDraw < 30){ raf = requestAnimationFrame(frame); return; }   // 30 fps is plenty on a phone
+    lastDraw = now;
+    if (!coarse) placeLabel();   // (the label isn't shown on a phone)
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!reduceMotion){
+      if (tilt.active){ targetYaw = tilt.x * 0.5; targetPitch = tilt.y * 0.35; }   // a phone: its lean swings the globe like the mouse does
       earth.rotation.y += dt * 0.11;
       messageNetwork.update(dt);
       moonPivot.rotation.y += dt * 0.5;
