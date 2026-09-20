@@ -193,4 +193,134 @@ await test('claims: only the owner can free a name', async () => {
   assert.equal((await (await call(e, '/claims/temp-name')).json()).available, true);
 });
 
+
+
+/* ---------------- orders ---------------- */
+
+const shop = () => ({ ...env(), CHECKOUT_URL_SINGLE: 'https://pay.test/single?ref={token}', CHECKOUT_URL_PACK: 'https://pay.test/pack?ref={token}', ORDER_SECRET: 'order-secret' });
+const owner = { Authorization: 'Bearer order-secret' };
+const startOrder = async (e, pack = 'pack', ip = '9.9.9.9') => (await (await call(e, '/checkout', { method: 'POST', body: { pack }, ip })).json());
+const paidOrder = async (e, pack = 'pack', ip = '9.9.9.9') => {
+  const { token } = await startOrder(e, pack, ip);
+  const res = await call(e, `/orders/${token}/confirm`, { method: 'POST', headers: owner, origin: null });
+  assert.equal(res.status, 200);
+  return token;
+};
+const generate = (e, token, items, extra = {}) => call(e, `/orders/${token}/generate`, { method: 'POST', body: { items }, ...extra });
+
+await test('checkout is refused until the payment links are set, and only accepts the two packs', async () => {
+  const off = await call(env(), '/checkout', { method: 'POST', body: { pack: 'pack' } });
+  assert.equal(off.status, 501);
+  const e = shop();
+  assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'huge' } })).status, 422);
+  assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'pack' }, origin: 'https://evil.example' })).status, 403);
+});
+
+await test('checkout makes a pending order and hands back the payment link with its token in it', async () => {
+  const e = shop();
+  const res = await call(e, '/checkout', { method: 'POST', body: { pack: 'single' } });
+  assert.equal(res.status, 201);
+  const out = await res.json();
+  assert.equal(out.token.length, 22);
+  assert.equal(out.checkoutUrl, `https://pay.test/single?ref=${out.token}`);
+  const order = await (await call(e, `/orders/${out.token}`)).json();
+  assert.deepEqual([order.status, order.credits, order.remaining, order.amount, order.links.length], ['pending', 1, 1, 199, 0]);
+  assert.ok(!('ipHash' in order));
+});
+
+await test('an unknown order is a 404, and nothing can be made before the payment is confirmed', async () => {
+  const e = shop();
+  assert.equal((await call(e, '/orders/AAAAAAAAAAAAAAAAAAAAAA')).status, 404);
+  const { token } = await startOrder(e);
+  assert.equal((await generate(e, token, { pixel: 1 })).status, 402);
+});
+
+await test('confirming needs the owner secret, and a repeated notice changes nothing', async () => {
+  const e = shop();
+  const { token } = await startOrder(e);
+  assert.equal((await call(e, `/orders/${token}/confirm`, { method: 'POST' })).status, 403);
+  assert.equal((await call(e, `/orders/${token}/confirm`, { method: 'POST', headers: { Authorization: 'Bearer wrong' } })).status, 403);
+  const first = await call(e, `/orders/${token}/confirm`, { method: 'POST', headers: owner });
+  assert.equal((await first.json()).status, 'paid');
+  const paidAt = JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).paidAt;
+  const again = await call(e, `/orders/${token}/confirm`, { method: 'POST', headers: owner });
+  assert.equal(again.status, 200);
+  assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).paidAt, paidAt);
+});
+
+await test('a pack of 8 can be split as the buyer likes: 3 Pixel, 2 Pinky, 3 WinXP', async () => {
+  const e = shop();
+  const token = await paidOrder(e);
+  const res = await generate(e, token, { pixel: 3, pinky: 2, winxp: 3 });
+  assert.equal(res.status, 200);
+  const order = await res.json();
+  assert.equal(order.remaining, 0);
+  assert.deepEqual(order.links.map(l => l.product), ['pixel', 'pixel', 'pixel', 'pinky', 'pinky', 'winxp', 'winxp', 'winxp']);
+  assert.equal(new Set(order.links.map(l => l.id)).size, 8);
+  for (const l of order.links) {
+    assert.equal(l.id.length, 22);
+    assert.equal(l.url, `https://sent4u.link/?share=${l.id}`);
+    const record = JSON.parse(e.BUCKET.store.get(`links/${l.id}.json`));
+    assert.deepEqual([record.product, record.order], [l.product, token]);
+  }
+  assert.equal((await generate(e, token, { pixel: 1 })).status, 422);              // nothing left
+});
+
+await test('it can be spread over several visits, and never past what was paid for', async () => {
+  const e = shop();
+  const token = await paidOrder(e);
+  assert.equal((await (await generate(e, token, { pinky: 5 })).json()).remaining, 3);
+  const tooMany = await generate(e, token, { pixel: 2, winxp: 2 });
+  assert.equal(tooMany.status, 422);
+  assert.match((await tooMany.json()).error, /only have 3/);
+  assert.equal((await (await call(e, `/orders/${token}`)).json()).links.length, 5);   // the refused request made nothing
+  assert.equal((await (await generate(e, token, { winxp: 3 })).json()).remaining, 0);
+});
+
+await test('a single link is exactly one link', async () => {
+  const e = shop();
+  const token = await paidOrder(e, 'single');
+  assert.equal((await generate(e, token, { pixel: 1, pinky: 1 })).status, 422);
+  assert.equal((await generate(e, token, { winxp: 1 })).status, 200);
+  assert.equal((await generate(e, token, { pixel: 1 })).status, 422);
+});
+
+await test('bad requests are refused', async () => {
+  const e = shop();
+  const token = await paidOrder(e);
+  for (const items of [{}, { pixel: 0 }, { pixel: -1 }, { pixel: 1.5 }, { pixel: '2' }, { gameboy: 1 }, { pixel: 99 }, null, [1]]) {
+    assert.equal((await generate(e, token, items)).status, 422, JSON.stringify(items));
+  }
+  assert.equal((await generate(e, token, { pixel: 1 }, { origin: 'https://evil.example' })).status, 403);
+  assert.equal((await (await call(e, `/orders/${token}`)).json()).links.length, 0);
+});
+
+await test('two requests at once can never make more links than were paid for', async () => {
+  const e = shop();
+  const token = await paidOrder(e);
+  const [a, b] = await Promise.all([generate(e, token, { pixel: 5 }), generate(e, token, { pinky: 5 })]);
+  assert.deepEqual([a.status, b.status].sort(), [200, 422]);
+  const order = await (await call(e, `/orders/${token}`)).json();
+  assert.equal(order.links.length, 5);
+  assert.equal([...e.BUCKET.store.keys()].filter(k => k.startsWith('links/')).length, 5);   // the losing request left nothing behind
+});
+
+await test('a refund stops the links working', async () => {
+  const e = shop();
+  const token = await paidOrder(e);
+  const order = await (await generate(e, token, { pixel: 2 })).json();
+  assert.equal((await call(e, `/orders/${token}/refund`, { method: 'POST' })).status, 403);
+  const res = await call(e, `/orders/${token}/refund`, { method: 'POST', headers: owner });
+  assert.equal((await res.json()).status, 'refunded');
+  for (const l of order.links) assert.equal(JSON.parse(e.BUCKET.store.get(`links/${l.id}.json`)).revoked, true);
+  assert.equal((await generate(e, token, { pixel: 1 })).status, 402);
+  assert.equal((await call(e, `/orders/${token}/confirm`, { method: 'POST', headers: owner })).status, 409);
+});
+
+await test('orders are limited per visitor', async () => {
+  const e = shop();
+  assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '5.5.5.5' })).status, 201);
+  assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '5.5.5.5' })).status, 429);   // too soon after the last one
+});
+
 console.log(`\n${passed} tests passed`);

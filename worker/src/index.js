@@ -8,7 +8,16 @@
    POST   /claims         reserve a link name (first come, first served; every name is unique)
    DELETE /claims/:name   free a name again (owner only)
 
+   POST   /checkout                 start an order for a pack: { pack: "single" | "pack" }  -> { token, checkoutUrl }
+   GET    /orders/:token            the order: how many links were paid for, how many are left, the links made so far
+   POST   /orders/:token/generate   make links from a paid order: { items: { pixel: 3, pinky: 2, winxp: 3 } }  (never more than were paid for)
+   POST   /orders/:token/confirm    the payment arrived (owner / payment provider only: Authorization: Bearer <ORDER_SECRET>)
+   POST   /orders/:token/refund     the payment was refunded: the order's links stop working (same secret)
+
    R2 layout
+     orders/<token>.json  one object per order (pack, credits, status, the links made); the token is a random 128-bit secret and is the buyer's key
+     links/<id>.json      one object per link that was made: which product it is and which order it came from (the page that serves ?share=<id> reads this)
+     rlo/<hash>.json      per-visitor counters for starting orders
      reviews/<id>.json    one object per review, including the private bits (email, hashed IP)
      index.json           the public list, rebuilt after every change (this is what GET serves)
      rl/<hash>.json       tiny per-visitor counters for rate limiting (hashed IP, nothing else)
@@ -38,6 +47,12 @@ export default {
       if (claim && request.method === 'GET') return await checkClaim(env, cors, claim[1]);
       if (claim && request.method === 'DELETE') return await deleteClaim(request, env, cors, claim[1]);
       if (url.pathname === '/claims' && request.method === 'POST') return await createClaim(request, env, cors);
+      if (url.pathname === '/checkout' && request.method === 'POST') return await createCheckout(request, env, cors);
+      const order = url.pathname.match(/^\/orders\/([A-Za-z0-9_-]{22})(?:\/(generate|confirm|refund))?$/);
+      if (order && !order[2] && request.method === 'GET') return await getOrder(env, cors, order[1]);
+      if (order && order[2] === 'generate' && request.method === 'POST') return await generateLinks(request, env, cors, order[1]);
+      if (order && order[2] === 'confirm' && request.method === 'POST') return await confirmOrder(request, env, cors, order[1]);
+      if (order && order[2] === 'refund' && request.method === 'POST') return await refundOrder(request, env, cors, order[1]);
       if (url.pathname === '/') return reply({ ok: true, service: 'sent4u reviews' }, 200, cors);
       return reply({ error: 'Not found' }, 404, cors);
     } catch (err) {
@@ -254,6 +269,146 @@ async function deleteClaim(request, env, cors, handle) {
   if (!env.ADMIN_TOKEN || !(await safeEqual(sent, `Bearer ${env.ADMIN_TOKEN}`))) return reply({ error: 'Not allowed.' }, 403, cors);
   await env.BUCKET.delete(`claims/${handle}.json`);
   return reply({ ok: true }, 200, cors);
+}
+
+/* ---------------- orders: packs of links ----------------
+   1 link is $1.99 and a pack of 8 is $9.99. The buyer pays on the payment provider's own page (CHECKOUT_URL_SINGLE / CHECKOUT_URL_PACK hold the
+   two payment links; "{token}" in them is replaced with the order's token so the provider can hand it back). When the provider says the money
+   arrived, whatever listens to it (a webhook adapter, or you by hand) calls /confirm. Only then can the buyer make links, and never more than
+   they paid for: with 8 they can split them as they like, e.g. 3 Pixel + 2 Pinky + 3 WinXP, in one go or over several visits. */
+
+const PACKS = { single: { credits: 1, amount: 199 }, pack: { credits: 8, amount: 999 } };
+const PRODUCTS = ['pixel', 'pinky', 'winxp'];
+const TOKEN_LENGTH = 22;                                       // 16 random bytes, base64url
+const JSON_OBJECT = { httpMetadata: { contentType: 'application/json' } };
+
+const orderKey = token => `orders/${token}.json`;
+const publicOrder = o => ({ token: o.token, pack: o.pack, credits: o.credits, remaining: o.credits - o.links.length, amount: o.amount, status: o.status, links: o.links });
+
+function randomToken(bytes = 16) {
+  const raw = String.fromCharCode(...crypto.getRandomValues(new Uint8Array(bytes)));
+  return btoa(raw).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+async function readOrder(env, token) {
+  const stored = await env.BUCKET.get(orderKey(token));
+  if (!stored) return null;
+  return { order: await stored.json(), etag: stored.etag };
+}
+
+const isOwner = async (request, env) => !!env.ORDER_SECRET && await safeEqual(request.headers.get('Authorization') || '', `Bearer ${env.ORDER_SECRET}`);
+
+async function readBody(request, cors, max) {
+  if (!(request.headers.get('Content-Type') || '').includes('application/json')) return { fail: reply({ error: 'Send JSON, please.' }, 415, cors) };
+  const raw = await request.text();
+  if (raw.length > max) return { fail: reply({ error: 'That is a bit too long.' }, 413, cors) };
+  try {
+    const body = JSON.parse(raw);
+    if (body && typeof body === 'object') return { body };
+  } catch { /* falls through */ }
+  return { fail: reply({ error: 'That did not look right. Please try again.' }, 400, cors) };
+}
+
+async function createCheckout(request, env, cors) {
+  if (!originOk(request, env)) return reply({ error: 'Orders can only be started from the sent4u site.' }, 403, cors);
+  const { body, fail } = await readBody(request, cors, 500);
+  if (fail) return fail;
+  const pack = String(body.pack || '');
+  if (!PACKS[pack]) return reply({ error: 'Choose 1 link or a pack of 8.' }, 422, cors);
+  const template = pack === 'single' ? env.CHECKOUT_URL_SINGLE : env.CHECKOUT_URL_PACK;
+  if (!template) return reply({ error: 'Checkout isn’t switched on yet. Please check back soon.' }, 501, cors);
+
+  const ipHash = await sha256(`${env.IP_SALT || ''}|${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
+  const tooMany = await orderLimit(env, ipHash);
+  if (tooMany) return reply({ error: tooMany }, 429, cors);
+
+  const token = randomToken();
+  const order = { token, pack, credits: PACKS[pack].credits, amount: PACKS[pack].amount, status: 'pending', createdAt: Date.now(), links: [], ipHash };
+  await env.BUCKET.put(orderKey(token), JSON.stringify(order), JSON_OBJECT);
+  return reply({ ok: true, token, checkoutUrl: template.replaceAll('{token}', encodeURIComponent(token)) }, 201, cors);
+}
+
+// a few orders an hour per visitor is plenty, and it keeps the bucket from filling with abandoned ones
+async function orderLimit(env, ipHash) {
+  const key = `rlo/${ipHash}.json`;
+  const now = Date.now(), hour = Math.floor(now / 3_600_000);
+  const stored = await env.BUCKET.get(key);
+  let s = stored ? await stored.json().catch(() => ({})) : {};
+  if (s.hour !== hour) s = { hour, n: 0, last: 0 };
+  if (now - (s.last || 0) < 3000) return 'One moment, please.';
+  if (s.n >= 12) return 'That’s plenty of orders for one hour. Please try again a little later.';
+  s.n += 1; s.last = now;
+  await env.BUCKET.put(key, JSON.stringify(s));
+  return '';
+}
+
+async function getOrder(env, cors, token) {
+  const found = await readOrder(env, token);
+  if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+  return reply(publicOrder(found.order), 200, cors, { 'Cache-Control': 'no-store' });
+}
+
+async function confirmOrder(request, env, cors, token) {
+  if (!(await isOwner(request, env))) return reply({ error: 'Not allowed.' }, 403, cors);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const found = await readOrder(env, token);
+    if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+    const { order, etag } = found;
+    if (order.status === 'refunded') return reply({ error: 'That order was refunded.' }, 409, cors);
+    if (order.status === 'paid') return reply(publicOrder(order), 200, cors);                 // a repeated notice from the provider: nothing to do
+    const next = { ...order, status: 'paid', paidAt: Date.now() };
+    if (await env.BUCKET.put(orderKey(token), JSON.stringify(next), { ...JSON_OBJECT, onlyIf: { etagMatches: etag } })) return reply(publicOrder(next), 200, cors);
+  }
+  return reply({ error: 'That order is busy. Please try again.' }, 409, cors);
+}
+
+async function generateLinks(request, env, cors, token) {
+  if (!originOk(request, env)) return reply({ error: 'Links can only be made from the sent4u site.' }, 403, cors);
+  const { body, fail } = await readBody(request, cors, 500);
+  if (fail) return fail;
+
+  const asked = body.items && typeof body.items === 'object' && !Array.isArray(body.items) ? body.items : null;
+  if (!asked || Object.keys(asked).some(k => !PRODUCTS.includes(k))) return reply({ error: 'Choose Pixel, Pinky or WinXP.' }, 422, cors);
+  const items = {};
+  let want = 0;
+  for (const product of PRODUCTS) {
+    const n = asked[product] ?? 0;
+    if (!Number.isInteger(n) || n < 0 || n > 8) return reply({ error: 'Those numbers don’t look right.' }, 422, cors);
+    items[product] = n; want += n;
+  }
+  if (want < 1) return reply({ error: 'Choose at least one link.' }, 422, cors);
+
+  const origin = String(env.LINK_ORIGIN || 'https://sent4u.link').replace(/[/]+$/, '');
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const found = await readOrder(env, token);
+    if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+    const { order, etag } = found;
+    if (order.status !== 'paid') return reply({ error: order.status === 'refunded' ? 'This order was refunded.' : 'This order hasn’t been paid yet.' }, 402, cors);
+    const remaining = order.credits - order.links.length;
+    if (want > remaining) return reply({ error: remaining ? `You only have ${remaining} link${remaining === 1 ? '' : 's'} left.` : 'All the links in this pack have been made.' }, 422, cors);
+
+    const at = Date.now(), made = [];
+    for (const product of PRODUCTS) for (let i = 0; i < items[product]; i++) {
+      const id = randomToken();
+      made.push({ product, id, url: `${origin}/?share=${id}`, at });
+    }
+    // the links exist the moment they are written; if the order changed underneath us (a second tab, a double tap), undo them and look again
+    await Promise.all(made.map(l => env.BUCKET.put(`links/${l.id}.json`, JSON.stringify({ id: l.id, product: l.product, order: token, createdAt: at }), { ...JSON_OBJECT, onlyIf: { etagDoesNotMatch: '*' } })));
+    const next = { ...order, links: [...order.links, ...made] };
+    if (await env.BUCKET.put(orderKey(token), JSON.stringify(next), { ...JSON_OBJECT, onlyIf: { etagMatches: etag } })) return reply(publicOrder(next), 200, cors);
+    await Promise.all(made.map(l => env.BUCKET.delete(`links/${l.id}.json`)));
+  }
+  return reply({ error: 'That order is busy. Please try again.' }, 409, cors);
+}
+
+async function refundOrder(request, env, cors, token) {
+  if (!(await isOwner(request, env))) return reply({ error: 'Not allowed.' }, 403, cors);
+  const found = await readOrder(env, token);
+  if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+  const next = { ...found.order, status: 'refunded', refundedAt: Date.now() };
+  await env.BUCKET.put(orderKey(token), JSON.stringify(next), JSON_OBJECT);
+  await Promise.all(next.links.map(l => env.BUCKET.put(`links/${l.id}.json`, JSON.stringify({ id: l.id, product: l.product, order: token, createdAt: l.at, revoked: true }), JSON_OBJECT)));
+  return reply(publicOrder(next), 200, cors);
 }
 
 /* ---------------- small helpers ---------------- */

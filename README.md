@@ -28,13 +28,13 @@ npm test           # the Worker's tests (they need no Cloudflare account)
 
 The root `wrangler.jsonc` tells `wrangler deploy` to publish the `dist/` folder, which holds only what the browser needs, so `worker/` and the notes are never served. (If you use a classic Pages project instead, set the build output directory to `dist` and leave the deploy command empty.)
 
-**The reviews and claims → the Worker.** Follow [worker/README.md](worker/README.md) (about 10 minutes: create the R2 bucket, set two secrets, `wrangler deploy`). Then:
+**The reviews and the orders → the Worker.** Follow [worker/README.md](worker/README.md) (about 10 minutes: create the R2 bucket, set the secrets, `wrangler deploy`). It also runs selling the links ($1.99 for 1, $9.99 for 8): the section "Orders" there says how to connect your payment provider. Then:
 
 1. In `worker/wrangler.toml`, put the real address of the site in `ALLOWED_ORIGINS` (for example `https://sent4u.link`) and deploy the Worker again.
-2. In `index.html`, on the `<section class="section reviews" …>` tag, set `data-api` to the Worker's address (`https://sent4u-reviews.<you>.workers.dev`). The "claim your link" box in the last section uses the same address.
+2. In `index.html`, set `data-api` to the Worker's address (`https://sent4u-reviews.<you>.workers.dev`) on the `<section class="section reviews" …>` tag and on the pricing section (`id="pricing"`; it falls back to the reviews one if left empty).
 3. Push. Pages rebuilds the site.
 
-Until `data-api` is set, reviews come from `assets/data/reviews.json` and claiming is a demo that lives in the visitor's own browser.
+Until `data-api` is set, reviews come from `assets/data/reviews.json` and buying is a demo that lives in the visitor's own browser (nothing is charged, and the links it makes are placeholders).
 
 ## Credits
 

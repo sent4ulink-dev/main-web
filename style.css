@@ -1493,3 +1493,49 @@ button.tilt-pill{ cursor:pointer; pointer-events:auto; }
 .tilt-pill svg{ flex:none; }
 .tilt-pill.is-min{ width:38px; padding:0; justify-content:center; }
 .tilt-pill.is-min span{ display:none; }
+
+/* ---------- buying: the pack buttons and the order dialog ---------- */
+button.btn{ font-family:inherit; border:0; cursor:pointer; }
+button.btn.btn-outline{ border:1px solid var(--border); }
+.pc-price .odo-dot{ display:block; height:1em; line-height:1; }
+.cta-buy{ display:flex; flex-wrap:wrap; justify-content:center; gap:14px; }
+.cta-note{ margin:18px 0 0; font-size:.86rem; color:rgba(255,255,255,.6); }
+
+.od-view{ display:flex; flex-direction:column; align-items:flex-start; }
+.od-view[hidden]{ display:none; }
+.od-view h3{ outline:none; }
+.od-spin{ width:34px; height:34px; margin:4px 0 18px; border-radius:50%; border:3px solid #dcdcf0; border-top-color:#7c5cff; animation:odSpin .8s linear infinite; }
+@keyframes odSpin{ to{ transform:rotate(360deg); } }
+.od-demo{ display:inline-block; margin-left:8px; padding:4px 9px; border-radius:99px; background:#fff1c9; color:#7a5200; font:700 .66rem/1 var(--ff-body); letter-spacing:.07em; text-transform:uppercase; vertical-align:middle; }
+.od-sum{ display:flex; justify-content:space-between; gap:12px; width:100%; margin:0 0 20px; padding:15px 17px; border-radius:14px; background:#fff; border:1px solid #e1e1ee; font:600 1rem/1.2 var(--ff-body); }
+.od-left{ display:flex; align-items:baseline; gap:10px; margin:0 0 16px; color:#4b4b5e; font:500 .92rem/1 var(--ff-body); }
+.od-left b{ color:#0b0b12; font:700 2.4rem/1 var(--ff-head); letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+.od-products{ display:grid; grid-template-columns:minmax(0,1fr); gap:10px; width:100%; margin:0 0 20px; padding:0; list-style:none; }
+.od-prod{ display:flex; align-items:center; gap:14px; padding:13px 15px; border-radius:16px; background:#fff; border:1.5px solid #e1e1ee; transition:border-color .2s, box-shadow .25s; }
+.od-prod.has{ border-color:var(--c); box-shadow:0 10px 24px -16px var(--c); }
+.od-swatch{ flex:none; display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:var(--c); color:#fff; font:700 1.05rem/1 var(--ff-head); }
+.od-name{ flex:1; min-width:0; }
+.od-name b{ display:block; margin-bottom:3px; font:600 1rem/1.2 var(--ff-body); color:#0b0b12; }
+.od-name small{ display:block; color:#6a6a80; font-size:.8rem; }
+.od-step{ display:flex; align-items:center; gap:6px; }
+.od-step button{ width:36px; height:36px; border-radius:50%; border:1px solid #d5d5e6; background:#f4f4fb; color:#0b0b12; font:600 1.15rem/1 var(--ff-body); cursor:pointer; transition:background-color .15s, transform .15s; }
+.od-step button:hover:not(:disabled){ background:#e6e6f2; transform:scale(1.06); }
+.od-step button:disabled{ opacity:.35; cursor:default; }
+.od-step output{ min-width:28px; text-align:center; font:700 1.2rem/1 var(--ff-head); font-variant-numeric:tabular-nums; color:#0b0b12; }
+.od-links{ display:grid; grid-template-columns:minmax(0,1fr); gap:8px; width:100%; max-height:min(300px,40vh); margin:0 0 20px; padding:0; list-style:none; overflow:auto; overscroll-behavior:contain; }
+.od-link{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:14px; background:#fff; border:1px solid #e1e1ee; }
+.od-tag{ flex:none; padding:5px 10px; border-radius:99px; background:var(--c); color:#fff; font:700 .72rem/1 var(--ff-body); }
+.od-url{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#2a2a3c; font:500 .8rem/1.2 ui-monospace,Consolas,monospace; }
+.od-copy, .od-open{ flex:none; padding:8px 12px; border-radius:99px; border:1px solid #d5d5e6; background:#f4f4fb; color:#0b0b12; font:600 .76rem/1 var(--ff-body); text-decoration:none; cursor:pointer; }
+.od-copy:hover, .od-open:hover{ background:#e6e6f2; }
+.od-actions{ display:flex; flex-wrap:wrap; gap:10px; }
+.od-actions .pill-btn[hidden]{ display:none; }
+.od-ghost{ background:#e6e6f2; color:#0b0b12; }
+.od-ghost .pill-arrow{ background:#0b0b12; color:#fff; }
+.od-fine{ margin:16px 0 0; color:#7a7a90; font-size:.78rem; line-height:1.5; }
+@media (max-width:480px){
+  .od-prod{ padding:11px 12px; gap:11px; }
+  .od-swatch{ width:38px; height:38px; }
+  .od-link{ flex-wrap:wrap; }
+  .od-url{ flex-basis:100%; order:3; }
+}

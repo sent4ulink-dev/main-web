@@ -485,7 +485,7 @@ function reviewCard(r){
   const who = mk('div', 'rv-who');
   who.append(mk('b', null, r.name), mk('small', null, r.role || (r.pending ? 'Only on this device' : 'sent4u user')));
   const top = mk('div', 'rv-top');
-  top.append(mk('span', 'rv-avatar', (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase()), who, mk('span', 'rv-tool', r.pending ? 'Pending' : r.tool));
+  top.append(mk('span', 'rv-avatar', (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase()), who, mk('span', 'rv-tool', r.pending ? 'Pending' : (r.tool === 'Marketplace' ? 'sent4u' : r.tool)));
   const stars = mk('div', 'rv-cardstars');
   stars.setAttribute('aria-label', `${r.rating} out of 5`);
   stars.append(mk('span', null, '★'.repeat(r.rating)));
@@ -1028,30 +1028,29 @@ function initBridge(){
 function initPricing(){
   const sec = document.getElementById('pricing');
   if (!sec) return;
-  const grid = sec.querySelector('.pricing-grid'), toggle = document.getElementById('prToggle'), scene = document.getElementById('prScene');
+  const scene = document.getElementById('prScene');
   const cards = [...sec.querySelectorAll('.price-card')];
-  const prices = [...sec.querySelectorAll('.pc-price[data-monthly]')];
-  const notes = [...sec.querySelectorAll('.pc-note')];
-  const sealText = document.getElementById('sealText'), saveNum = document.getElementById('prSaveNum');
-  const SAVE = 48;                                          // what a year on the yearly plan saves (Trader: $19 → $15 a month, × 12)
+  const prices = [...sec.querySelectorAll('.pc-price[data-price]')];
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
 
-  // Each price is a row of odometer wheels: a strip of 0–9 twice over, so a roll can spin a whole turn before it lands.
+  // Each price is a row of odometer wheels (a strip of 0–9 twice over, so a roll can spin a whole turn before it lands); the point stays put.
   const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   prices.forEach(el => {
     const odo = mk('span', 'odo'); odo.setAttribute('aria-hidden', 'true');
-    [...el.dataset.monthly].forEach((_, k) => {
-      const strip = mk('span', 'odo-strip'); strip.style.setProperty('--k', k);
+    let k = 0;
+    for (const ch of el.dataset.price){
+      if (!/[0-9]/.test(ch)){ odo.append(mk('span', 'odo-dot', ch)); continue; }
+      const strip = mk('span', 'odo-strip'); strip.style.setProperty('--k', k++);
       for (let i = 0; i < 20; i++) strip.append(mk('i', null, String(i % 10)));
       const col = mk('span', 'odo-col'); col.append(strip); odo.append(col);
-    });
+    }
     const cur = mk('span', 'pc-cur', '$'); cur.setAttribute('aria-hidden', 'true');
-    const per = mk('span', 'pc-per', '/mo'); per.setAttribute('aria-hidden', 'true');
-    el.replaceChildren(cur, odo, per);
+    el.replaceChildren(cur, odo);
   });
   const setPrice = (el, value) => {
-    [...el.querySelectorAll('.odo-strip')].forEach((strip, k) => strip.style.setProperty('--d', String(Number(String(value)[k] || 0) + 10))); // the second turn of the strip, so a change rolls the short way
-    el.setAttribute('aria-label', `$${value} per month`);
+    const digits = String(value).replace(/[^0-9]/g, '');
+    [...el.querySelectorAll('.odo-strip')].forEach((strip, k) => strip.style.setProperty('--d', String(Number(digits[k] || 0) + 10))); // the second turn of the strip, so a change rolls the short way
+    el.setAttribute('aria-label', `$${value}`);
   };
   const snapToZero = el => {                                // jump every wheel back to 0 without animating
     const strips = [...el.querySelectorAll('.odo-strip')];
@@ -1060,50 +1059,9 @@ function initPricing(){
     strips.forEach(st => { st.style.transition = ''; });
   };
 
-  let saveAnim = null;
-  const showBilling = (mode, burst) => {
-    sec.dataset.billing = mode;
-    toggle.style.setProperty('--i', mode === 'yearly' ? 1 : 0);
-    toggle.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.billing === mode)));
-    prices.forEach(el => setPrice(el, el.dataset[mode]));
-    notes.forEach(n => { n.textContent = n.dataset[mode]; });
-    if (sealText) sealText.textContent = mode === 'yearly' ? 'SAVE 20% ✦ SAVE 20% ✦ SAVE 20% ✦ ' : 'MOST LOVED ✦ MOST LOVED ✦ ';
-    if (saveAnim) saveAnim.pause();
-    if (mode === 'yearly' && !reduceMotion){
-      const o = { v: 0 };
-      saveAnim = animate(o, { v: SAVE, duration: 1100, ease: 'outExpo', onUpdate: () => { saveNum.textContent = Math.round(o.v); } });
-    } else saveNum.textContent = SAVE;
-    if (burst && mode === 'yearly' && !reduceMotion) sparks();
-  };
-  // a burst of colour out of the toggle when you switch to yearly
-  function sparks(){
-    const thumb = toggle.querySelector('.pr-thumb'), tr = toggle.getBoundingClientRect(), r = thumb.getBoundingClientRect();
-    const x = r.left - tr.left + r.width / 2;
-    ['#7c5cff', '#ff6b9d', '#5ce1ff', '#ffc94d'].forEach((color, c) => {
-      for (let i = 0; i < 4; i++){
-        const a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 70;
-        const dot = mk('i', 'pr-spark');
-        dot.style.cssText = `--x:${x}px;--sc:${color};--tx:${(Math.cos(a) * d).toFixed(0)}px;--ty:${(Math.sin(a) * d).toFixed(0)}px;animation-delay:${c * 30}ms`;
-        toggle.append(dot);
-        dot.addEventListener('animationend', () => dot.remove());
-      }
-    });
-  }
-  toggle.addEventListener('click', e => {
-    const b = e.target.closest('button[data-billing]');
-    if (b && b.dataset.billing !== sec.dataset.billing) showBilling(b.dataset.billing, true);
-  });
-  toggle.addEventListener('keydown', e => {
-    if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-    const next = e.key === 'ArrowRight' ? 'yearly' : 'monthly';
-    showBilling(next, true);
-    toggle.querySelector(`[data-billing="${next}"]`).focus();
-  });
-
   // the prices start on 0 and roll to their numbers when the section arrives
-  showBilling('monthly', false);
   prices.forEach(snapToZero);
-  const arrive = () => { sec.classList.add('is-in'); prices.forEach(el => setPrice(el, el.dataset[sec.dataset.billing])); };
+  const arrive = () => { sec.classList.add('is-in'); prices.forEach(el => setPrice(el, el.dataset.price)); };
   if (reduceMotion) arrive();
   else {
     const seen = new IntersectionObserver(([e]) => { if (e.isIntersecting){ arrive(); seen.disconnect(); } }, { threshold: 0, rootMargin: '0px 0px 8% 0px' }); // starts as soon as the top edge arrives, so the heading is already there when the wave hands over
@@ -1113,7 +1071,7 @@ function initPricing(){
   // each card turns toward the cursor, is lit from where it points, and hovering it spins its price like a slot machine
   const rolledAt = new WeakMap();
   cards.forEach(card => {
-    const inner = card.querySelector('.pc-inner'), fx = card.querySelector('.pc-fx'), price = card.querySelector('.pc-price[data-monthly]');
+    const inner = card.querySelector('.pc-inner'), fx = card.querySelector('.pc-fx'), price = card.querySelector('.pc-price[data-price]');
     card.addEventListener('pointermove', e => {
       if (e.pointerType !== 'mouse' || reduceMotion) return;
       const r = inner.getBoundingClientRect();
@@ -1129,7 +1087,7 @@ function initPricing(){
       if (now - (rolledAt.get(price) || 0) < 1800) return;   // once per visit, not on every twitch
       rolledAt.set(price, now);
       snapToZero(price);
-      setPrice(price, price.dataset[sec.dataset.billing]);
+      setPrice(price, price.dataset.price);
     });
   });
 
@@ -1140,7 +1098,7 @@ function initPricing(){
   let active = false, raf = 0, lastFan = '', lastFade = '';
   const ease = t => t * t * (3 - 2 * t);
   const wide = window.matchMedia('(min-width:981px)');
-  const fans = cards.map((card, i) => ({ el: card.querySelector('.pc-fan'), side: [-1, 0, 1][i], lift: i === 1 ? 22 : 70, s: i === 1 ? 1.04 : 1 }));
+  const fans = cards.map((card, i) => ({ el: card.querySelector('.pc-fan'), side: [-1, 1][i], lift: i === 1 ? 22 : 70, s: i === 1 ? 1.04 : 1 }));
   function frame(){
     if (!active){ raf = 0; return; }
     const r = sec.getBoundingClientRect(), vh = window.innerHeight;
@@ -1819,6 +1777,249 @@ function initPhoneSection(){
   pills.forEach(b => b.addEventListener('click', () => goTo(+b.dataset.k)));
 }
 
+/* ---------------- Orders: buy a pack, then choose which links to make ----------------
+   1 link costs $1.99 and a pack of 8 costs $9.99. After paying, the buyer chooses how many of each style (Pixel, Pinky, WinXP) to create,
+   up to the number of links they paid for: with 8 they could make 3 Pixel, 2 Pinky and 3 WinXP, in one go or over several visits.
+
+   With a Worker address in the pricing section's data-api (see worker/): "Buy" asks the Worker for a checkout, sends the buyer to it, and the
+   Worker marks the order paid when the payment provider confirms. The buyer comes back to /?order=<token>, the dialog waits for the
+   confirmation, and links are created by the Worker. With no address this all runs as a demo in the visitor's own browser: nothing is
+   charged, and the links it makes are placeholders that open nothing. */
+function initOrders(){
+  const modal = document.getElementById('orderModal');
+  if (!modal) return;
+  const PACKS = { single: { credits: 1, cents: 199, label: '1 link' }, pack: { credits: 8, cents: 999, label: '8 links' } };
+  const NAMES = { pixel: 'Pixel', pinky: 'Pinky', winxp: 'WinXP' };
+  const COLORS = { pixel: '#6d9b3a', pinky: '#ff2e7e', winxp: '#2a63d8' };
+  const KEY = 'sent4u.order', HOST = 'https://sent4u.link';
+  const money = cents => `$${(cents / 100).toFixed(2)}`;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const $ = id => document.getElementById(id);
+  const pricing = $('pricing'), reviews = $('reviews');
+  const api = String((pricing && pricing.dataset.api) || (reviews && reviews.dataset.api) || '').trim().replace(/[/]+$/, '');
+
+  const panel = modal.querySelector('.rvm-panel');
+  const views = Object.fromEntries([...modal.querySelectorAll('[data-view]')].map(v => [v.dataset.view, v]));
+  const rows = [...modal.querySelectorAll('.od-prod')];
+  const createBtn = $('odCreate'), errBox = views.choose.querySelector('.rvm-error');
+  const lockables = [$('mainContent'), $('siteHeader')].filter(Boolean);
+  const counts = { pixel: 0, pinky: 0, winxp: 0 };
+  let order = null, pendingPack = '', busy = false, run = 0, lastFocus = null, closeTimer = 0, made = 0;
+
+  const store = {
+    read(){ try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; } },
+    write(v){ try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} },
+  };
+  const total = () => counts.pixel + counts.pinky + counts.winxp;
+
+  /* ---- the dialog ---- */
+  function show(name){
+    Object.entries(views).forEach(([k, el]) => { el.hidden = k !== name; });
+    requestAnimationFrame(() => { const h = views[name].querySelector('h3'); if (h) h.focus({ preventScroll: true }); });
+    panel.scrollTop = 0;
+  }
+  function open(){
+    clearTimeout(closeTimer);
+    if (modal.hidden){
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      lockables.forEach(el => { el.inert = true; });
+      if (lenis) lenis.stop(); else document.documentElement.style.overflow = 'hidden';
+      requestAnimationFrame(() => modal.classList.add('is-open'));
+    }
+  }
+  function close(){
+    if (modal.hidden) return;
+    run++;                                                     // stops any waiting for a payment
+    modal.classList.remove('is-open');
+    lockables.forEach(el => { el.inert = false; });
+    if (lenis) lenis.start(); else document.documentElement.style.overflow = '';
+    if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+    closeTimer = setTimeout(() => { modal.hidden = true; }, 380);
+  }
+  modal.addEventListener('click', e => { if (e.target.closest('[data-close]')) close(); });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) close(); });
+  const fail = (text, title = 'Something went wrong') => { $('odErrTitle').textContent = title; $('odErrText').textContent = text; open(); show('error'); };
+
+  /* ---- choosing ---- */
+  function renderChoose(){
+    const left = order.remaining - total();
+    const spent = order.credits - order.remaining;
+    $('odPaid').textContent = spent
+      ? `You paid ${money(order.amount)} for ${plural(order.credits, 'link')}. ${plural(spent, 'link')} already made. Choose the rest.`
+      : `You paid ${money(order.amount)} for ${plural(order.credits, 'link')}. Choose which ones to create.`;
+    $('odLeft').textContent = left;
+    $('odLeftLabel').textContent = left === 1 ? 'link left to choose' : 'links left to choose';
+    rows.forEach(row => {
+      const p = row.dataset.product, n = counts[p];
+      row.classList.toggle('has', n > 0);
+      row.querySelector('output').textContent = n;
+      row.querySelector('[data-dec]').disabled = n === 0 || busy;
+      row.querySelector('[data-inc]').disabled = busy || (order.remaining > 1 && left === 0);   // with one link left, a tap simply moves it
+    });
+    createBtn.disabled = busy || total() === 0;
+    createBtn.firstChild.nodeValue = total() ? `Create ${plural(total(), 'link')}` : 'Choose at least one';
+  }
+  rows.forEach(row => {
+    const p = row.dataset.product;
+    row.querySelector('[data-inc]').addEventListener('click', () => {
+      errBox.hidden = true;
+      if (order.remaining === 1){ counts.pixel = counts.pinky = counts.winxp = 0; counts[p] = 1; }
+      else if (total() < order.remaining) counts[p]++;
+      renderChoose();
+    });
+    row.querySelector('[data-dec]').addEventListener('click', () => { errBox.hidden = true; if (counts[p] > 0) counts[p]--; renderChoose(); });
+  });
+
+  function showChoose(){ counts.pixel = counts.pinky = counts.winxp = 0; busy = false; errBox.hidden = true; show('choose'); renderChoose(); }
+
+  createBtn.addEventListener('click', async () => {
+    if (busy || !total()) return;
+    const items = Object.fromEntries(Object.entries(counts).filter(([, n]) => n > 0));
+    busy = true; errBox.hidden = true; renderChoose();
+    try {
+      order = order.demo ? demoGenerate(items) : await request(`/orders/${encodeURIComponent(order.token)}/generate`, { items });
+      made = total();
+      busy = false;
+      showDone();
+    } catch (err){
+      busy = false; renderChoose();
+      errBox.textContent = err.message || 'That didn’t work. Please try again.'; errBox.hidden = false;
+    }
+  });
+
+  /* ---- done ---- */
+  function showDone(){
+    $('odDoneSub').textContent = `${made ? `${plural(made, 'link')} made. ` : ''}${order.remaining ? `${plural(order.remaining, 'link')} still to create.` : 'That’s your whole pack.'}`;
+    $('odMore').hidden = order.remaining === 0;
+    $('odFine').textContent = order.demo
+      ? 'Demo links: they look real, but they don’t open anything yet.'
+      : 'Open a link to edit it: you have five days to change anything, then it becomes read-only. This page stays yours: find it again under “My links” in the footer.';
+    const list = $('odLinks'); list.replaceChildren();
+    [...order.links].sort((a, b) => b.at - a.at).forEach(l => {   // the newest batch first, each batch in the order it was chosen
+      const li = document.createElement('li'); li.className = 'od-link'; li.style.setProperty('--c', COLORS[l.product] || '#7c5cff');
+      const tag = document.createElement('span'); tag.className = 'od-tag'; tag.textContent = NAMES[l.product] || l.product;
+      const url = document.createElement('span'); url.className = 'od-url'; url.textContent = l.url.replace(/^https?:[/][/]/, ''); url.title = l.url;
+      const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'od-copy'; copy.textContent = 'Copy';
+      copy.addEventListener('click', () => copyText(l.url, copy));
+      li.append(tag, url, copy);
+      if (!order.demo){
+        const a = document.createElement('a'); a.className = 'od-open'; a.textContent = 'Open'; a.href = l.url; a.target = '_blank'; a.rel = 'noopener';
+        li.append(a);
+      }
+      list.append(li);
+    });
+    show('done');
+  }
+  $('odMore').addEventListener('click', showChoose);
+  async function copyText(text, btn){
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.append(ta); ta.select(); try { document.execCommand('copy'); } catch {} ta.remove();
+    }
+    const was = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = was; }, 1600);
+  }
+
+  /* ---- the Worker ---- */
+  async function request(path, body){
+    const res = await fetch(api + path, body
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : { headers: { Accept: 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok){ const err = new Error(data.error || 'That didn’t work. Please try again.'); err.status = res.status; throw err; }
+    return data;
+  }
+
+  /* ---- the demo (no Worker): the order lives in this browser ---- */
+  const demoId = () => Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 8);
+  function demoGenerate(items){
+    const next = { ...order, links: [...order.links], remaining: order.remaining }, at = Date.now();
+    Object.entries(items).forEach(([product, n]) => {
+      for (let i = 0; i < n && next.remaining > 0; i++){
+        const id = `demo-${demoId()}`;
+        next.links.push({ product, id, url: `${HOST}/?share=${id}`, at });
+        next.remaining--;
+      }
+    });
+    store.write(next);
+    return next;
+  }
+
+  /* ---- flows ---- */
+  const toNext = () => { order.remaining > 0 ? showChoose() : (made = 0, showDone()); };
+
+  async function buy(pack){
+    if (!PACKS[pack]) return;
+    const my = ++run;
+    open();
+    if (!api){                                                  // demo: a pretend checkout
+      pendingPack = pack;
+      $('odDemoPack').textContent = PACKS[pack].label;
+      $('odDemoPrice').textContent = money(PACKS[pack].cents);
+      show('demo');
+      return;
+    }
+    $('odTitle').textContent = 'Taking you to checkout…'; $('odWaitText').textContent = 'One moment.';
+    show('wait');
+    try {
+      const data = await request('/checkout', { pack });
+      if (my !== run) return;
+      if (!data.checkoutUrl) throw new Error('Checkout isn’t available right now. Please try again in a moment.');
+      store.write({ token: data.token });
+      location.assign(data.checkoutUrl);
+    } catch (err){ if (my === run) fail(err.message, 'Couldn’t start checkout'); }
+  }
+  $('odDemoPay').addEventListener('click', async () => {
+    const my = ++run;
+    $('odTitle').textContent = 'Confirming your payment…'; $('odWaitText').textContent = 'This only takes a moment.';
+    show('wait');
+    await sleep(1500);
+    if (my !== run) return;
+    const pack = pendingPack;
+    order = { token: `demo-${demoId()}`, pack, credits: PACKS[pack].credits, remaining: PACKS[pack].credits, amount: PACKS[pack].cents, status: 'paid', links: [], demo: true };
+    store.write(order);
+    made = 0; showChoose();
+  });
+
+  // back from the payment page (or "My links"): wait until the payment provider has told the Worker the money arrived
+  async function resume(token){
+    const my = ++run;
+    $('odTitle').textContent = 'Confirming your payment…'; $('odWaitText').textContent = 'This only takes a moment.';
+    open(); show('wait');
+    for (let i = 0; i < 48 && my === run; i++){
+      try {
+        order = await request(`/orders/${encodeURIComponent(token)}`);
+        if (order.status === 'paid'){ if (my === run){ made = 0; toNext(); } return; }
+      } catch (err){
+        if (err.status === 404){ if (my === run) fail('We couldn’t find that order. Check the link you were sent, or get in touch and we’ll sort it out.', 'Order not found'); return; }
+      }
+      await sleep(2500);
+    }
+    if (my === run) fail('Your payment hasn’t been confirmed yet. If you’ve paid, give it a minute and refresh this page: nothing is lost.', 'Still waiting');
+  }
+
+  function openSaved(){
+    const saved = store.read();
+    if (!saved){ fail('You haven’t bought a pack on this device yet. Pick 1 link or 8 links in the pricing section.', 'No order yet'); return; }
+    if (saved.demo){ order = saved; open(); made = 0; toNext(); return; }
+    resume(saved.token);
+  }
+
+  document.querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => buy(b.dataset.buy)));
+  document.querySelectorAll('[data-order-open]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); openSaved(); }));
+
+  // back from the payment page: the provider sends the buyer to /?paid=1 (the token was saved in this browser before leaving) or to /?order=<token>
+  const params = new URLSearchParams(location.search);
+  if (api && (params.has('order') || params.has('paid'))){
+    const token = params.get('order') || (store.read() || {}).token;
+    history.replaceState(null, '', location.pathname + location.hash);   // the address bar goes back to normal; the token stays in this browser
+    if (token){ store.write({ token }); resume(token); }
+    else fail('We couldn’t tell which order that was. Open “My links” in the footer on the device you paid from, or get in touch and we’ll sort it out.', 'Order not found');
+  }
+}
+
 /* ---------------- Boot ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
   initTilt();
@@ -1837,6 +2038,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initReviews();
   initBridge();
   initPricing();
+  initOrders();
   initFinale({ reduceMotion });
   initOffscreenPause();
   initPerfGuard();
