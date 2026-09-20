@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>sent4u — The Marketplace for Links</title>
+<meta name="description" content="Buy, sell and trade premium links — domains, bio slots and sponsored placements — on sent4u.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Bodoni+Moda:ital,wght@1,400;1,700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="preloader" id="preloader">
+  <div class="preloader-bg" aria-hidden="true">
+    <span class="pl-blob b1"></span>
+    <span class="pl-blob b2"></span>
+    <span class="pl-blob b3"></span>
+    <span class="pl-blob b4"></span>
+    <div class="pl-halo"></div>
+    <div class="pl-grid"></div>
+  </div>
+  <div class="preloader-inner">
+    <div class="preloader-phones" aria-hidden="true">
+      <div class="ploader-phone phone-a">
+        <span class="ploader-notch"></span>
+        <span class="ploader-screen"></span>
+        <span class="ploader-ping ping-a"></span>
+      </div>
+      <span class="ploader-dot"></span>
+      <div class="ploader-phone phone-b">
+        <span class="ploader-notch"></span>
+        <span class="ploader-screen"></span>
+        <span class="ploader-ping ping-b"></span>
+      </div>
+    </div>
+    <div class="preloader-word" id="preloaderWord">sent4u</div>
+    <div class="preloader-bar"><span id="preloaderFill"></span></div>
+    <div class="preloader-pct" id="preloaderPct">0</div>
+  </div>
+</div>
+
+<header class="site-header" id="siteHeader">
+  <div class="container header-inner">
+    <a href="#hero" class="logo">sent4u</a>
+    <nav class="main-nav">
+      <a href="#apps">Marketplace</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
+    <div class="header-actions">
+      <a href="#" class="text-link">Log in</a>
+      <a href="#cta" class="btn btn-primary btn-magnetic" data-magnetic>
+        <span class="btn-label" data-text="Get Started">Get Started</span>
+      </a>
+      <button type="button" class="menu-pill" id="menuToggle" aria-expanded="false" aria-controls="menuOverlay">
+        <span class="menu-pill-label">Menu</span><span class="menu-pill-dots" aria-hidden="true"><i></i><i></i></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- full-screen menu -->
+<div class="menu-overlay" id="menuOverlay" aria-hidden="true" inert>
+  <div class="container menu-inner">
+    <nav class="menu-links" aria-label="Menu">
+      <a href="#hero" class="menu-link"><span class="menu-num">01</span><span class="menu-link-inner">Home</span></a>
+      <a href="#apps" class="menu-link"><span class="menu-num">02</span><span class="menu-link-inner">Marketplace</span></a>
+      <a href="#how" class="menu-link"><span class="menu-num">03</span><span class="menu-link-inner">How it works</span></a>
+      <a href="#pricing" class="menu-link"><span class="menu-num">04</span><span class="menu-link-inner">Pricing</span></a>
+    </nav>
+    <div class="menu-meta">
+      <p>Free to list. Free to browse.<br>sent4u only earns when you do.</p>
+      <a href="#cta" class="pill-btn" data-magnetic>Get started<span class="pill-arrow" aria-hidden="true">→</span></a>
+      <div class="menu-social"><a href="#">Twitter / X</a><a href="#">Instagram</a><a href="#">LinkedIn</a></div>
+    </div>
+  </div>
+</div>
+
+<main id="mainContent">
+
+  <!-- the light panel behind sections 2–3 (see initTides) -->
+  <div class="light-panel" id="lightPanel" aria-hidden="true"></div>
+  <!-- the two section changes are "tides": three wavy layers that rise up the screen as you scroll — brand colours leading,
+       the colour of the next section last — so the page seems to fill up with liquid -->
+  <div class="tide tide-light" id="tideLight" aria-hidden="true">
+    <div class="tide-layer tl-a"><svg viewBox="0 0 1600 130" preserveAspectRatio="none"><path d="M0 88 Q200 8 400 88 T800 88 T1200 88 T1600 88 V130 H0Z"/></svg><i></i></div>
+    <div class="tide-layer tl-b"><svg viewBox="0 0 1600 130" preserveAspectRatio="none"><path d="M0 102 Q100 50 200 102 T400 102 T600 102 T800 102 T1000 102 T1200 102 T1400 102 T1600 102 V130 H0Z"/></svg><i></i></div>
+    <div class="tide-layer tl-c"><svg viewBox="0 0 1600 130" preserveAspectRatio="none"><path d="M0 114 Q50 86 100 114 T200 114 T300 114 T400 114 T500 114 T600 114 T700 114 T800 114 T900 114 T1000 114 T1100 114 T1200 114 T1300 114 T1400 114 T1500 114 T1600 114 V130 H0Z"/></svg><i></i></div>
+  </div>
+  <div class="tide tide-dark" id="tideDark" aria-hidden="true">
+    <div class="tide-layer tl-a"><svg viewBox="0 0 1600 130" preserveAspectRatio="none"><path d="M0 88 Q200 8 400 88 T800 88 T1200 88 T1600 88 V130 H0Z"/></svg><i></i></div>
+    <div class="tide-layer tl-b"><svg viewBox="0 0 1600 130" preserveAspectRatio="none"><path d="M0 102 Q100 50 200 102 T400 102 T600 102 T800 102 T1000 102 T1200 102 T1400 102 T1600 102 V130 H0Z"/></svg><i></i></div>
+    <div class="tide-layer tl-c"><svg viewBox="0 0 1600 130" preserveAspectRatio="none"><path d="M0 114 Q50 86 100 114 T200 114 T300 114 T400 114 T500 114 T600 114 T700 114 T800 114 T900 114 T1000 114 T1100 114 T1200 114 T1300 114 T1400 114 T1500 114 T1600 114 V130 H0Z"/></svg><i></i></div>
+  </div>
+
+  <!-- a snake-like line that slides in from the left and wanders down the page behind sections 2+, driven by scroll (see initSnake) -->
+  <svg class="snake" id="snake" aria-hidden="true" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="snakeGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1000">
+        <stop offset="0" stop-color="#7c5cff"/>
+        <stop offset="0.5" stop-color="#ff6b9d"/>
+        <stop offset="1" stop-color="#5ce1ff"/>
+      </linearGradient>
+      <!-- the part of the page behind the pinned, sliding section 3: the wave is hidden there (see initSnake) -->
+      <clipPath id="snakeClip"><rect id="snakeClipTop" x="0" y="0" width="0" height="0"/><rect id="snakeClipBot" x="0" y="0" width="0" height="0"/></clipPath>
+    </defs>
+    <!-- one continuous wavy line down the page (see initSnake); the head below is a paper plane -->
+    <path id="snakeGlow" fill="none" stroke="url(#snakeGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#snakeClip)"/>
+    <path id="snakeBody" fill="none" stroke="url(#snakeGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#snakeClip)"/>
+    <!-- the head is a paper plane: #snakeHead is moved to the path point, #snakePlane is rotated to face the direction of travel -->
+    <g id="snakeHead" opacity="0">
+      <g id="snakePlane">
+        <path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff" stroke="#4a2fe0" stroke-width="1.6" stroke-linejoin="miter"/>
+        <path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff" stroke="#4a2fe0" stroke-width="1.6" stroke-linejoin="miter"/>
+        <path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6" stroke="#4a2fe0" stroke-width="1.2" stroke-linejoin="miter"/>
+      </g>
+    </g>
+  </svg>
+
+  <!-- 1. HERO -->
+  <section class="section hero" id="hero">
+    <!-- sits outside the tilted 3D stack (so it stays perfectly level); earth-scene.js pins it next to the globe -->
+    <div class="globe-label" id="globeLabel" aria-hidden="true">
+      <div class="gt-card">
+        <span class="gt-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M21.5 2.5 2.5 9.8l7.1 2.9 2.9 7.1z"/></svg></span>
+        <span class="gt-text"><b>Link sent</b><span class="gt-route"></span></span>
+      </div>
+    </div>
+    <div class="hero-wordmark" data-parallax-speed="0.15" aria-hidden="true">sent4u</div>
+    <div class="hero-layers signal-scene" aria-hidden="true">
+      <div class="signal-tilt" id="signalTilt">
+        <!-- earth: a dot-matrix globe drawn from real land outlines, with messages flying between cities, plus the moon and a satellite on their own orbits -->
+        <div class="signal-layer" data-parallax-speed="0.55" data-cursor-depth="30">
+          <div class="signal-layer-inner">
+            <!-- billboarded so the canvas always faces the camera; the real low-poly
+                 3D (earth/moon/satellite, lighting, orbits) is rendered inside it
+                 by earth-scene.js, not faked with CSS -->
+            <div class="billboard earth-billboard">
+              <canvas id="earthCanvas" class="earth-canvas" aria-hidden="true"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="container hero-inner">
+      <div class="hero-lead">
+        <p class="eyebrow" data-reveal="fade">The marketplace for links</p>
+        <h1 class="hero-title" id="heroTitle">Your links are<br>worth more than<br>you think.</h1>
+      </div>
+      <div class="hero-follow">
+        <p class="hero-sub" data-reveal="fade">sent4u lets you list, discover and trade premium links — domain redirects,
+          bio-page slots and sponsored placements — bought and sold like any other digital asset, with escrow built in.</p>
+        <div class="hero-ctas">
+          <a href="#apps" class="btn btn-primary btn-magnetic" data-magnetic>
+            <span class="btn-label" data-text="Browse the Marketplace">Browse the Marketplace</span>
+          </a>
+          <a href="#how" class="btn btn-outline btn-magnetic" data-magnetic>
+            <span class="btn-label" data-text="List a Link">List a Link</span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="scroll-cue" aria-hidden="true"><span></span>Scroll</div>
+  </section>
+
+  <!-- 2. INTRO — big statement, copy + pill on the left, a gradient media card on the right -->
+  <section class="section intro" id="intro">
+    <div class="container intro-wrap">
+      <h2 class="intro-title" data-reveal="fade">
+        <span class="intro-line l1">A real market,</span>
+        <span class="intro-line l2">built for links.</span>
+      </h2>
+      <figure class="intro-card" data-reveal="up">
+        <div class="mock-window">
+          <div class="mock-window-bar"><span></span><span></span><span></span></div>
+          <div class="mock-window-body">
+            <div class="mock-listing">
+              <div class="mock-listing-dot"></div>
+              <div class="mock-listing-lines"><span></span><span class="short"></span></div>
+              <div class="mock-listing-price">$1,240</div>
+            </div>
+            <div class="mock-listing">
+              <div class="mock-listing-dot alt"></div>
+              <div class="mock-listing-lines"><span></span><span class="short"></span></div>
+              <div class="mock-listing-price">$340</div>
+            </div>
+            <div class="mock-listing">
+              <div class="mock-listing-dot"></div>
+              <div class="mock-listing-lines"><span></span><span class="short"></span></div>
+              <div class="mock-listing-price">$980</div>
+            </div>
+          </div>
+        </div>
+      </figure>
+      <div class="intro-body" data-reveal="fade">
+        <p>Every link has value — an aged domain, a slot on a popular bio page, a sponsored
+          placement in a trusted newsletter. sent4u turns that value into something you can list, price, discover
+          and trade, with verified sellers and escrow-protected checkout on every order.</p>
+        <a href="#apps" class="pill-btn" data-magnetic>Explore the marketplace<span class="pill-arrow" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. HOW IT WORKS — a pinned page that slides right → left as you scroll (see initHow). Every slide is one full screen. -->
+  <section class="how-wrapper" id="how" aria-label="How it works">
+    <div class="how-sticky" id="howSticky">
+      <div class="how-track" id="howTrack">
+        <div class="how-slide how-intro">
+          <span class="how-eyebrow"><i></i>How it works</span>
+          <h2>Four steps.<br><span class="hl">Zero friction.</span></h2>
+          <p class="how-sub">From a link you own to money in your pocket — no calls, no contracts, nothing to install.</p>
+          <ol class="how-route" aria-hidden="true"><li>List</li><li>Match</li><li>Trade</li><li>Earn</li></ol>
+        </div>
+        <article class="how-panel">
+          <div class="how-inner">
+            <div class="how-copy">
+              <span class="how-step">Step 1 <em>of 4</em></span>
+              <h3>List your link</h3>
+              <p class="how-lead">Add any link you own — a domain redirect, a bio-page slot, a sponsored placement — and set a price or open it to offers.</p>
+              <ul class="how-chips"><li>Live in a minute</li><li>Fixed price or offers</li><li>Pause anytime</li></ul>
+            </div>
+            <div class="how-card hc-violet" aria-hidden="true"><div class="hc-ui">
+              <p class="hc-title">New listing <span class="hc-badge">Draft</span></p>
+              <div class="hc-field"><small>Link</small><b>sent4u.link/aged-domain</b></div>
+              <div class="hc-row"><div class="hc-field"><small>Category</small><b>Domain</b></div><div class="hc-field"><small>Price</small><b>$1,240</b></div></div>
+              <div class="hc-toggle"><span>Open to offers</span><i></i></div>
+              <div class="hc-btn">Publish listing</div>
+            </div></div>
+          </div>
+        </article>
+        <article class="how-panel">
+          <div class="how-inner flip">
+            <div class="how-copy">
+              <span class="how-step">Step 2 <em>of 4</em></span>
+              <h3>Find a match</h3>
+              <p class="how-lead">Buyers browse the marketplace, filter by category and traffic, then bid or buy instantly at your price.</p>
+              <ul class="how-chips"><li>Verified sellers</li><li>Audited stats</li><li>Instant alerts</li></ul>
+            </div>
+            <div class="how-card hc-pink" aria-hidden="true"><div class="hc-ui">
+              <p class="hc-title">Offers <span class="hc-badge">3 new</span></p>
+              <div class="hc-offer best"><i class="av a1"></i><div><b>Maya R.</b><small>Verified buyer · best offer</small></div><strong>$1,300</strong></div>
+              <div class="hc-offer"><i class="av a2"></i><div><b>Studio Nord</b><small>Verified buyer</small></div><strong>$1,180</strong></div>
+              <div class="hc-offer"><i class="av a3"></i><div><b>Kenji T.</b><small>New buyer</small></div><strong>$1,050</strong></div>
+            </div></div>
+          </div>
+        </article>
+        <article class="how-panel">
+          <div class="how-inner">
+            <div class="how-copy">
+              <span class="how-step">Step 3 <em>of 4</em></span>
+              <h3>Trade with escrow</h3>
+              <p class="how-lead">Money and ownership move through sent4u escrow — nothing changes hands until both sides confirm.</p>
+              <ul class="how-chips"><li>Payment held</li><li>Automatic link checks</li><li>Disputes before payout</li></ul>
+            </div>
+            <div class="how-card hc-cyan" aria-hidden="true"><div class="hc-ui">
+              <p class="hc-title">Escrow <span class="hc-badge ok">Secured</span></p>
+              <ul class="hc-steps">
+                <li class="done"><i></i><div><b>Payment held</b><small>$1,300 safe in escrow</small></div></li>
+                <li class="done"><i></i><div><b>Link verified</b><small>Redirect is live and correct</small></div></li>
+                <li><i></i><div><b>Funds released</b><small>Waiting for the buyer to confirm</small></div></li>
+              </ul>
+            </div></div>
+          </div>
+        </article>
+        <article class="how-panel">
+          <div class="how-inner flip">
+            <div class="how-copy">
+              <span class="how-step">Step 4 <em>of 4</em></span>
+              <h3>Get paid</h3>
+              <p class="how-lead">Watch clicks and revenue in real time, then cash out to your bank or wallet whenever you like.</p>
+              <ul class="how-chips"><li>Live analytics</li><li>Instant payouts</li><li>Fees only when you earn</li></ul>
+            </div>
+            <div class="how-card hc-mint" aria-hidden="true"><div class="hc-ui">
+              <p class="hc-title">This month</p>
+              <p class="hc-big">$4,860 <span class="hc-badge ok">+18%</span></p>
+              <svg class="hc-chart" viewBox="0 0 240 80" preserveAspectRatio="none"><path class="area" d="M0 62 C30 58 40 40 70 44 S110 62 140 34 S200 12 240 18 V80 H0Z"/><path class="line" d="M0 62 C30 58 40 40 70 44 S110 62 140 34 S200 12 240 18"/></svg>
+              <div class="hc-btn">Cash out</div>
+            </div></div>
+          </div>
+        </article>
+      </div>
+      <!-- the flying line, right → left, in step with the sliding panels (see initHow) -->
+      <svg class="how-line" id="howLine" aria-hidden="true">
+        <defs><linearGradient id="howGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1000" y2="0">
+          <stop offset="0" stop-color="#5ce1ff"/><stop offset="0.5" stop-color="#ff6b9d"/><stop offset="1" stop-color="#7c5cff"/>
+        </linearGradient></defs>
+        <path id="howGlow" fill="none" stroke="url(#howGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+        <path id="howBody" fill="none" stroke="url(#howGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+        <g id="howHead"><g id="howPlane">
+          <path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff" stroke="#4a2fe0" stroke-width="1.6" stroke-linejoin="miter"/>
+          <path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff" stroke="#4a2fe0" stroke-width="1.6" stroke-linejoin="miter"/>
+          <path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6" stroke="#4a2fe0" stroke-width="1.2" stroke-linejoin="miter"/>
+        </g></g>
+      </svg>
+      <div class="how-progress" id="howProgress" aria-hidden="true">
+        <div class="hp-seg"><span class="hp-bar"><i></i></span><span class="hp-label">List</span></div>
+        <div class="hp-seg"><span class="hp-bar"><i></i></span><span class="hp-label">Match</span></div>
+        <div class="hp-seg"><span class="hp-bar"><i></i></span><span class="hp-label">Trade</span></div>
+        <div class="hp-seg"><span class="hp-bar"><i></i></span><span class="hp-label">Earn</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5b. THE APP — pinned, scroll-driven phone (see initPhoneSection).
+       Slide 1: a sent4u.link link is sent through a messenger. Slides 2–4: the three products (Pixel, Pinky, WinXP), one by one —
+       each slide re-skins the whole stage (backdrop, type, phone screen) in that product's own design language. -->
+  <section class="phone-section" id="apps" aria-label="The sent4u app">
+    <div class="phone-track" id="phoneTrack">
+      <div class="phone-sticky" id="phoneSticky">
+        <div class="phone-glow" aria-hidden="true"></div>
+        <div class="phone-glow phone-glow-pink" aria-hidden="true"></div>
+        <div class="phone-grid" aria-hidden="true"></div>
+        <div class="phone-planes" id="phonePlanes" aria-hidden="true"></div>
+        <div class="phone-words" id="phoneWords" aria-hidden="true">
+          <span class="phone-word">send</span><span class="phone-word">pixel</span><span class="phone-word">pinky</span><span class="phone-word">winxp</span>
+        </div>
+
+        <div class="phone-intro" id="phoneIntro">
+          <div class="pi-row">
+            <h2 class="pi-l">sent4u,</h2>
+            <div class="pi-r"><h2>in your <br>pocket.</h2><p class="phone-intro-sub">Send a link. Open a world. Everything you sell, in one place.</p></div>
+          </div>
+        </div>
+        <p class="phone-ring-copy" id="phoneRingCopy">One link. Three worlds.</p>
+
+        <svg class="phone-links" id="phoneLinks" aria-hidden="true"><line></line><line></line><line></line><line></line></svg>
+
+        <div class="phone-stage" id="phoneStage" aria-hidden="true">
+          <div class="phone" id="phone">
+            <div class="phone-layers" id="phoneLayers"></div>
+            <span class="phone-btn vol"></span><span class="phone-btn pwr"></span>
+            <div class="phone-front">
+              <div class="phone-status"><b>9:41</b><span class="phone-island"></span><i></i></div>
+              <div class="phone-screen">
+                <div class="pscreen idle" data-s="on"><span class="idle-logo">sent4u</span></div>
+
+                <!-- 1 · Send: a sent4u.link link goes out through a messenger -->
+                <div class="pscreen s-ms" data-s="after">
+                  <div class="ms-head">
+                    <span class="ms-back">‹</span><span class="ms-av"></span>
+                    <div class="ms-who"><b>Naraa</b><small><i></i>Active now</small></div>
+                    <span class="ms-actions"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><svg viewBox="0 0 24 24" width="15" height="15"><rect x="3" y="6" width="12" height="12" rx="3"/><path d="m15 10 6-3v10l-6-3z"/></svg></span>
+                  </div>
+                  <div class="ms-body">
+                    <div class="ms-time">Today 9:41 PM</div>
+                    <div class="ms-msg in">did you send it yet?? 👀</div>
+                    <div class="ms-msg out ms-link-msg">
+                      <span class="ms-url">https://sent4u.link</span>
+                      <div class="ms-card">
+                        <div class="ms-thumb"><span>sent4u</span><svg viewBox="0 0 24 24" width="16" height="16"><path d="M2.5 11.5 21.5 3 15 21 11 13.2z"/></svg></div>
+                        <div class="ms-meta"><small>sent4u.link</small><b>Your links are worth more than you think.</b></div>
+                      </div>
+                    </div>
+                    <div class="ms-status"><span class="ms-st1">Delivered</span><span class="ms-st2">Seen just now ✓✓</span></div>
+                    <div class="ms-msg in ms-typing"><i></i><i></i><i></i></div>
+                    <div class="ms-msg in ms-reply">omg it's so cute 😍 opening it now!!</div>
+                  </div>
+                  <div class="ms-input"><span class="ms-ph">Message…</span><span class="ms-typed"><span>https://sent4u.link</span></span><span class="ms-send"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M3 11.5 21 3l-8.5 18-2.3-7.2z"/></svg></span></div>
+                </div>
+
+                <!-- 2 · Pixel -->
+                <div class="pscreen s-pixel" data-s="after">
+                  <svg class="px-scene" viewBox="0 0 131 281" preserveAspectRatio="none" shape-rendering="crispEdges"><path class="px-ink" fill="#20351b"></path><path class="px-paper" fill="#9bb477"></path><path class="px-heart" fill="#20351b"></path></svg>
+                  <div class="px-top"><span class="px-bars"><i></i><i></i><i></i><i></i></span><span class="px-net">ХАЙРЫН СҮЛЖЭЭ</span><span class="px-pct">87%</span><span class="px-batt"><i></i><i></i><i></i><i></i></span></div>
+                  <div class="px-logo">Зөвхөн түүнд × 56 MOMENTS</div>
+                  <div class="px-new">1 ШИНЭ ЗУРВАС</div>
+                  <div class="px-title">Надтай болзоонд явах уу?</div>
+                  <div class="px-btns"><span>◀ Тэгье</span><span>Үгүй ▶</span></div>
+                  <div class="px-cap">БЯЦХАН ДОХИО. БЯЦХАН ХАЙР.</div>
+                </div>
+
+                <!-- 3 · Pinky -->
+                <div class="pscreen s-pinky" data-s="after">
+                  <div class="pk-glow"></div><span class="pk-line"></span>
+                  <div class="pk-top"><span class="pk-pill">4d 23h left to edit</span><span class="pk-edit">✎</span></div>
+                  <div class="pk-logo">Зөвхөн түүнд <em>×</em> 56 MOMENTS</div>
+                  <div class="pk-bubble">Will you go on a date with me?<span class="pk-heart">♥</span></div>
+                  <div class="pk-yes">Yes</div><div class="pk-no">No</div>
+                </div>
+
+                <!-- 4 · WinXP -->
+                <div class="pscreen s-xp" data-s="after">
+                  <div class="xp-sky"></div><div class="xp-hill"></div>
+                  <div class="xp-icons">
+                    <div class="xp-icon"><svg viewBox="0 0 32 32"><rect x="4" y="5" width="24" height="17" rx="2" fill="#dfe9f7" stroke="#5b7bb8"/><rect x="6.5" y="7.5" width="19" height="12" fill="#3a86e8"/><rect x="11" y="24" width="10" height="3" fill="#9aa9c2"/></svg><span>My Computer</span></div>
+                    <div class="xp-icon"><svg viewBox="0 0 32 32"><path d="M3 9h9l2 3h15v14H3z" fill="#f4d160" stroke="#c9a02a"/><path d="M3 14h26v12H3z" fill="#f9e08a"/></svg><span>My Documents</span></div>
+                    <div class="xp-icon"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="#e9f2ff" stroke="#4a78c8" stroke-width="1.5"/><path d="m13 11 9 5-9 5z" fill="#2c6be0"/></svg><span>Music</span></div>
+                    <div class="xp-icon"><svg viewBox="0 0 32 32"><rect x="7" y="4" width="18" height="24" rx="2" fill="#fbfdff" stroke="#7a94c4"/><path d="M11 10h10M11 14h10M11 18h10M11 22h6" stroke="#6a86bd" stroke-width="1.4"/></svg><span>Notes</span></div>
+                    <div class="xp-icon xp-invite"><svg viewBox="0 0 32 32"><rect x="3" y="8" width="26" height="18" rx="2" fill="#fbf1d8" stroke="#c8a960"/><path d="m3 9 13 9 13-9" fill="none" stroke="#c8a960" stroke-width="1.3"/><path d="M24 4c1.6-1.7 4 .1 2.6 2L24 8.6 21.4 6c-1.4-1.9 1-3.7 2.6-2z" fill="#e8455f"/></svg><span>Чамд зориулсан урилга ♡</span></div>
+                  </div>
+                  <div class="xp-window">
+                    <div class="xp-title"><svg viewBox="0 0 32 32" width="11" height="11"><rect x="3" y="8" width="26" height="18" rx="2" fill="#fbf1d8" stroke="#c8a960"/><path d="m3 9 13 9 13-9" fill="none" stroke="#c8a960" stroke-width="1.6"/></svg><b>Чамд зориулсан урилга ♡</b><span class="xp-wb"><i></i><i></i><i class="x"></i></span></div>
+                    <div class="xp-menu"><span>File</span><span>Edit</span><span>View</span><span>Favorites ♡</span></div>
+                    <div class="xp-body">
+                      <svg class="xp-heart" viewBox="0 0 9 8" shape-rendering="crispEdges"><path fill="#e8455f" d="M1 0h2v1h1v1h1V1h1V0h2v1h1v3H8v1H7v1H6v1H5v1H4V7H3V6H2V5H1V4H0V1h1z"/><path fill="#f8a1b0" d="M1 1h2v1H1z"/></svg>
+                      <p>Надтай болзоонд явах уу?</p>
+                      <div class="xp-btns"><span class="xp-b def">Тийм ээ! ♡</span><span class="xp-b">Үгүй</span></div>
+                    </div>
+                  </div>
+                  <svg class="xp-cursor" viewBox="0 0 12 19"><path d="M1 1v14l3.4-3.2 2.4 5.6 2.4-1-2.4-5.5h4.6z" fill="#fff" stroke="#000" stroke-linejoin="round"/></svg>
+                  <div class="xp-taskbar"><span class="xp-start"><i>♥</i>start</span><span class="xp-quick"></span><span class="xp-task">Чамд зориулсан урилга ♡</span><span class="xp-tray"><i>♫</i>13:51</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="phone-copy" id="phoneCopy">
+          <article class="pfeature t-send text-l">
+            <div class="pf-inner">
+              <p class="pf-kicker"><b>01</b><i></i><span>04</span></p>
+              <h3>Send a link that feels like a gift.</h3>
+              <p class="pf-text">Drop your sent4u link into any messenger. Instead of a plain URL, your person gets a rich preview — and a page made just for them.</p>
+              <ul class="pf-tags"><li>Works in any messenger</li><li>Rich link preview</li><li>Opens instantly</li></ul>
+            </div>
+          </article>
+          <article class="pfeature t-pixel text-r">
+            <div class="pf-inner">
+              <p class="pf-kicker"><b>02</b><i></i><span>04</span></p>
+              <h3>Pixel — a love letter on a Game Boy.</h3>
+              <p class="pf-text">A tiny handheld love-signal: a pixel skyline, two cats on the pier and a chunky retro “Will you go on a date with me?”.</p>
+              <ul class="pf-tags"><li>Pixel-art scene</li><li>LCD retro type</li><li>Yes / No choice</li></ul>
+              <a class="pf-link" href="https://pixel.56moments.store/?share=test" target="_blank" rel="noopener">Open live demo<i aria-hidden="true"></i></a>
+            </div>
+          </article>
+          <article class="pfeature t-pinky text-l">
+            <div class="pf-inner">
+              <p class="pf-kicker"><b>03</b><i></i><span>04</span></p>
+              <h3>Pinky — <em>neon</em>, after dark.</h3>
+              <p class="pf-text">A black stage, a glowing pink speech bubble and a big, dramatic Yes or No. Quiet, editorial, impossible to ignore.</p>
+              <ul class="pf-tags"><li>Neon glow</li><li>Editorial serif type</li><li>Split-screen Yes / No</li></ul>
+              <a class="pf-link" href="https://pinky.56moments.store/?share=test" target="_blank" rel="noopener">Open live demo<i aria-hidden="true"></i></a>
+            </div>
+          </article>
+          <article class="pfeature t-xp text-r">
+            <div class="pf-inner">
+              <p class="pf-kicker"><b>04</b><i></i><span>04</span></p>
+              <h3>WinXP — nostalgia, unlocked.</h3>
+              <p class="pf-text">A full retro desktop on the green hill. Open the envelope and the invitation pops up in a classic XP window.</p>
+              <ul class="pf-tags"><li>Retro desktop</li><li>Classic XP window</li><li>Click to open</li></ul>
+              <a class="pf-link" href="https://winxp.56moments.store/?share=test" target="_blank" rel="noopener">Open live demo<i aria-hidden="true"></i></a>
+            </div>
+          </article>
+        </div>
+
+        <div class="phone-pills" id="phonePills">
+          <button type="button" class="tool-pill" data-k="0" style="--c:#7c5cff"><i></i>Send</button>
+          <button type="button" class="tool-pill" data-k="1" style="--c:#6d9b3a"><i></i>Pixel</button>
+          <button type="button" class="tool-pill" data-k="2" style="--c:#ff2e7e"><i></i>Pinky</button>
+          <button type="button" class="tool-pill" data-k="3" style="--c:#2a63d8"><i></i>WinXP</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. REVIEWS — the review wall is the section's background; the headline and rating sit on top (see initReviews). Cards are drawn from assets/data/reviews.json; until there are real reviews the wall shows empty placeholder cards.
+       The reviewers here are placeholders: swap in real ones before launch. -->
+  <!-- Reviews are kept in a Cloudflare R2 bucket behind the Worker in /worker. Put the Worker's address in data-api (e.g. https://sent4u-reviews.<you>.workers.dev)
+       and reviews go live the moment they are sent, no approval. Optional: data-turnstile takes a Cloudflare Turnstile site key for a human check.
+       With data-api empty the list comes from assets/data/reviews.json and a visitor's own review is only kept in their browser. -->
+  <section class="section reviews" id="reviews" aria-label="Reviews" data-api="" data-turnstile="">
+    <div class="rv-scene" id="rvScene">
+    <div class="rv-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+    <!-- the background: a full-bleed, tilted wall of review cards that scrolls itself and lights up under the cursor -->
+    <div class="rv-stage" id="rvStage">
+      <div class="rv-wall" id="rvWall">
+          <div class="rv-col" data-dir="up" style="--dur:62s"><div class="rv-track"></div></div>
+          <div class="rv-col" data-dir="down" style="--dur:48s"><div class="rv-track"></div></div>
+          <div class="rv-col" data-dir="up" style="--dur:70s"><div class="rv-track"></div></div>
+          <div class="rv-col" data-dir="down" style="--dur:54s"><div class="rv-track"></div></div>
+          <div class="rv-col" data-dir="up" style="--dur:66s"><div class="rv-track"></div></div>
+      </div>
+    </div>
+    <div class="rv-veil" aria-hidden="true"></div>
+    </div>
+    <div class="container rv-inner">
+      <div class="rv-copy">
+        <span class="rv-eyebrow" style="--n:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>Reviews</span>
+        <h2 style="--n:1">Tell people<br>how it <span class="rv-hl">went.</span></h2>
+        <p class="rv-lead" style="--n:2">Tried Send, Pixel, Pinky, WinXP or the marketplace? Leave a review and it goes straight on the wall.</p>
+        <div class="rv-score" style="--n:3" hidden>
+          <div class="rv-big"><span class="rv-count" data-count="0" data-decimals="1">0</span><small>/ 5</small></div>
+          <div class="rv-rating" role="img" aria-label="Rated 0 out of 5">
+            <div class="rv-stars" aria-hidden="true"><i style="--i:0">★</i><i style="--i:1">★</i><i style="--i:2">★</i><i style="--i:3">★</i><i style="--i:4">★</i></div>
+            <p>from <b class="rv-count" data-count="0">0</b> <span class="rv-word">reviews</span></p>
+          </div>
+        </div>
+        <ul class="rv-facts" style="--n:4" hidden><li class="rv-fact-rec"><b>0%</b> would recommend</li></ul>
+        <div style="--n:5"><button type="button" class="pill-btn" data-magnetic data-review-open aria-haspopup="dialog">Leave a review<span class="pill-arrow" aria-hidden="true">→</span></button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. THE BRIDGE — no words: one wave between the reviews and the pricing. A lattice of dots, three ribbons, a formation of paper planes
+       and pulsing rings all follow the same clock and the same wave, and scrolling scrubs it. It is also playable: the cursor pushes the dots
+       and steers the planes, a click sends out a shockwave and launches a plane, and dragging pushes the wave itself (see initBridge). -->
+  <section class="bridge" id="bridge" aria-hidden="true"><!-- decorative: the interaction is pointer-only -->
+    <canvas id="bridgeCanvas"></canvas>
+    <div class="bridge-hit"></div>
+  </section>
+
+  <!-- 9. PRICING — a stage: a star network that reacts to the cursor, a perspective floor, planes and outlined words behind three cards that
+       fan in as you scroll, tilt in real 3D toward the cursor (the price floats above the card) and light up under it. The popular plan has a
+       spinning gradient border, a holographic foil and a rotating seal; hovering a price spins it like a slot machine; the toggle rolls the prices (see initPricing). -->
+  <section class="section pricing-section" id="pricing" aria-label="Pricing" data-billing="monthly">
+    <div class="pr-scene" id="prScene" aria-hidden="true">
+      <div class="pr-aurora"><i></i><i></i><i></i></div>
+      <span class="pr-cursor"></span>
+      <canvas class="pr-stars" id="prStars"></canvas>
+      <div class="pr-marquee"><div class="pr-row"><span>START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> </span><span aria-hidden="true">START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> </span></div><div class="pr-row rev"><span>START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> </span><span aria-hidden="true">START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> START FREE <b>✦</b> TRADE MORE <b>✦</b> PAY LESS <b>✦</b> </span></div></div>
+      <span class="pr-fly" style="--y:14%; --dy:-70px; --r:-4deg; --dur:21s; --dl:-4s; --s:.9"><svg viewBox="-26 -20 56 40"><path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff"/><path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff"/><path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6"/></svg></span>
+      <span class="pr-fly" style="--y:34%; --dy:90px; --r:5deg; --dur:27s; --dl:-13s; --s:.65"><svg viewBox="-26 -20 56 40"><path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff"/><path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff"/><path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6"/></svg></span>
+      <span class="pr-fly" style="--y:52%; --dy:-40px; --r:-2deg; --dur:17s; --dl:-9s; --s:1"><svg viewBox="-26 -20 56 40"><path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff"/><path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff"/><path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6"/></svg></span>
+      <span class="pr-fly" style="--y:68%; --dy:80px; --r:4deg; --dur:24s; --dl:-1s; --s:.7"><svg viewBox="-26 -20 56 40"><path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff"/><path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff"/><path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6"/></svg></span>
+      <span class="pr-fly" style="--y:80%; --dy:-90px; --r:-6deg; --dur:30s; --dl:-18s; --s:.55"><svg viewBox="-26 -20 56 40"><path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff"/><path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff"/><path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6"/></svg></span>
+      <span class="pr-fly" style="--y:24%; --dy:50px; --r:3deg; --dur:35s; --dl:-22s; --s:.5"><svg viewBox="-26 -20 56 40"><path d="M27 0 L-24 -19 L-11 0 Z" fill="#fff"/><path d="M27 0 L-11 0 L-24 19 Z" fill="#d8d2ff"/><path d="M-11 0 L-4 7 L-6 0 Z" fill="#b6acf6"/></svg></span>
+      <div class="pr-floor"><div class="pr-plane"><i></i></div></div>
+    </div>
+    <div class="container pr-inner">
+      <span class="pr-eyebrow" style="--n:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>Pricing</span>
+      <h2 style="--n:1">Start free.<br>Trade more, <span class="pr-hl">pay less.</span></h2>
+      <div class="pr-toggle" id="prToggle" role="radiogroup" aria-label="Billing period" style="--i:0; --n:2">
+        <span class="pr-thumb" aria-hidden="true"></span>
+        <button type="button" role="radio" aria-checked="true" data-billing="monthly">Monthly</button>
+        <button type="button" role="radio" aria-checked="false" data-billing="yearly">Yearly <em>−20%</em></button>
+      </div>
+      <p class="pr-save" id="prSave" style="--n:3" aria-live="polite">Go yearly and save up to <b>$<span id="prSaveNum">0</span></b> a year</p>
+      <div class="pricing-grid">
+        <article class="price-card" style="--n:0; --side:-1; --c1:#5ce1ff; --c2:#7c5cff">
+          <div class="pc-fan"><div class="pc-inner">
+            
+            <div class="pc-body">
+              <div class="pc-fx" aria-hidden="true"><span class="pc-glow"></span><span class="pc-foil"></span></div>
+              <h3>Starter</h3>
+              <p class="pc-tag">For trying things out</p>
+              <p class="pc-price pc-free" aria-label="Free"><span>Free</span></p>
+              <p class="pc-note" data-monthly="Free forever" data-yearly="Free forever">Free forever</p>
+              <ul class="pc-list"><li style="--i:0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>List up to 2 links</li><li style="--i:1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Standard escrow</li><li style="--i:2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Marketplace access</li></ul>
+              <div class="pc-cta"><a href="#" class="btn btn-outline btn-magnetic" data-magnetic><span class="btn-label">Start free</span></a></div>
+            </div>
+          </div></div>
+        </article>
+        <article class="price-card featured" style="--n:1; --side:0; --c1:#7c5cff; --c2:#ff6b9d">
+          <div class="pc-fan"><div class="pc-inner">
+            <span class="pc-halo" aria-hidden="true"></span><svg class="pc-seal" viewBox="0 0 120 120" aria-hidden="true">
+              <defs>
+                <linearGradient id="sealGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#ff6b9d"/></linearGradient>
+                <path id="sealPath" d="M60 60 m-43 0 a43 43 0 1 1 86 0 a43 43 0 1 1 -86 0"/>
+              </defs>
+              <circle cx="60" cy="60" r="58" fill="url(#sealGrad)"/>
+              <circle cx="60" cy="60" r="53" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="2 4"/>
+              <g class="seal-ring"><text><textPath href="#sealPath" id="sealText" textLength="268" lengthAdjust="spacing">MOST LOVED ✦ MOST LOVED ✦ </textPath></text></g>
+              <path class="seal-star" d="M60 44 L65 55 L77 56.5 L68 65 L70.5 77 L60 71 L49.5 77 L52 65 L43 56.5 L55 55 Z"/>
+            </svg><span class="pc-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>Most popular</span>
+            <div class="pc-body">
+              <div class="pc-fx" aria-hidden="true"><span class="pc-glow"></span><span class="pc-foil"></span></div>
+              <h3>Trader</h3>
+              <p class="pc-tag">For people who trade every week</p>
+              <p class="pc-price" data-monthly="19" data-yearly="15" aria-label="$19 per month"></p>
+              <p class="pc-note" data-monthly="Cancel any time" data-yearly="Billed yearly · save 20%">Cancel any time</p>
+              <ul class="pc-list"><li style="--i:0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Unlimited listings</li><li style="--i:1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Priority placement</li><li style="--i:2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Analytics dashboard</li></ul>
+              <div class="pc-cta"><a href="#" class="btn btn-primary btn-magnetic" data-magnetic><span class="btn-label">Start trading</span></a></div>
+            </div>
+          </div></div>
+        </article>
+        <article class="price-card" style="--n:2; --side:1; --c1:#ffc94d; --c2:#ff6b9d">
+          <div class="pc-fan"><div class="pc-inner">
+            
+            <div class="pc-body">
+              <div class="pc-fx" aria-hidden="true"><span class="pc-glow"></span><span class="pc-foil"></span></div>
+              <h3>Marketplace Pro</h3>
+              <p class="pc-tag">For teams and power sellers</p>
+              <p class="pc-price" data-monthly="49" data-yearly="39" aria-label="$49 per month"></p>
+              <p class="pc-note" data-monthly="Cancel any time" data-yearly="Billed yearly · save 20%">Cancel any time</p>
+              <ul class="pc-list"><li style="--i:0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Everything in Trader</li><li style="--i:1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>API access</li><li style="--i:2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Dedicated support</li></ul>
+              <div class="pc-cta"><a href="#" class="btn btn-outline btn-magnetic" data-magnetic><span class="btn-label">Go Pro</span></a></div>
+            </div>
+          </div></div>
+        </article>
+      </div>
+      <p class="pr-foot" style="--n:6">Every plan comes with escrow-protected checkout.</p>
+    </div>
+  </section>
+
+  <!-- 8. THE FINALE — a night sky with an Earth rising from the bottom edge, a "claim your link" field, and a paper plane that flies to
+       the globe when you claim (see finale.js). Names are reserved through the same Worker as the reviews: set its address in data-api here,
+       or leave this empty to use the one on the reviews section. With neither set, claiming only works as a demo in the visitor's browser. -->
+  <section class="section cta-section" id="cta" aria-label="Claim your link" data-api="">
+    <div class="cta-scene" aria-hidden="true"><canvas id="ctaGlobe"></canvas></div>
+    <div class="container cta-inner">
+      <span class="pr-eyebrow" style="--n:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>Claim your link</span>
+      <h2 id="ctaTitle" style="--n:1">Start trading<br>links <span class="pr-hl">today.</span></h2>
+      <p class="hero-sub" style="--n:2">Free to list. Free to browse. sent4u only earns when you do.</p>
+      <div class="claim-wrap" style="--n:3">
+        <form class="claim" id="claimForm" data-state="idle" novalidate>
+          <div class="claim-row">
+            <label class="claim-field">
+              <span class="claim-prefix">sent4u.link/</span>
+              <input name="handle" type="text" maxlength="24" placeholder="yourname" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Choose the name for your link" aria-describedby="claimHint">
+              <span class="claim-status" aria-hidden="true">
+                <i class="cs-spin"></i>
+                <svg class="cs-ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                <svg class="cs-no" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-lg btn-magnetic" data-magnetic><span class="btn-label">Claim it</span></button>
+          </div>
+          <div class="claim-more"><div><input name="email" type="email" maxlength="80" placeholder="Email (optional): so we can reach you about your link" autocomplete="email" aria-label="Your email, optional"></div></div>
+          <input type="text" name="website" class="rvm-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <p class="claim-hint" id="claimHint" role="status" aria-live="polite"></p>
+        </form>
+        <div class="claim-done" id="claimDone" hidden>
+          <span class="claim-tick" aria-hidden="true">✓</span>
+          <p class="claim-done-title" tabindex="-1"><b id="claimDoneLink"></b> is yours</p>
+          <p class="claim-done-sub" id="claimDoneSub"></p>
+          <div class="claim-done-actions">
+            <button type="button" class="pill-btn" id="claimCopy">Copy link<span class="pill-arrow" aria-hidden="true">→</span></button>
+            <button type="button" class="claim-again" id="claimAgain">Use a different name</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="ft-mark" aria-hidden="true"><span>s</span><span>e</span><span>n</span><span>t</span><span>4</span><span>u</span></div>
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo">sent4u</span>
+      <p>The marketplace for links.</p>
+    </div>
+    <div class="footer-col"><h4>Product</h4><a href="#apps">Marketplace</a><a href="#how">How it works</a><a href="#pricing">Pricing</a></div>
+    <div class="footer-col"><h4>Company</h4><a href="#">About</a><a href="#">Careers</a><a href="#">Blog</a></div>
+    <div class="footer-col"><h4>Legal</h4><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Escrow policy</a></div>
+  </div>
+  <div class="container footer-bottom">
+    <span>© 2026 sent4u. A concept demo, not a real marketplace.</span>
+    <span class="model-credit">“Satellite” and “Paper airplane” 3D models by Poly by Google (<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC-BY 3.0</a>, via <a href="https://poly.pizza" target="_blank" rel="noopener">poly.pizza</a>) · Land outlines: <a href="https://www.naturalearthdata.com" target="_blank" rel="noopener">Natural Earth</a> (public domain)</span>
+  </div>
+</footer>
+
+<!-- leave-a-review dialog (see initReviewForm) -->
+<div class="rv-modal" id="reviewModal" role="dialog" aria-modal="true" aria-labelledby="rvModalTitle" hidden>
+  <div class="rvm-backdrop" data-close></div>
+  <div class="rvm-panel" tabindex="-1" data-lenis-prevent>
+    <button type="button" class="rvm-close" data-close aria-label="Close">×</button>
+    <form id="reviewForm" novalidate>
+      <h3 id="rvModalTitle">Leave a review</h3>
+      <p class="rvm-sub">Tell people what it was like. Your review goes on the wall as soon as you send it.</p>
+      <fieldset class="rvm-rating"><legend>Your rating</legend><div class="rvm-stars"><input type="radio" name="rating" id="rvR5" value="5"><label for="rvR5" title="5 stars"><span class="rvm-sr">5 stars</span>★</label><input type="radio" name="rating" id="rvR4" value="4"><label for="rvR4" title="4 stars"><span class="rvm-sr">4 stars</span>★</label><input type="radio" name="rating" id="rvR3" value="3"><label for="rvR3" title="3 stars"><span class="rvm-sr">3 stars</span>★</label><input type="radio" name="rating" id="rvR2" value="2"><label for="rvR2" title="2 stars"><span class="rvm-sr">2 stars</span>★</label><input type="radio" name="rating" id="rvR1" value="1"><label for="rvR1" title="1 star"><span class="rvm-sr">1 star</span>★</label></div></fieldset>
+      <fieldset class="rvm-tools"><legend>What did you use?</legend><div class="rvm-chips"><input type="radio" name="tool" id="rvTSend" value="Send"><label for="rvTSend" style="--c:#7c5cff">Send</label><input type="radio" name="tool" id="rvTPixel" value="Pixel"><label for="rvTPixel" style="--c:#8fb84a">Pixel</label><input type="radio" name="tool" id="rvTPinky" value="Pinky"><label for="rvTPinky" style="--c:#ff2e7e">Pinky</label><input type="radio" name="tool" id="rvTWinXP" value="WinXP"><label for="rvTWinXP" style="--c:#3d8bff">WinXP</label><input type="radio" name="tool" id="rvTMarketplace" value="Marketplace"><label for="rvTMarketplace" style="--c:#12a0c8">Marketplace</label></div></fieldset>
+      <label class="rvm-field"><span>Your review</span>
+        <textarea name="text" rows="4" maxlength="280" placeholder="What did you send, sell or buy — and how did it go?"></textarea>
+        <small class="rvm-count">0 / 280</small></label>
+      <div class="rvm-row">
+        <label class="rvm-field"><span>Name</span><input name="name" maxlength="40" autocomplete="name" placeholder="First name and initial"></label>
+        <label class="rvm-field"><span>What you do <em>optional</em></span><input name="role" maxlength="40" placeholder="e.g. Designer"></label>
+      </div>
+      <label class="rvm-field"><span>Email <em>optional · never shown</em></span><input type="email" name="email" maxlength="80" autocomplete="email" placeholder="So we can check it’s really you"></label>
+      <input type="text" name="website" class="rvm-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="rvm-check"><input type="checkbox" name="consent"><span>I’m happy for my name and review to be shown publicly on sent4u.</span></label>
+      <div class="rvm-turnstile" hidden></div>
+      <p class="rvm-error" role="alert" hidden></p>
+      <button type="submit" class="pill-btn rvm-submit">Send review<span class="pill-arrow" aria-hidden="true">→</span></button>
+    </form>
+    <div class="rvm-done" hidden>
+      <span class="rvm-tick" aria-hidden="true">✓</span>
+      <h3 tabindex="-1">Thank you!</h3>
+      <p class="rvm-done-text"></p>
+      <button type="button" class="pill-btn rvm-submit" data-close>Close<span class="pill-arrow" aria-hidden="true">→</span></button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="script.js"></script>
+</body>
+</html>

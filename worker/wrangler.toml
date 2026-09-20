@@ -1,0 +1,17 @@
+name = "sent4u-reviews"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# the bucket that holds the reviews (create it once: npx wrangler r2 bucket create sent4u-reviews)
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "sent4u-reviews"
+
+[vars]
+# the sites that may send reviews, comma separated. Put your real address here, e.g. https://sent4u.link
+ALLOWED_ORIGINS = "https://sent4u.link,http://localhost:4173"
+
+# Secrets (never put these in this file — set them with `npx wrangler secret put NAME`):
+#   ADMIN_TOKEN       lets you delete a review
+#   TURNSTILE_SECRET  optional: turns on the Cloudflare human check (see README)
+#   IP_SALT           optional: any random text, makes the stored IP hashes harder to reverse

@@ -1,0 +1,14 @@
+{
+  "name": "sent4u-reviews",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/worker.test.mjs",
+    "local": "node test/local-server.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

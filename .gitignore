@@ -1,0 +1,19 @@
+# dependencies and build output
+node_modules/
+dist/
+.wrangler/
+*.log
+
+# local tooling
+.claude/
+.DS_Store
+Thumbs.db
+
+# reference material kept for working on the site, not part of it (third-party docs and notes)
+animejs-docs/
+motion-docs/
+parallax-techniques.md
+
+# 3D models that are downloaded but not used by the site
+assets/models/earth.glb
+assets/models/moon.glb

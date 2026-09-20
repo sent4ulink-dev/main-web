@@ -1,0 +1,102 @@
+{
+  "_how_to_use": "Add approved reviews to the TOP of the \"reviews\" list, in the same shape, without \"sample\": true. tool must be one of: Send, Pixel, Pinky, WinXP, Marketplace. rating is 1-5. text is up to 280 characters. The rating, review count and \"would recommend\" figures on the site are worked out from the real reviews here. The entries marked \"sample\": true are made-up placeholders and are NOT shown unless you set showSamples to true (only do that for a private preview, never on the live site).",
+  "showSamples": false,
+  "reviews": [
+    {
+      "name": "Jordan M.",
+      "role": "Domain investor",
+      "tool": "Marketplace",
+      "rating": 5,
+      "text": "Sold three aged domains in a week — the escrow made buyers trust the listing instantly.",
+      "sample": true
+    },
+    {
+      "name": "Lena K.",
+      "role": "Wedding planner",
+      "tool": "Pinky",
+      "rating": 5,
+      "text": "I sent the invite with Pinky and three guests screenshotted it before they even replied. Instant hit.",
+      "sample": true
+    },
+    {
+      "name": "Aisha B.",
+      "role": "Podcaster",
+      "tool": "Marketplace",
+      "rating": 5,
+      "text": "The payout landed the same afternoon the deal closed. Fees only when I earn — that is fair.",
+      "sample": true
+    },
+    {
+      "name": "Ren A.",
+      "role": "Newsletter editor",
+      "tool": "Marketplace",
+      "rating": 5,
+      "text": "I swap newsletter placements every month now. No cash, just fair trades.",
+      "sample": true
+    },
+    {
+      "name": "Omar S.",
+      "role": "Indie developer",
+      "tool": "Pixel",
+      "rating": 5,
+      "text": "Pixel’s little LCD look is perfect. My friends thought I had built a Game Boy app.",
+      "sample": true
+    },
+    {
+      "name": "Priya D.",
+      "role": "Creator",
+      "tool": "Marketplace",
+      "rating": 5,
+      "text": "Listing my bio slots turned a passive audience into real, recurring income.",
+      "sample": true
+    },
+    {
+      "name": "Tomás V.",
+      "role": "Designer",
+      "tool": "Pinky",
+      "rating": 5,
+      "text": "Neon pink, black stage, italic serif — it looks like a fashion drop, not a link.",
+      "sample": true
+    },
+    {
+      "name": "Sofia R.",
+      "role": "Teacher",
+      "tool": "WinXP",
+      "rating": 5,
+      "text": "The XP window popping open made my mum laugh and cry at once. Best birthday link ever.",
+      "sample": true
+    },
+    {
+      "name": "Dae-jung P.",
+      "role": "Founder",
+      "tool": "Send",
+      "rating": 5,
+      "text": "One sent4u.link in the group chat and the whole team had the doc in seconds.",
+      "sample": true
+    },
+    {
+      "name": "Marcus T.",
+      "role": "Affiliate marketer",
+      "tool": "Marketplace",
+      "rating": 5,
+      "text": "The marketplace filters found me buyers I never would have reached on my own.",
+      "sample": true
+    },
+    {
+      "name": "Hannah W.",
+      "role": "Community lead",
+      "tool": "Send",
+      "rating": 5,
+      "text": "The link preview looks so clean in messages that people actually tap it.",
+      "sample": true
+    },
+    {
+      "name": "Ravi N.",
+      "role": "Reseller",
+      "tool": "Marketplace",
+      "rating": 5,
+      "text": "Verified sellers and audited stats — I stopped second-guessing every purchase.",
+      "sample": true
+    }
+  ]
+}
