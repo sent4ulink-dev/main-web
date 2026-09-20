@@ -19,14 +19,14 @@ npm test           # the Worker's tests (they need no Cloudflare account)
 
 ## Deploy
 
-**The site → Cloudflare Pages.** Connect this repository in the Pages dashboard, then set:
+**The site → Cloudflare (Workers & Pages).** Connect this repository in the dashboard, then set:
 
 | Setting | Value |
 |---|---|
 | Build command | `npm run build` |
-| Build output directory | `dist` |
+| Deploy command | `npx wrangler deploy` |
 
-`dist/` holds only what the browser needs, so `worker/` and the notes are never served.
+The root `wrangler.jsonc` tells `wrangler deploy` to publish the `dist/` folder, which holds only what the browser needs, so `worker/` and the notes are never served. (If you use a classic Pages project instead, set the build output directory to `dist` and leave the deploy command empty.)
 
 **The reviews and claims → the Worker.** Follow [worker/README.md](worker/README.md) (about 10 minutes: create the R2 bucket, set two secrets, `wrangler deploy`). Then:
 

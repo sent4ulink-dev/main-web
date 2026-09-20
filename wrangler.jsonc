@@ -1,0 +1,9 @@
+{
+  // The site itself: a Worker with static assets. `npm run build` puts the site in dist/, and `npx wrangler deploy` publishes that folder.
+  // (The reviews / claims Worker is a separate project in worker/ with its own wrangler.toml.)
+  "name": "main-web",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}
