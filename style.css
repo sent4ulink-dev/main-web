@@ -335,7 +335,7 @@ main{ position:relative; overflow-x:clip; } /* slide-in reveals must not widen t
 .bridge-hit{ position:absolute; left:0; right:0; top:24%; bottom:24%; pointer-events:auto; cursor:grab; touch-action:pan-y; -webkit-tap-highlight-color:transparent; }
 .bridge-hit.is-drag{ cursor:grabbing; }
 
-/* ---------- pricing: a stage with three cards ---------- */
+/* ---------- pricing: a stage with two cards ---------- */
 @property --ang{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
 .pricing-section{ position:relative; overflow:hidden; padding-block:clamp(84px,11vh,120px) clamp(120px,18vh,190px); }
 
@@ -429,7 +429,7 @@ main{ position:relative; overflow-x:clip; } /* slide-in reveals must not widen t
 
 /* the cards */
 .pricing-grid{
-  width:100%; display:grid; grid-template-columns:1fr 1.1fr 1fr; align-items:center; gap:clamp(16px,2.4vw,30px); perspective:1500px; text-align:left;
+  width:100%; max-width:920px; margin-inline:auto; display:grid; grid-template-columns:1fr 1.08fr; align-items:center; gap:clamp(16px,2.4vw,30px); perspective:1500px; text-align:left;
 }
 .price-card{ position:relative; opacity:0; }
 .pricing-section.is-in .price-card{ opacity:1; animation:prIn 1s cubic-bezier(.2,.8,.2,1) calc(var(--n) * 150ms) backwards; }
@@ -909,15 +909,12 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 
 /* ---- 3 · Pinky: black, neon #ff2e7e, Instrument Serif + Bodoni Moda italics ---- */
 .s-pinky{ background:#000; font-family:"Plus Jakarta Sans",var(--ff-body); }
-.pk-glow{ position:absolute; left:-25%; top:42%; width:90%; height:38%; background:radial-gradient(closest-side,rgba(255,46,126,.3),transparent); }
-.pk-line{ position:absolute; left:50%; top:0; bottom:0; width:1px; background:rgba(255,255,255,.1); }
-.pk-top{ position:absolute; top:38px; left:10px; right:10px; display:flex; justify-content:space-between; align-items:center; }
-.pk-pill{ padding:5px 8px; border-radius:99px; font-size:7px; font-weight:600; color:rgba(255,255,255,.75); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); }
-.pk-edit{ width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font-size:10px; color:#fff; border:1px solid rgba(255,255,255,.25); }
+.pk-glow{ position:absolute; left:5%; top:32%; width:90%; height:32%; background:radial-gradient(closest-side,rgba(255,46,126,.3),transparent); }
+.pk-line{ position:absolute; left:0; right:0; top:62%; height:1px; background:rgba(255,255,255,.1); }   /* Yes on top, No underneath: the same stacked layout as on a phone */
 .pk-logo{ position:absolute; top:66px; left:0; right:0; text-align:center; font:italic 400 18px "Instrument Serif",Georgia,serif; color:rgba(255,255,255,.92); letter-spacing:.01em; }
 .pk-logo em{ font-style:normal; opacity:.6; margin:0 2px; }
 .pk-bubble{
-  position:absolute; left:22px; right:22px; top:200px; padding:13px 16px; text-align:center; color:#fff;
+  position:absolute; left:22px; right:22px; top:124px; padding:13px 16px; text-align:center; color:#fff;
   font:italic 700 15px/1.25 "Bodoni Moda",Georgia,serif; background:#16050d; border:1.5px solid #ff2e7e; border-radius:14px;
   box-shadow:0 0 20px rgba(255,46,126,.55), inset 0 0 14px rgba(255,46,126,.22);
 }
@@ -925,9 +922,9 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .pk-bubble::before{ bottom:-10px; border-width:10px 9px 0; border-top-color:#ff2e7e; }
 .pk-bubble::after{ bottom:-7.5px; left:17.5px; border-width:8px 7.5px 0; border-top-color:#16050d; }
 .pk-heart{ position:absolute; right:-8px; top:-12px; font-style:normal; font-size:22px; line-height:1; color:#ff2e7e; filter:drop-shadow(0 0 6px rgba(255,46,126,.9)); }
-.pk-yes, .pk-no{ position:absolute; top:296px; width:50%; text-align:center; font:italic 400 66px/1 "Instrument Serif",Georgia,serif; }
-.pk-yes{ left:0; color:#ff2e7e; text-shadow:0 0 30px rgba(255,46,126,.5); }
-.pk-no{ right:0; color:#d6d6d6; }
+.pk-yes, .pk-no{ position:absolute; left:0; right:0; text-align:center; font:italic 400 66px/1 "Instrument Serif",Georgia,serif; }
+.pk-yes{ top:218px; color:#ff2e7e; text-shadow:0 0 30px rgba(255,46,126,.5); }
+.pk-no{ top:424px; color:#d6d6d6; }
 .pscreen[data-s="on"] .pk-bubble{ animation:pkPop .6s .2s cubic-bezier(.2,.9,.3,1.2) both, pkGlow 2.6s 1s ease-in-out infinite; }
 .pscreen[data-s="on"] .pk-heart{ animation:pkBeat 1.3s ease-in-out infinite; }
 .pscreen[data-s="on"] .pk-yes{ animation:pkBreath 3s ease-in-out infinite; }
@@ -969,7 +966,7 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .xp-wb i.x::after{ content:"✕"; font-size:7px; }
 .xp-menu{ display:flex; gap:9px; padding:3px 7px; font-size:7.5px; color:#111; background:#ece9d8; border-bottom:1px solid #cfcbb6; }
 .xp-body{ padding:11px 8px 12px; text-align:center; background:#f6f4ea; }
-.xp-heart{ width:28px; height:25px; margin:0 auto 6px; display:block; stroke:none; }
+.pscreen .xp-heart{ width:28px; height:25px; margin:0 auto 6px; display:block; stroke:none; }   /* (needs the .pscreen too: ".pscreen svg" would otherwise put a thick white outline on it) */
 .xp-body p{ margin:0 0 11px; font-size:14px; font-weight:700; line-height:1.2; color:#12315d; }
 .xp-btns{ display:flex; gap:7px; justify-content:center; }
 .xp-b{ padding:5px 9px; font-size:9px; color:#062b59; background:linear-gradient(180deg,#fff,#ecebe5 85%,#d6d0c5); border:1px solid #003c74; border-radius:3px; }

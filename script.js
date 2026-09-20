@@ -1033,7 +1033,7 @@ function initPricing(){
   const prices = [...sec.querySelectorAll('.pc-price[data-monthly]')];
   const notes = [...sec.querySelectorAll('.pc-note')];
   const sealText = document.getElementById('sealText'), saveNum = document.getElementById('prSaveNum');
-  const SAVE = 118;                                         // the most a year on the yearly plan saves (Pro: 49 × 12 × 20%)
+  const SAVE = 48;                                          // what a year on the yearly plan saves (Trader: $19 → $15 a month, × 12)
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
 
   // Each price is a row of odometer wheels: a strip of 0–9 twice over, so a roll can spin a whole turn before it lands.
@@ -1145,7 +1145,7 @@ function initPricing(){
     if (!active){ raf = 0; return; }
     const r = sec.getBoundingClientRect(), vh = window.innerHeight;
     const fan = clamp((r.top + r.height / 2 - vh / 2) / (vh * 0.75), -1, 1), key = fan.toFixed(3);
-    if (key !== lastFan){                              // the three cards are moved directly (a custom property on the grid would restyle everything inside it)
+    if (key !== lastFan){                              // the cards are moved directly (a custom property on the grid would restyle everything inside it)
       lastFan = key;
       for (const f of fans) f.el.style.transform = wide.matches ? `translate3d(0,${(fan * f.lift).toFixed(1)}px,0) rotateY(${(fan * f.side * -22).toFixed(2)}deg) scale(${(f.s - fan * fan * 0.05).toFixed(4)})` : '';
     }
