@@ -8,6 +8,8 @@
 
    The land outlines are Natural Earth (public domain). */
 
+import { onRealResize } from './viewport.js';
+
 const DEG = Math.PI / 180;
 const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -263,7 +265,7 @@ function initGlobe(sec, reduceMotion) {
 
   resize();
   buildLand().then(() => { if (reduceMotion) { draw(0); } }).catch(err => console.error('finale: could not build the globe', err));
-  window.addEventListener('resize', () => { resize(); if (reduceMotion && ready) draw(0); });
+  onRealResize(() => { resize(); if (reduceMotion && ready) draw(0); });
   if (reduceMotion) return { launch: () => Promise.resolve(), markClaimed: i => claimed.add(i) };
 
   window.addEventListener('sent4u:lite', () => { minGap = 50; });

@@ -1,5 +1,6 @@
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
+import { onRealResize } from './viewport.js';
 
 /* ---------------- Dot-matrix Earth · messages flying between real cities · Moon · Satellite ----------------
    The Earth is procedural: land is read from Natural Earth's public-domain 110m outlines
@@ -472,7 +473,7 @@ export async function initEarthScene({ canvas, reduceMotion }){
   if (!canvas || !canvas.getContext) return;
 
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); // the canvas is huge: more pixels than this cost a lot and show little
+  renderer.setPixelRatio(window.matchMedia('(pointer: coarse)').matches ? 1 : Math.min(window.devicePixelRatio || 1, 1.25)); // the canvas is huge: more pixels than this cost a lot and show little
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
@@ -593,7 +594,7 @@ export async function initEarthScene({ canvas, reduceMotion }){
     dotUniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
   }
   resize();
-  window.addEventListener('resize', resize);
+  onRealResize(resize);
 
   // gentle cursor-driven nudge, independent of the CSS billboard the canvas sits in
   let targetYaw = 0, targetPitch = 0, yaw = 0, pitch = 0;

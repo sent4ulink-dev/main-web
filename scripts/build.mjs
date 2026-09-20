@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const OUT = 'dist';
-const FILES = ['index.html', 'style.css', 'script.js', 'finale.js', 'earth-scene.js', '_headers'];
+const FILES = ['index.html', 'style.css', 'script.js', 'finale.js', 'earth-scene.js', 'viewport.js', '_headers'];
 const DIRS = ['vendor', 'assets'];
 
 rmSync(OUT, { recursive: true, force: true });

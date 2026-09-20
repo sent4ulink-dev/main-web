@@ -5,6 +5,7 @@ import {
 import Lenis from './vendor/lenis.js';
 import { initEarthScene } from './earth-scene.js';
 import { initFinale } from './finale.js';
+import { onRealResize, pinnedHeight } from './viewport.js';
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -262,7 +263,7 @@ function initHow(){
   }
 
   function measure(){
-    vw = window.innerWidth; vh = window.innerHeight;
+    vw = window.innerWidth; vh = pinnedHeight();
     endX = -N * vw;                                     // every slide is one screen wide: the intro plus N panels
     range = Math.max(wrap.offsetHeight - 120 - vh, 1);  // the wrapper keeps 120px below the pinned part
     buildLine();
@@ -295,7 +296,7 @@ function initHow(){
     active = e.isIntersecting;
     if (active && !raf){ pS = -1; last = 0; lastNow = 0; raf = requestAnimationFrame(frame); }
   }, { rootMargin: '150px' }).observe(wrap);
-  window.addEventListener('resize', measure);
+  onRealResize(measure);
   measure();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
   render(0);
@@ -335,7 +336,7 @@ function initTides(){
   // top of the screen the overlay is one solid colour, identical to what lies beneath it.
   function render(){
     if (!flooding) return;
-    const vh = window.innerHeight, sy = window.scrollY, howRange = Math.max(how.offsetHeight - 120 - vh, 1);
+    const vh = window.innerHeight, sy = window.scrollY, howRange = Math.max(how.offsetHeight - 120 - pinnedHeight(), 1);
     const jobs = [
       [tides[0], intro.offsetTop, Math.max(0, intro.offsetTop - vh) + 0.12 * vh],                          // light: just after you leave the hero
       [tides[1], how.offsetTop + how.offsetHeight, how.offsetTop + howRange + 0.05 * vh],                  // dark: once the sliding page has unpinned
@@ -358,7 +359,7 @@ function initTides(){
 
   place(); render();
   window.addEventListener('scroll', render, { passive: true });
-  window.addEventListener('resize', () => { place(); tides.forEach(t => t && (t.last = [])); render(); });
+  onRealResize(() => { place(); tides.forEach(t => t && (t.last = [])); render(); });
   if ('ResizeObserver' in window) new ResizeObserver(() => { place(); render(); }).observe(main);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { place(); render(); });
 }
@@ -368,7 +369,7 @@ function initTides(){
    slides up one line, staggered left to right, so the word appears to roll over. Links roll
    as a whole; headings roll one word at a time. Pure CSS transition — see .roll-* in style.css. */
 function initLetterRoll(){
-  if (reduceMotion) return;
+  if (reduceMotion || window.matchMedia('(hover: none)').matches) return;   // it only reacts to hovering, so a touch screen doesn't need it
   const targets = document.querySelectorAll(
     '.main-nav a, .text-link, .footer-col a, .menu-link-inner, .menu-social a, main h2, main h3'
   );
@@ -614,7 +615,7 @@ function initReviews(){
   });
 
   let refill = 0;
-  window.addEventListener('resize', () => { clearTimeout(refill); refill = setTimeout(fill, 200); });
+  onRealResize(fill, 200);
   if (reduceMotion){
     sec.classList.add('is-in', 'is-still');
     countUp(true);
@@ -656,7 +657,8 @@ function initReviews(){
     const dt = last ? Math.min(now - last, 64) : 16.7; last = now;
     const k = 1 - Math.exp(-dt / 180);
     cx += (tx - cx) * k; cy += (ty - cy) * k;
-    const [rx, ry, rz] = small.matches ? [8, 0, 3] : [12, -10, 5];
+    const lite = document.body.classList.contains('lite');
+    const [rx, ry, rz] = lite ? [0, 0, 4] : small.matches ? [8, 0, 3] : [12, -10, 5];   // lite: a flat wall, no 3D
     const tf = `rotateX(${(rx - cy * 7).toFixed(2)}deg) rotateY(${(ry + cx * 9).toFixed(2)}deg) rotateZ(${rz}deg)`;
     if (tf !== lastTf){ wall.style.transform = tf; lastTf = tf; }
     const r = sec.getBoundingClientRect(), vh = window.innerHeight;
@@ -1009,7 +1011,7 @@ function initBridge(){
   hit.addEventListener('pointercancel', e => release(e, true));
 
   let rt = 0;
-  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 200); });
+  onRealResize(resize, 200);
   new IntersectionObserver(([e]) => { active = e.isIntersecting; if (active && !raf){ last = 0; raf = requestAnimationFrame(frame); } }, { rootMargin: '100px' }).observe(sec);
 }
 
@@ -1224,7 +1226,7 @@ function initPricingStars(sec, scene){
   });
   sec.addEventListener('pointerleave', () => { mx = my = -9999; cursorLight.style.opacity = '0'; });
   let rt = 0;
-  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(build, 200); });
+  onRealResize(build, 200);
   build();
   new IntersectionObserver(([e]) => { active = e.isIntersecting; if (active && !raf){ last = 0; raf = requestAnimationFrame(frame); } }, { rootMargin: '80px' }).observe(sec);
 }
@@ -1244,6 +1246,9 @@ function initPerfGuard(){
   const query = new URLSearchParams(location.search);
   if (query.has('nolite')) return;
   if (query.has('lite')){ document.body.classList.add('lite'); window.dispatchEvent(new CustomEvent('sent4u:lite')); return; }
+  if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700){   // phones and tablets: lighter from the start
+    document.body.classList.add('lite'); window.dispatchEvent(new CustomEvent('sent4u:lite')); return;
+  }
   let attempts = 0;
   function sample(){
     const gaps = []; let last = 0;
@@ -1367,7 +1372,7 @@ function initSnake(){
     const vh = window.innerHeight;
     // Section 3 slides right → left while it is pinned, so the line hands over to the plane flying across that page (see
     // initHow) and ends there: before the pin the wave swings off the right edge, and the plane leaves at the left.
-    const range = Math.max(howEl.offsetHeight - 120 - vh, 1);
+    const range = Math.max(howEl.offsetHeight - 120 - pinnedHeight(), 1);
     pin0 = howEl.offsetTop - top + vh * 0.7;   // where the head is when the pin starts (it rides at 70% of the screen)
     pin1 = pin0 + range;
     H = Math.max(pin1 + 40, 1);
@@ -1488,7 +1493,7 @@ function initSnake(){
   cur = target;
   hits.forEach(h => { h.on = cur >= h.len - 40; });
   window.addEventListener('scroll', readTarget, { passive: true });
-  window.addEventListener('resize', () => { build(); readTarget(); });
+  onRealResize(() => { build(); readTarget(); });
   // section heights change (images and fonts loading) — re-anchor, but only when the page really changed size, and not more than once in a while
   if ('ResizeObserver' in window){
     let timer = 0;
@@ -1628,7 +1633,7 @@ function initPhoneSection(){
   let W = 0, H = 0, S = 1, mobile = false, keys = [], scatter = [], dockPos = [], dockY = 0, dockScale = 1;
   const pose = (x, y, s, rx, ry, rz) => ({ x, y, s, rx, ry, rz });
   function measure(){
-    W = window.innerWidth; H = window.innerHeight; mobile = W <= 900;
+    W = window.innerWidth; H = (document.getElementById('phoneSticky') || {}).clientHeight || window.innerHeight; mobile = W <= 900;
     S = mobile ? Math.min(H * 0.45 / 580, W * 0.66 / 280) : clamp(H * 0.7 / 580, 0.5, 1.2);
     const py = mobile ? -H * 0.17 : 0, y0 = mobile ? H * 0.14 : 0;
     intro.style.setProperty('--gap', `${Math.round(280 * S + 70)}px`);
@@ -1774,7 +1779,7 @@ function initPhoneSection(){
   if (!reduceMotion && !window.matchMedia('(hover: none)').matches){
     window.addEventListener('mousemove', e => { tmx = (e.clientX / W - 0.5) * 2; tmy = (e.clientY / H - 0.5) * 2; }, { passive: true });
   }
-  window.addEventListener('resize', measure);
+  onRealResize(measure);
   measure();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); // pill widths depend on the webfont
   render(0, 0);

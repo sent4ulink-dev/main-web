@@ -3,7 +3,7 @@
 The marketing site for sent4u: a static page (no framework, no bundler) plus a small Cloudflare Worker that keeps the reviews and the claimed link names in an R2 bucket.
 
 ```
-index.html  style.css  script.js  finale.js  earth-scene.js   the site
+index.html  style.css  script.js  finale.js  earth-scene.js  viewport.js   the site
 vendor/                                                        Three.js, Anime.js and Lenis, copied in (no install needed to run the site)
 assets/                                                        the land outlines, the font, the 3D models, reviews.json
 worker/                                                        the Cloudflare Worker (reviews + "claim your link"); see worker/README.md

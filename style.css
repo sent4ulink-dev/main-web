@@ -189,7 +189,7 @@ p{ margin:0 0 1em; color:var(--fg-dim); }
 .site-header .btn .btn-label::after{ width:30px; height:30px; font-size:.95rem; }
 
 /* ---------- hero ---------- */
-.hero{ min-height:100vh; display:flex; align-items:center; overflow:hidden; padding-top:120px; }
+.hero{ min-height:100vh; min-height:100svh; display:flex; align-items:center; overflow:hidden; padding-top:120px; }
 .hero-wordmark{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-start;
   font-family:var(--ff-head); font-weight:700; font-size:min(38vw,520px); color:#fff;
@@ -753,7 +753,7 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .phone-section{ position:relative; background:#0d0a24; }
 .phone-track{ position:relative; height:720vh; }
 /* the backdrop colour is set from JS (one saturated tint per tool); the gradients only add depth */
-.phone-sticky{ position:sticky; top:0; height:100vh; overflow:hidden; background-color:#0d0a24; }
+.phone-sticky{ position:sticky; top:0; height:100vh; height:100svh; overflow:hidden; background-color:#0d0a24; }
 /* the depth gradients live on their own layer: repainting them every frame (as the colour above changes) is slow */
 .phone-glow{
   position:absolute; inset:0; pointer-events:none; will-change:transform; transform:translateZ(0);
@@ -1157,7 +1157,7 @@ body:not(.tide-on) .tide{ display:none; }
 
 /* ---------- how it works: a pinned page that slides right → left, one full screen per step ---------- */
 .how-wrapper{ position:relative; height:calc(100vh + max(340vw, 300vh) + 120px); padding:0 0 120px; }
-.how-sticky{ position:sticky; top:0; height:100vh; overflow:hidden; color:#0b0b12; }
+.how-sticky{ position:sticky; top:0; height:100vh; height:100svh; overflow:hidden; color:#0b0b12; }
 .how-track{ position:absolute; left:0; top:0; height:100%; display:flex; align-items:stretch; will-change:transform; }
 .how-slide, .how-panel{ flex:none; width:100vw; }
 
@@ -1458,5 +1458,10 @@ body:not(.tide-on) .tide{ display:none; }
 /* a section that is well off screen does not animate (initOffscreenPause toggles .is-off) */
 .is-off, .is-off *, .is-off *::before, .is-off *::after{ animation-play-state:paused !important; }
 /* on a slow machine (initPerfGuard adds .lite) the pure decoration goes: the rest of the page looks the same */
-.lite .pr-marquee, .lite .pr-fly, .lite .pr-floor, .lite .rv-aurora, .lite .pr-aurora, .lite .pc-halo, .lite .pc-foil, .lite .tide-layer svg{ display:none; }
-.lite .pc-inner::before, .lite .price-card.featured .pc-fx::after, .lite .pc-badge, .lite .seal-ring, .lite .pc-free span{ animation:none; }
+.lite .pr-marquee, .lite .pr-fly, .lite .pr-floor, .lite .rv-aurora, .lite .pr-aurora, .lite .pc-halo, .lite .pc-foil{ display:none; }
+.lite .tide-layer svg, .lite .pc-inner::before, .lite .price-card.featured .pc-fx::after, .lite .pc-badge, .lite .seal-ring, .lite .pc-free span{ animation:none; }
+/* no 3D on a slow or touch screen: every depth layer is one more surface for the phone's GPU to composite */
+.lite .rv-stage, .lite .pricing-grid{ perspective:none; }
+.lite .rv-wall, .lite .pc-inner, .lite .pc-body{ transform-style:flat; }
+.lite .pc-body, .lite .pc-body > *{ transform:none !important; }
+.lite .pc-fan, .lite .pc-inner{ transform:none !important; }
