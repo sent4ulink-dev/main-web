@@ -229,13 +229,17 @@ p{ margin:0 0 1em; color:var(--fg-dim); }
 
 /* a small link packet continuously travels its own orbit around the earth canvas */
 @media (max-width:760px){
-  /* phones: the globe sits centred above the headline (scaled to ~68%), the copy starts below it */
-  .hero{ align-items:flex-start; padding-top:344px; padding-bottom:36px; }
+  /* phones: the globe sits centred above the headline (scaled down), the copy starts below it.
+     Kept noticeably shorter than it looks like it needs to be: a phone browser's own address/tab bar
+     covers a real chunk of the screen that plain CSS viewport units don't reliably account for
+     (confirmed against a real device, not just a simulated one — see the CTAs below). */
+  .hero{ align-items:flex-start; padding-top:266px; padding-bottom:36px; }
   .earth-canvas{ width:820px; height:820px; margin:-410px 0 0 -410px; }
-  .signal-layer-inner{ transform:scale(.68); transform-origin:center; }
+  .signal-layer-inner{ transform:scale(.56); transform-origin:center; }
   .signal-tilt{ left:50%; right:auto; margin-left:-470px; top:-222px; margin-top:0; opacity:1; }
   .signal-tilt, .billboard{ transform:none !important; } /* no CSS 3D tilt on phones: the globe stays a flat, true circle */
   .globe-label{ display:none; }
+  .hero-sub{ font-size:1rem; line-height:1.45; }
 }
 
 /* full-bleed: drops .container's centered max-width + side padding so the headline
