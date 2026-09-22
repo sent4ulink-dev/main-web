@@ -230,7 +230,7 @@ p{ margin:0 0 1em; color:var(--fg-dim); }
 /* a small link packet continuously travels its own orbit around the earth canvas */
 @media (max-width:760px){
   /* phones: the globe sits centred above the headline (scaled to ~68%), the copy starts below it */
-  .hero{ align-items:flex-start; padding-top:395px; padding-bottom:90px; }
+  .hero{ align-items:flex-start; padding-top:344px; padding-bottom:36px; }
   .earth-canvas{ width:820px; height:820px; margin:-410px 0 0 -410px; }
   .signal-layer-inner{ transform:scale(.68); transform-origin:center; }
   .signal-tilt{ left:50%; right:auto; margin-left:-470px; top:-222px; margin-top:0; opacity:1; }
@@ -249,7 +249,8 @@ p{ margin:0 0 1em; color:var(--fg-dim); }
 .hero-sub{ font-size:1.15rem; max-width:46ch; margin-left:auto; color:#c9c7d6; text-shadow:0 1px 14px rgba(8,8,12,.95), 0 0 4px rgba(8,8,12,.8); }
 .hero-ctas{ display:flex; gap:16px; margin-top:12px; flex-wrap:wrap; justify-content:flex-end; }
 @media (max-width:760px){
-  .hero-follow{ margin-top:20px; }
+  .hero-follow{ margin-top:14px; }
+  .hero-ctas{ gap:12px; margin-top:8px; } /* the two CTAs stack here (too narrow to sit side by side): tighter spacing keeps both on screen without scrolling */
 }
 .scroll-cue{
   position:absolute; bottom:36px; left:24px; display:flex; align-items:center; gap:10px;
