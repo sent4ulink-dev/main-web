@@ -145,7 +145,7 @@ export function LoveSnake({
     <section className="game-scene transition-in" aria-labelledby="snake-title">
       <div className="game-heading">
         <div>
-          <p className="eyebrow">НЭМЭЛТ ҮЕ / 01</p>
+          <p className="eyebrow">BONUS LEVEL / 01</p>
           <h1 id="snake-title">
             <InlineEdit
               value={content.gameTitle}
@@ -172,7 +172,7 @@ export function LoveSnake({
           className="pixel-progress"
           value={game.score}
           max={TARGET}
-          aria-label={`7 зүрхнээс ${game.score}-г цуглуулсан`}
+          aria-label={`${game.score} of 7 hearts collected`}
         />
         <span>
           {game.score}/{TARGET}
@@ -185,7 +185,7 @@ export function LoveSnake({
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
         role="application"
-        aria-label="Хайрын могой. Суман товч эсвэл WASD-аар хөдөлгөнө. Зай товчоор түр зогсооно. Ирмэгээр нэвт гарна."
+        aria-label="Love Snake. Move with the arrow keys or WASD. Space pauses. Edges wrap around."
         onPointerDown={(e) => {
           if (mode !== 'playing' || state.current.status !== 'playing') return;
           pointer.current = { x: e.clientX, y: e.clientY };
@@ -228,11 +228,11 @@ export function LoveSnake({
                   }
                 />
               ) : game.status === 'collision' ? (
-                'ЖААХАН ОРООЦОЛДЧИХЛОО'
+                'GOT A LITTLE TANGLED'
               ) : mode === 'paused' ? (
-                'ТҮР АМРААРАЙ'
+                'TAKE A BREAK'
               ) : (
-                '7 ЗҮРХ. НЭГ БОЛЗОО.'
+                '7 HEARTS. ONE DATE.'
               )}
             </h2>
             <p>
@@ -245,11 +245,11 @@ export function LoveSnake({
                   }
                 />
               ) : game.status === 'collision' ? (
-                'Дахиад нэг оролдоод үзье.'
+                "Let's try again."
               ) : mode === 'paused' ? (
-                'Зүрхнүүд чинь хадгалагдсан.'
+                'Your hearts are saved.'
               ) : (
-                'Зүрх цуглуул. Ирмэгээр нэвт гарна.'
+                'Collect hearts. Edges wrap around.'
               )}
             </p>
             <button
@@ -257,10 +257,10 @@ export function LoveSnake({
               onClick={editing ? undefined : start}
             >
               {game.status === 'collision'
-                ? 'ДАХИН ОРОЛДОХ'
+                ? 'TRY AGAIN'
                 : mode === 'paused'
-                  ? 'ҮРГЭЛЖЛҮҮЛЭХ'
-                  : 'ЭХЛЭХ'}{' '}
+                  ? 'CONTINUE'
+                  : 'START'}{' '}
               <span aria-hidden="true">▶</span>
             </button>
           </div>
@@ -270,12 +270,12 @@ export function LoveSnake({
         <div className="snake-message-editor">
           <button
             onClick={() => setEditMessage((editMessage + 6) % 7)}
-            aria-label="Өмнөх зүрхний зурвас"
+            aria-label="Previous heart message"
           >
             ◀
           </button>
           <p className="game-feedback">
-            <small>{editMessage + 1}/7 · ЗҮРХ АВАХАД</small>
+            <small>{editMessage + 1}/7 · ON HEART PICKUP</small>
             <InlineEdit
               value={content.snakeMessages[editMessage]}
               editing
@@ -289,30 +289,30 @@ export function LoveSnake({
           </p>
           <button
             onClick={() => setEditMessage((editMessage + 1) % 7)}
-            aria-label="Дараагийн зүрхний зурвас"
+            aria-label="Next heart message"
           >
             ▶
           </button>
         </div>
       ) : (
         <p className="game-feedback" aria-live="polite">
-          {message || 'Зүрх бүрээр чамдаа ойртоно.'}
+          {message || 'Every heart brings me closer to you.'}
         </p>
       )}
       {!editing && (
         <div className="game-controls">
           <span className="control-hint">
-            СУМ / WASD
+            ARROWS / WASD
             <br />
-            ЭСВЭЛ ШУДАРЧ ЭРГЭХ
+            OR SWIPE TO STEER
           </span>
-          <div className="dpad" aria-label="Чиглэлийн удирдлага">
+          <div className="dpad" aria-label="Direction controls">
             {(['up', 'left', 'down', 'right'] as Direction[]).map((dir, i) => (
               <button
                 key={dir}
                 className={dir}
                 aria-label={
-                  { up: 'Дээш', left: 'Зүүн', down: 'Доош', right: 'Баруун' }[
+                  { up: 'Up', left: 'Left', down: 'Down', right: 'Right' }[
                     dir
                   ]
                 }
@@ -332,7 +332,7 @@ export function LoveSnake({
             }
             disabled={mode === 'ready' || game.status !== 'playing'}
           >
-            {mode === 'paused' ? 'Тоглох' : 'Зогсоох'}
+            {mode === 'paused' ? 'Play' : 'Pause'}
           </button>
         </div>
       )}

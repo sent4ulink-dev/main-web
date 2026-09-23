@@ -39,7 +39,7 @@ export function Envelope({ open = false }: { open?: boolean }) {
 export function MessageNotification({
   onOpen,
   sender = dateConfig.sender,
-  notificationText = '1 зурвас\nирлээ',
+  notificationText = '1 message\nreceived',
   editing = false,
   onContentChange,
   content,
@@ -62,7 +62,7 @@ export function MessageNotification({
           className="message-alert"
           ref={ref}
           onClick={onOpen}
-          aria-label="Шинэ зурвасаа унших"
+          aria-label="Read your new message"
         >
           <Envelope />
           <span className="message-count">
@@ -76,7 +76,7 @@ export function MessageNotification({
             />
           </span>
           <span className="message-from">
-            ИЛГЭЭГЧ:{' '}
+            FROM:{' '}
             <InlineEdit
               value={sender}
               editing={editing}
@@ -90,7 +90,7 @@ export function MessageNotification({
       {!editing && (
         <footer className="softkeys single">
           <button onClick={onOpen}>
-            Унших <span aria-hidden="true">▶</span>
+            Read <span aria-hidden="true">▶</span>
           </button>
         </footer>
       )}
@@ -149,11 +149,11 @@ export function NokiaMessage({
       >
         <header className="sms-header">
           <Envelope open />
-          <h1 id="sms-title">Зурвасууд</h1>
+          <h1 id="sms-title">Messages</h1>
           <span>1/1</span>
         </header>
         <div className="sms-sender">
-          <span>Илгээгч:</span>
+          <span>From:</span>
           <strong>
             <InlineEdit
               value={content.sender}
@@ -161,7 +161,7 @@ export function NokiaMessage({
               onChange={(sender) => onContentChange?.({ ...content, sender })}
             />
           </strong>
-          <span className="sms-label">ЗУРВАС</span>
+          <span className="sms-label">MESSAGE</span>
         </div>
         <div className="sms-body">
           <p aria-hidden={!editing ? 'true' : undefined}>
@@ -184,17 +184,17 @@ export function NokiaMessage({
           {!editing && <p className="sr-only">{text}</p>}
         </div>
         <div className="sms-bottom">
-          <span>♥ ЗҮРХЭНДЭЭ ХАДГАЛЛАА</span>
+          <span>♥ SAVED TO HEART</span>
           {!done && (
-            <button onClick={() => setInstant(true)}>БҮГДИЙГ УНШИХ</button>
+            <button onClick={() => setInstant(true)}>READ ALL</button>
           )}
         </div>
       </section>
       {!editing && (
         <footer className="softkeys picker-softkeys">
-          <button onClick={() => dispatch({ type: 'BACK' })}>◀ Буцах</button>
+          <button onClick={() => dispatch({ type: 'BACK' })}>◀ Back</button>
           <button onClick={() => dispatch({ type: 'VIEW_PLAN' })}>
-            Бидний болзоо <span aria-hidden="true">▶</span>
+            Our date <span aria-hidden="true">▶</span>
           </button>
         </footer>
       )}

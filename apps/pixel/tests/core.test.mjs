@@ -26,15 +26,15 @@ test('editable activities keep their own sanitized place choices', () => {
       {
         id: 'coffee',
         NZ: 'ignored',
-        label: ' Кофе ',
-        places: [' Төв кафе ', ''],
+        label: ' Coffee ',
+        places: [' The downtown café ', ''],
       },
-      { id: 'walk', label: 'Алхах', places: ['Цэцэрлэг'] },
+      { id: 'walk', label: 'Walk', places: ['The park'] },
     ],
   });
   assert.deepEqual(content.activities, [
-    { id: 'coffee', label: 'Кофе', places: ['Төв кафе'] },
-    { id: 'walk', label: 'Алхах', places: ['Цэцэрлэг'] },
+    { id: 'coffee', label: 'Coffee', places: ['The downtown café'] },
+    { id: 'walk', label: 'Walk', places: ['The park'] },
   ]);
 });
 test('invitation completes through the bonus game and cat ending', () => {
@@ -164,7 +164,7 @@ test('the calendar download and Nokia message contain the same picked plan', () 
   assert.ok(
     event
       .replace(/\r\n /g, '')
-      .includes(`SUMMARY:Бидний болзоо: ${activities[3]}`),
+      .includes(`SUMMARY:Our date: ${activities[3]}`),
   );
   assert.match(event, /LOCATION:Our park\\, by the lake/);
   assert.equal(new Date(config.startsAt).getHours(), 19);
@@ -264,14 +264,14 @@ test('time menu excludes elapsed slots and handles midnight and month rollover',
 
 test('story sharing uses the exact confirmed plan', () => {
   const plan = {
-    activity: 'Нар жаргахыг харан алхах',
+    activity: 'Walk and watch the sunset',
     day: '2099-09-11',
     time: '19:30',
-    place: 'Голын эрэг',
+    place: 'The riverside park',
   };
   const text = sharePlanText(plan);
-  assert.match(text, /Нар жаргахыг харан алхах/);
+  assert.match(text, /Walk and watch the sunset/);
   assert.match(text, /2099\.09\.11, 19:30/);
-  assert.match(text, /Голын эрэг/);
-  assert.equal(storyFileName(plan), 'bidnii-bolzoo-2099-09-11-final.png');
+  assert.match(text, /The riverside park/);
+  assert.equal(storyFileName(plan), 'our-date-2099-09-11-final.png');
 });

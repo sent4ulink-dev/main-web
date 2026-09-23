@@ -162,7 +162,7 @@ export function Invitation({
     const event = calendarEvent(dateConfig),
       text =
         event ??
-        `${dateConfig.title}\n\nӨДӨР: ${dateConfig.date}\nЦАГ: ${dateConfig.time}\nГАЗАР: ${dateConfig.location}\n\n${dateConfig.message}\n\nБолзоогоо хараахан товлоогүй байна.\n`;
+        `${dateConfig.title}\n\nDAY: ${dateConfig.date}\nTIME: ${dateConfig.time}\nPLACE: ${dateConfig.location}\n\n${dateConfig.message}\n\nThe date hasn't been set yet.\n`;
     const url = URL.createObjectURL(
       new Blob([text], {
         type: event
@@ -177,13 +177,13 @@ export function Invitation({
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setSaved(event ? 'ХУАНЛИД ХАДГАЛАХ ФАЙЛ БЭЛЭН' : 'ТЭМДЭГЛЭЛ ХАДГАЛЛАА');
+    setSaved(event ? 'CALENDAR FILE READY' : 'NOTE SAVED');
   };
   const sharePlan = async () => {
     if (sharingRef.current) return;
     sharingRef.current = true;
     setSharing(true);
-    setShareStatus('ЗУРАГ ҮҮСГЭЖ БАЙНА...');
+    setShareStatus('CREATING IMAGE...');
     try {
       const file = await createStoryCard(displayPlan);
       if (
@@ -191,11 +191,11 @@ export function Invitation({
         (!navigator.canShare || navigator.canShare({ files: [file] }))
       ) {
         await navigator.share({
-          title: 'Бидний болзоо ♥',
+          title: 'Our date ♥',
           text: sharePlanText(displayPlan),
           files: [file],
         });
-        setShareStatus('ХУВААЛЦАХАД БЭЛЭН ♥');
+        setShareStatus('READY TO SHARE ♥');
       } else {
         const url = URL.createObjectURL(file);
         const link = document.createElement('a');
@@ -205,13 +205,13 @@ export function Invitation({
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        setShareStatus('ЗУРАГ ТАТАГДЛАА ♥');
+        setShareStatus('IMAGE DOWNLOADED ♥');
       }
     } catch (error) {
       setShareStatus(
         error instanceof DOMException && error.name === 'AbortError'
-          ? 'ХУВААЛЦАХЫГ ЦУЦАЛЛАА'
-          : 'ЗУРАГ ҮҮСГЭЖ ЧАДСАНГҮЙ',
+          ? 'SHARING CANCELLED'
+          : "COULDN'T CREATE THE IMAGE",
       );
     } finally {
       setSharing(false);
@@ -310,13 +310,13 @@ export function Invitation({
                         content.noMessages.length,
                     )
                   }
-                  aria-label="Өмнөх Үгүй хариу"
+                  aria-label="Previous No reply"
                 >
                   ◀
                 </button>
                 <output className="notice">
                   <small>
-                    {noEditMessage + 1}/{content.noMessages.length} · ҮГҮЙ ДАРАХАД
+                    {noEditMessage + 1}/{content.noMessages.length} · ON NO CLICK
                   </small>
                   <InlineEdit
                     value={content.noMessages[noEditMessage]}
@@ -337,7 +337,7 @@ export function Invitation({
                       (noEditMessage + 1) % content.noMessages.length,
                     )
                   }
-                  aria-label="Дараагийн Үгүй хариу"
+                  aria-label="Next No reply"
                 >
                   ▶
                 </button>
@@ -360,8 +360,8 @@ export function Invitation({
       case 'YES_PROCESSING':
         return (
           <>
-            <h1>ТҮР ХҮЛЭЭГЭЭРЭЙ...</h1>
-            <p>Бидний долгионыг хайж байна.</p>
+            <h1>HOLD ON...</h1>
+            <p>Finding our wavelength.</p>
             <Heart className="invitation-heart" />
           </>
         );
@@ -369,9 +369,9 @@ export function Invitation({
         return (
           <>
             <h1>
-              ХОЛБОЛТ
+              CONNECTION
               <br />
-              АМЖИЛТТАЙ
+              SUCCESSFUL
             </h1>
             <Heart className="invitation-heart" />
           </>
@@ -441,38 +441,38 @@ export function Invitation({
               {editable('dateTitle')} <span aria-hidden="true">♥</span>
             </h1>
             <dl className="date-grid">
-              <dt>ЮУ</dt>
+              <dt>WHAT</dt>
               <dd>{previewPlan.activity}</dd>
-              <dt>ӨДӨР</dt>
+              <dt>DAY</dt>
               <dd>{dateConfig.date}</dd>
-              <dt>ЦАГ</dt>
+              <dt>TIME</dt>
               <dd>{dateConfig.time}</dd>
-              <dt>ГАЗАР</dt>
+              <dt>PLACE</dt>
               <dd>{dateConfig.location}</dd>
-              <dt>ТӨЛӨВ</dt>
+              <dt>STATUS</dt>
               <dd>{editable('dateStatus')}</dd>
             </dl>
             <p className="date-message">{editable('dateMessage')}</p>
             <output className="save-feedback">
-              {shareStatus || saved || 'ЧИ + БИ. ТОХИРЛОО ШҮҮ.'}
+              {shareStatus || saved || "YOU + ME. IT'S A MATCH."}
             </output>
             <div className="date-actions">
               <button className="story-share pixel-button" onClick={save}>
-                ХУАНЛИД ХАДГАЛАХ <span aria-hidden="true">♥</span>
+                SAVE TO CALENDAR <span aria-hidden="true">♥</span>
               </button>
               <button
                 className="story-share pixel-button"
                 onClick={sharePlan}
                 disabled={sharing}
               >
-                {sharing ? 'ЗУРАГ ҮҮСГЭЖ БАЙНА...' : editable('shareImageLabel')}{' '}
+                {sharing ? 'CREATING IMAGE...' : editable('shareImageLabel')}{' '}
                 <span aria-hidden="true">♥</span>
               </button>
               <button
                 className="story-share pixel-button message-plan"
                 onClick={openPlanMessage}
               >
-                МЕССЕЖЭЭР ЯВУУЛАХ <span aria-hidden="true">▶</span>
+                SEND AS TEXT <span aria-hidden="true">▶</span>
               </button>
             </div>
           </>
@@ -523,18 +523,18 @@ export function Invitation({
         <button
           className="boot"
           onClick={() => dispatch({ type: 'BOOT_DONE' })}
-          aria-label="Эхлэлийг алгасах"
+          aria-label="Skip intro"
         >
           <span className="boot-title" aria-live="polite">
-            {bootFound ? 'ДОХИО ОЛДЛОО' : 'ХОЛБОЖ БАЙНА...'}
+            {bootFound ? 'SIGNAL FOUND' : 'CONNECTING...'}
           </span>
           <span className="boot-bars" aria-hidden="true">
             {Array.from({ length: 8 }, (_, i) => (
               <i key={i} style={{ '--i': i } as CSSProperties} />
             ))}
           </span>
-          <span className="boot-tagline">БЯЦХАН ДОХИО. БЯЦХАН ХАЙР.</span>
-          <span className="text-button">ҮРГЭЛЖЛҮҮЛЭХ ▶</span>
+          <span className="boot-tagline">A LITTLE SIGNAL. A LITTLE LOVE.</span>
+          <span className="text-button">CONTINUE ▶</span>
         </button>
       ) : scene === 'LOVE_SNAKE' ? (
         <LoveSnake
@@ -580,20 +580,20 @@ export function Invitation({
           tabIndex={-1}
           key={scene}
           className={`scene transition-in ${classes}`}
-          aria-label="Бидний бяцхан хайрын түүх"
+          aria-label="Our little love story"
         >
           {contents()}
         </section>
       )}
       <div className="sr-only" aria-live="polite">
         {scene === 'YES_PROCESSING'
-          ? 'Хариуг чинь хүлээн авч байна'
+          ? 'Receiving your answer'
           : scene === 'CONNECTED'
-            ? 'Холболт амжилттай'
+            ? 'Connection successful'
             : scene === 'GAME_COMPLETE'
-              ? 'Долоон зүрх цуглууллаа. Үе дууслаа.'
+              ? 'Seven hearts collected. Level cleared.'
               : scene === 'ENDING'
-                ? 'Төгс хос. Могой муур болон хувирч, хос дээрээ очлоо.'
+                ? 'Perfect pair. The snake becomes a cat, and finds its match.'
                 : ''}
       </div>
       {scene === 'INVITATION' && (
@@ -610,7 +610,7 @@ export function Invitation({
           >
             <span aria-hidden="true">◀</span> {editable('yesLabel')}
           </button>
-          <span className="footer-note">БЯЦХАН ДОХИО. БЯЦХАН ХАЙР.</span>
+          <span className="footer-note">A LITTLE SIGNAL. A LITTLE LOVE.</span>
           <button
             onClick={() => {
               if (!editing) dispatch({ type: 'DECLINE' });
@@ -637,13 +637,13 @@ export function Invitation({
               dispatch({ type: 'RETURN' });
             }}
           >
-            ◀ ДАХИН
+            ◀ REPLAY
           </button>
           <span className="date-signoff">{content.dateSignoff}</span>
         </footer>
       )}
       {editing && (
-        <nav className="inline-editor-nav" aria-label="Засах дэлгэц сонгох">
+        <nav className="inline-editor-nav" aria-label="Choose the screen to edit">
           <button
             onClick={() => {
               const index = editorScenes.indexOf(scene);
@@ -656,11 +656,11 @@ export function Invitation({
               });
             }}
           >
-            ◀ ӨМНӨХ
+            ◀ PREV
           </button>
           <span>
-            {editorScenes.indexOf(scene) + 1}/{editorScenes.length} · ТЕКСТ ДЭЭР
-            ДАРЖ ЗАСНА
+            {editorScenes.indexOf(scene) + 1}/{editorScenes.length} · tap the
+            text to edit
           </span>
           <button
             onClick={() => {
@@ -671,7 +671,7 @@ export function Invitation({
               });
             }}
           >
-            ДАРААХ ▶
+            NEXT ▶
           </button>
         </nav>
       )}

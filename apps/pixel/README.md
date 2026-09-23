@@ -10,17 +10,17 @@ A responsive monochrome LCD date invitation. Original canvas artwork, a guarded 
 
 Connect this repository to the `pixel-dom` Pages project and use `npm run build` as the build command. The tracked `wrangler.jsonc` selects `dist/pages` as the output directory. The build produces a standalone client-rendered `index.html`, so the Pages root URL works without a server function.
 
-Set `VITE_API_BASE_URL` to the Render API origin and `VITE_LOCK_ENABLED=true`. These values are public configuration and contain no password.
+Set `VITE_API_BASE_URL` to the API origin. This value is public configuration.
 
 ## Share API
 
-Deploy the included `render.yaml` as a Render Blueprint. The API exposes `POST /api/studio/unlock`, `POST /shares`, `GET/PUT /shares/:id`, `POST /shares/:id/finalize`, `GET /stats`, and `GET /health`. Keep `STUDIO_PASSWORD` only in Render's server environment. The password is compared through a fixed-length SHA-256 digest with Node's constant-time comparison and never enters the frontend build.
+Deploy the included `render.yaml` as a Render Blueprint. The API exposes `POST /shares/:id/ensure`, `GET/PUT /shares/:id`, `POST /shares/:id/finalize`, and `GET /health`.
 
-The studio session expires after one hour and stays only in page memory, so every reload asks again. Failed unlocks are tracked per client IP behind Render's trusted proxy: the first failure reports one remaining attempt, and the second failure removes the form and locks that IP for 24 hours. The in-memory lockout resets if the Render process restarts.
+There is no public studio and no password: an invitation only ever comes into existence because the sent4u order Worker calls `POST /shares/:id/ensure` server-to-server the moment it's paid for, gated by the shared secret `SHARE_CREATE_SECRET`. Whoever holds the resulting share URL can edit or finalize it within its edit window — the link itself is the credential.
 
 The API stores records in `server/data/shares.json` by default. For durable production storage, create a private Cloudflare R2 bucket and set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET` on Render. Each invitation is stored privately as `shares/<id>.json`; the bucket is never exposed to the browser.
 
-Sharing modes use query parameters only: `/` is the private studio, `/?share=test` is the browser-local public demo, and `/?share=<id>` loads a persisted invitation. A real invitation remains editable for five days unless its creator finalizes it first.
+Sharing modes use query parameters only: a bare visit shows a "this link doesn't look right" screen, `/?share=test` is the browser-local public demo, and `/?share=<id>` loads a persisted invitation. A real invitation remains editable for five days unless it's finalized first.
 
 ## Personalize
 
@@ -38,7 +38,7 @@ Motion follows `prefers-reduced-motion`; audio starts muted. Only the boot-seen 
 
 ## September 2026 update
 
-The UI and screen-reader labels are in Mongolian. `Love LCD` adds original pixel-grid Cyrillic glyphs including Өө and Үү to the OFL-licensed VT323 base; its generated WOFF2/TTF and reproducible source live in `public/fonts` and `scripts/build_pixel_font.py`. The supplied logo is unchanged and cropped for display with CSS.
+The UI and screen-reader labels are in English. `Love LCD` extends the OFL-licensed VT323 base with original pixel-grid glyphs; its generated WOFF2/TTF and reproducible source live in `public/fonts` and `scripts/build_pixel_font.py`. The logo is a plain "sent4u" wordmark set in this font.
 
 Calendar navigation is controlled explicitly. Time choices use 15-minute intervals and exclude elapsed times, refreshing every 15 seconds and on window focus. Clicking an already selected activity, day, or place confirms that step; a high-contrast confirmation button remains available. Framed opaque panels protect text from scenery. Snake touch targets are 64 × 64 CSS pixels.
 

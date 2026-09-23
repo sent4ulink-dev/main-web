@@ -2444,8 +2444,14 @@ svg {
 .brand-logo {
   width: 100%;
   height: 58px;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  font-family: LCD, monospace;
+  font-size: clamp(16px, 4.2vw, 22px);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 .scene,
 .picker-scene,

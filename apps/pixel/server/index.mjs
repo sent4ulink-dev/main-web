@@ -1,9 +1,3 @@
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from 'node:crypto';
 import cors from 'cors';
 import express from 'express';
 import { createStorage } from './storage.mjs';
@@ -12,10 +6,95 @@ const app = express();
 const storage = createStorage();
 const port = Number(process.env.PORT || 8787);
 const editWindowMs = 5 * 24 * 60 * 60 * 1000;
-const studioSessionMs = 60 * 60 * 1000;
-const lockoutMs = 24 * 60 * 60 * 1000;
-const maxPasswordFailures = 2;
-const passwordAttempts = new Map();
+
+app.disable('x-powered-by');
+app.use(
+  cors({
+    origin(origin, callback) {
+      const allowed = (process.env.CORS_ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (!origin || allowed.length === 0 || allowed.includes(origin))
+        return callback(null, true);
+      callback(new Error('Origin is not allowed.'));
+    },
+  }),
+);
+app.use(express.json({ limit: '32kb' }));
+
+const route = (handler) => (request, response, next) =>
+  Promise.resolve(handler(request, response, next)).catch(next);
+
+// Plain-JS mirror of lib/share-content.ts's defaultShareContent — the same starter
+// template every freshly-paid share begins from, before the buyer's first edit. Kept
+// as a literal here since this server runs directly under Node with no TS build step,
+// so it can't import that file. Bump the comment if that file's shape changes.
+function defaultShareContent() {
+  return {
+    networkLabel: 'LOVE NETWORK',
+    invitationEyebrow: '1 NEW MESSAGE',
+    invitationQuestion: 'Will you\ngo on a\ndate with me?',
+    yesLabel: 'Yes',
+    noLabel: 'No',
+    noMessages: [
+      'Are you sure?',
+      'Really?',
+      'Hmm, interesting...',
+      'Signal must be lost :)',
+      'Try the other button?',
+      'My heart says ask again.',
+    ],
+    successTitle: "IT'S A DATE!",
+    successAchievement: 'New achievement:',
+    successPair: 'YOU + ME',
+    successMessage: 'Best decision ever :)',
+    continueLabel: 'CONTINUE',
+    gamePromptEyebrow: 'A LITTLE GIFT FOR YOU',
+    gamePromptTitle: 'BONUS LEVEL\nUNLOCKED',
+    gamePromptMessage: 'One quick game before the date.\nSeven hearts. One cute pair.',
+    gameStartLabel: 'PLAY',
+    gameTitle: 'LOVE SNAKE',
+    gameEyebrow: 'BONUS LEVEL / 01',
+    gameMeterLabel: 'LOVE METER',
+    gameReadyTitle: '7 HEARTS. ONE DATE.',
+    gameReadyMessage: 'Collect hearts. Edges wrap around.',
+    gameCompleteTitle: 'LEVEL CLEARED!',
+    gameCompleteMessage: 'DATE UNLOCKED',
+    gameGoal: 'COLLECT 7 HEARTS TO SET THE DATE ♥',
+    snakeMessages: [
+      'LOVE +1',
+      'NICE!',
+      "I'M SO LUCKY",
+      'SO CUTE',
+      'YESSS',
+      'ALMOST THERE',
+      'PERFECT PAIR',
+    ],
+    endingEyebrow: 'TOP ACHIEVEMENT: US',
+    endingTitle: 'PERFECT PAIR',
+    endingMessage: 'Found my way to you.',
+    sender: 'Your person',
+    notificationText: '1 message\nreceived',
+    letterBody:
+      "Hi :)\n\nThe date is set!\n\n{activity}\n{date} at {time}\n{place}\n\nSeven hearts collected, and I'd still pick you.\n\n{closing}",
+    dateDetailsEyebrow: 'OUR CUTE LITTLE PLAN',
+    dateStatus: 'CONFIRMED ♥',
+    dateSignoff: "CAN'T WAIT ♥",
+    shareImageLabel: 'SAVE IMAGE',
+    dateTitle: 'Our date',
+    dateMessage: "Can't wait for our time together.",
+    smsClosing: "Can't wait to see you. <3",
+    activities: [
+      { id: 'activity-1', label: 'Coffee and a chat', places: ['A cozy café', 'Your favorite coffee shop', 'Somewhere new'] },
+      { id: 'activity-2', label: 'Dinner together', places: ['Our favorite restaurant', 'A cozy spot downtown', 'Dinner at home'] },
+      { id: 'activity-3', label: 'Watch a movie together', places: ['The movie theater', 'A movie night at home', 'Your favorite theater'] },
+      { id: 'activity-4', label: 'Walk and watch the sunset', places: ['By the river', 'A quiet park', 'Our favorite walking spot'] },
+      { id: 'activity-5', label: 'Get dessert', places: ['The ice cream place', 'A little bakery', 'Your favorite dessert spot'] },
+    ],
+  };
+}
+
 const contentKeys = [
   'networkLabel',
   'invitationEyebrow',
@@ -57,26 +136,6 @@ const limits = [
   30, 40, 90, 24, 24, 50, 50, 40, 90, 30, 70, 70, 180, 30, 50, 50, 40, 60, 100,
   60, 70, 100, 60, 50, 100, 40, 50, 800, 70, 50, 70, 40, 60, 180, 120,
 ];
-
-app.disable('x-powered-by');
-app.set('trust proxy', 1);
-app.use(
-  cors({
-    origin(origin, callback) {
-      const allowed = (process.env.CORS_ALLOWED_ORIGINS || '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
-      if (!origin || allowed.length === 0 || allowed.includes(origin))
-        return callback(null, true);
-      callback(new Error('Origin is not allowed.'));
-    },
-  }),
-);
-app.use(express.json({ limit: '32kb' }));
-
-const route = (handler) => (request, response, next) =>
-  Promise.resolve(handler(request, response, next)).catch(next);
 
 function cleanContent(value) {
   if (!value || typeof value !== 'object') return null;
@@ -138,131 +197,88 @@ function editable(record) {
   return !record.finalized && new Date(record.editUntil).getTime() > Date.now();
 }
 
+// The sent4u order Worker mints 128-bit random tokens (22-character base64url); "test"
+// is reserved for the demo and is never a real id.
 function validId(id) {
-  return /^[A-Za-z0-9_-]{8}$/.test(id) && id !== 'test';
+  return /^[A-Za-z0-9_-]{6,40}$/.test(id) && id !== 'test';
 }
 
 function publicRecord(record) {
-  const { editTokenHash: _secret, ...safe } = record;
-  return safe;
+  return record;
 }
 
-function tokenHash(token) {
-  return createHash('sha256').update(token).digest('hex');
+// Gates POST /shares/:id/ensure — the endpoint the sent4u order Worker calls,
+// server-to-server, the moment a paid order generates this id (see
+// worker/src/index.js's generateLinks). Never called from a browser: there is no
+// public studio any more, no password, no way to mint a share id from this app at
+// all — a real invitation only ever exists because it was paid for.
+const SHARE_CREATE_SECRET = process.env.SHARE_CREATE_SECRET;
+function requireCreateSecret(request, response, next) {
+  if (!SHARE_CREATE_SECRET) return next(); // not configured yet — dev convenience only
+  if (request.get('x-date-create-secret') !== SHARE_CREATE_SECRET)
+    return response.status(403).json({ error: 'forbidden' });
+  next();
 }
 
-function tokenMatches(record, authorization = '') {
-  const supplied = authorization.replace(/^Bearer\s+/i, '');
-  if (!supplied || !record.editTokenHash) return false;
-  const actual = Buffer.from(tokenHash(supplied));
-  const expected = Buffer.from(record.editTokenHash);
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
-
-function secureEqual(actual, expected) {
-  const actualHash = createHash('sha256').update(actual).digest();
-  const expectedHash = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(actualHash, expectedHash);
-}
-
-function createStudioToken() {
-  const payload = `${Date.now() + studioSessionMs}.${randomBytes(12).toString('base64url')}`;
-  const signature = createHmac('sha256', process.env.STUDIO_PASSWORD)
-    .update(payload)
-    .digest('base64url');
-  return `${payload}.${signature}`;
-}
-
-function validStudioToken(authorization = '') {
-  const token = authorization.replace(/^Bearer\s+/i, '');
-  const separator = token.lastIndexOf('.');
-  if (separator < 1 || !process.env.STUDIO_PASSWORD) return false;
-  const payload = token.slice(0, separator);
-  const signature = token.slice(separator + 1);
-  const expiresAt = Number(payload.split('.')[0]);
-  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return false;
-  const expected = createHmac('sha256', process.env.STUDIO_PASSWORD)
-    .update(payload)
-    .digest('base64url');
-  return secureEqual(signature, expected);
+// Self-heal: if a share isn't in storage yet, ask the sent4u order Worker whether this
+// id was ever actually issued (paid for, and for this product) before creating it here.
+// Covers the gap where the background /ensure call after a purchase is still mid-retry
+// when the buyer clicks the link; without this a link nobody did anything wrong to just
+// 404s forever. A random unpaid id still gets rejected, since the Worker only confirms
+// ids that exist in a real, unrevoked order.
+const ORDERS_API_BASE = (process.env.ORDERS_API_BASE ?? '').replace(/\/$/, '');
+async function selfHealShare(id) {
+  if (!ORDERS_API_BASE) return null; // not configured — self-heal simply can't run; /ensure remains the normal path
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const r = await fetch(`${ORDERS_API_BASE}/links/${encodeURIComponent(id)}`, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!r.ok) return null;
+    const { ok, product } = await r.json();
+    if (!ok || product !== 'pixel') return null; // exists, but isn't a Pixel link — not ours to heal
+  } catch (err) {
+    clearTimeout(timer);
+    console.warn(`Self-heal verify failed for ${id}:`, err.message);
+    return null;
+  }
+  const createdAt = new Date();
+  const record = {
+    id,
+    content: defaultShareContent(),
+    createdAt: createdAt.toISOString(),
+    editUntil: new Date(createdAt.getTime() + editWindowMs).toISOString(),
+    finalized: false,
+  };
+  await storage.put(id, record);
+  console.log(`Self-healed ${id} (verified with the order Worker, was never created here)`);
+  return record;
 }
 
 app.get('/health', (_request, response) => response.json({ ok: true }));
 
-app.post('/api/studio/unlock', (request, response) => {
-  const expected = process.env.STUDIO_PASSWORD;
-  if (!expected)
-    return response
-      .status(503)
-      .json({ status: 'error', message: 'Studio password is not configured.' });
-
-  const ip = request.ip || request.socket.remoteAddress || 'unknown';
-  let attempt = passwordAttempts.get(ip);
-  if (attempt?.lockedUntil > Date.now()) {
-    const retryAfterMs = attempt.lockedUntil - Date.now();
-    return response
-      .status(429)
-      .set('Retry-After', String(Math.ceil(retryAfterMs / 1000)))
-      .json({ status: 'locked_out', retryAfterMs });
-  }
-  if (attempt?.lockedUntil) {
-    passwordAttempts.delete(ip);
-    attempt = undefined;
-  }
-
-  const supplied =
-    typeof request.body?.password === 'string' ? request.body.password : '';
-  if (secureEqual(supplied, expected)) {
-    passwordAttempts.delete(ip);
-    return response
-      .set('Cache-Control', 'no-store')
-      .json({ status: 'ok', token: createStudioToken() });
-  }
-
-  const failures = (attempt?.fails ?? 0) + 1;
-  if (failures >= maxPasswordFailures) {
-    const lockedUntil = Date.now() + lockoutMs;
-    passwordAttempts.set(ip, { fails: failures, lockedUntil });
-    return response
-      .status(429)
-      .set('Retry-After', String(Math.ceil(lockoutMs / 1000)))
-      .json({ status: 'locked_out', retryAfterMs: lockoutMs });
-  }
-
-  const attemptsRemaining = maxPasswordFailures - failures;
-  passwordAttempts.set(ip, { fails: failures, lockedUntil: 0 });
-  response.status(401).json({ status: 'wrong', attemptsRemaining });
-});
-
+// POST /shares/:id/ensure — create a share at a SPECIFIC id if it doesn't already
+// exist (no-op otherwise, never overwrites existing content). This is the *only* way
+// a share ever comes into existence: there is no public, unauthenticated "create a
+// share" endpoint any more.
 app.post(
-  '/shares',
+  '/shares/:id/ensure',
+  requireCreateSecret,
   route(async (request, response) => {
-    if (!process.env.STUDIO_PASSWORD)
-      return response
-        .status(503)
-        .json({ error: 'Studio password is not configured.' });
-    if (!validStudioToken(request.get('authorization')))
-      return response.status(401).json({ error: 'Studio login is invalid.' });
-    const content = cleanContent(request.body?.content);
-    if (!content)
-      return response.status(400).json({ error: 'Invalid content.' });
-    let id;
-    do id = randomBytes(6).toString('base64url');
-    while (await storage.get(id));
+    const id = request.params.id;
+    if (!validId(id)) return response.status(422).json({ error: 'Invalid id.' });
+    const existing = await storage.get(id);
+    if (existing) return response.json({ ok: true, existed: true });
     const createdAt = new Date();
-    const editToken = randomBytes(24).toString('base64url');
-    const finalized = request.body?.finalized === true;
     const record = {
       id,
-      content,
+      content: defaultShareContent(),
       createdAt: createdAt.toISOString(),
       editUntil: new Date(createdAt.getTime() + editWindowMs).toISOString(),
-      finalized,
-      ...(finalized ? { finalizedAt: createdAt.toISOString() } : {}),
-      editTokenHash: tokenHash(editToken),
+      finalized: false,
     };
     await storage.put(id, record);
-    response.status(201).json({ ...publicRecord(record), editToken });
+    response.status(201).json({ ok: true, existed: false });
   }),
 );
 
@@ -271,9 +287,9 @@ app.get(
   route(async (request, response) => {
     if (!validId(request.params.id))
       return response.status(404).json({ error: 'Share not found.' });
-    const record = await storage.get(request.params.id);
-    if (!record)
-      return response.status(404).json({ error: 'Share not found.' });
+    let record = await storage.get(request.params.id);
+    if (!record) record = await selfHealShare(request.params.id);
+    if (!record) return response.status(404).json({ error: 'Share not found.' });
     response.json(publicRecord(record));
   }),
 );
@@ -297,6 +313,9 @@ app.put(
   }),
 );
 
+// Whoever holds the link can finalize it within the edit window — same trust model
+// as PUT above (there is no separate owner token any more; the link itself, only
+// ever handed to the buyer who paid for it, is the credential).
 app.post(
   '/shares/:id/finalize',
   route(async (request, response) => {
@@ -305,8 +324,6 @@ app.post(
     const record = await storage.get(request.params.id);
     if (!record)
       return response.status(404).json({ error: 'Share not found.' });
-    if (!tokenMatches(record, request.get('authorization')))
-      return response.status(403).json({ error: 'Owner token is invalid.' });
     if (!editable(record))
       return response.status(423).json({ error: 'Share is locked.' });
     const updated = {
@@ -319,19 +336,12 @@ app.post(
   }),
 );
 
-app.get(
-  '/stats',
-  route(async (_request, response) => {
-    const records = await storage.list();
-    const finalized = records.filter((record) => record.finalized).length;
-    const active = records.filter(editable).length;
-    response.json({ total: records.length, finalized, active });
-  }),
-);
-
 app.use((error, _request, response, _next) => {
   console.error(error);
   response.status(500).json({ error: 'Internal server error.' });
 });
 
-app.listen(port, () => console.log(`Share API listening on ${port}`));
+app.listen(port, () => {
+  console.log(`Share API listening on ${port}`);
+  console.log(`Fulfillment /ensure: ${SHARE_CREATE_SECRET ? 'secret-gated' : 'OPEN (SHARE_CREATE_SECRET unset)'}`);
+});

@@ -17,7 +17,7 @@ export function StatusBar({
   connected,
   sound,
   onSound,
-  networkLabel = 'ХАЙРЫН СҮЛЖЭЭ',
+  networkLabel = 'LOVE NETWORK',
 }: {
   connected: boolean;
   sound: boolean;
@@ -26,42 +26,21 @@ export function StatusBar({
 }) {
   return (
     <header className="status-bar">
-      <div className="signal" aria-label={`Дохио: 4-өөс ${connected ? 4 : 3}`}>
+      <div className="signal" aria-label={`Signal: ${connected ? 4 : 3} of 4`}>
         <i />
         <i />
         <i />
         <i className={connected ? '' : 'empty'} />
-        <span>{connected ? 'ХОЛБОГДЛОО' : networkLabel}</span>
+        <span>{connected ? 'CONNECTED' : networkLabel}</span>
       </div>
-      <svg
-        className="brand-logo"
-        viewBox="0 100 2172 480"
-        aria-label="Зөвхөн түүнд × 56 Moments"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <title>Зөвхөн түүнд × 56 Moments</title>
-        <filter id="logo-transparent-pixels" colorInterpolationFilters="sRGB">
-          <feColorMatrix
-            type="matrix"
-            values="0 0 0 0 .125  0 0 0 0 .208  0 0 0 0 .106  -.25 -.25 -.25 0 1"
-          />
-          <feComponentTransfer>
-            <feFuncA type="discrete" tableValues="0 0 1" />
-          </feComponentTransfer>
-          <feComposite in2="SourceAlpha" operator="in" />
-        </filter>
-        <image
-          href="/love-logo.png"
-          width="2172"
-          height="724"
-          filter="url(#logo-transparent-pixels)"
-        />
-      </svg>
+      <span className="brand-logo" aria-label="sent4u">
+        sent4u
+      </span>
       <div className="status-right">
         <button
           className="sound-toggle"
           onClick={onSound}
-          aria-label={sound ? 'Дууг хаах' : 'Дууг нээх'}
+          aria-label={sound ? 'Mute' : 'Unmute'}
           aria-pressed={sound}
         >
           <svg
@@ -90,7 +69,7 @@ export function StatusBar({
         <span className="battery-label">{connected ? '100%' : '87%'}</span>
         <div
           className="battery"
-          aria-label={`Цэнэг ${connected ? 100 : 87} хувь`}
+          aria-label={`Battery: ${connected ? 100 : 87}%`}
         >
           <i />
           <i />

@@ -7,18 +7,18 @@ const HEIGHT = 1920;
 
 export function sharePlanText(plan: DatePlan): string {
   const config = planConfig(plan);
-  return `БИДНИЙ БОЛЗОО ♥\n\nЮУ: ${plan.activity}\nӨДӨР, ЦАГ: ${config.date}, ${config.time}\nГАЗАР: ${config.location}\n\nХамтдаа өнгөрүүлэх мөчөө тэсэн ядан хүлээж байна ♥`;
+  return `OUR DATE ♥\n\nWHAT: ${plan.activity}\nDAY, TIME: ${config.date}, ${config.time}\nPLACE: ${config.location}\n\nCan't wait for our time together ♥`;
 }
 
 export function storyFileName(plan: DatePlan): string {
-  return `bidnii-bolzoo-${plan.day || 'story'}-final.png`;
+  return `our-date-${plan.day || 'story'}-final.png`;
 }
 
 async function drawBackground(ctx: CanvasRenderingContext2D) {
   const image = new Image();
   await new Promise<void>((resolve, reject) => {
     image.onload = () => resolve();
-    image.onerror = () => reject(new Error('Зургийн background ачаалсангүй.'));
+    image.onerror = () => reject(new Error("Couldn't load the background image."));
     image.src = '/assets/story-background-final.png';
   });
   ctx.drawImage(image, 0, 0, WIDTH, HEIGHT);
@@ -71,16 +71,16 @@ function drawPlan(ctx: CanvasRenderingContext2D, plan: DatePlan) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '32px LCD, monospace';
-  outlinedText('БИДНИЙ ХӨӨРХӨН ТӨЛӨВЛӨГӨӨ', WIDTH / 2, 380);
+  outlinedText('OUR CUTE LITTLE PLAN', WIDTH / 2, 380);
   ctx.font = '68px LCD, monospace';
-  outlinedText('БИДНИЙ БОЛЗОО ♥', WIDTH / 2, 475);
+  outlinedText('OUR DATE ♥', WIDTH / 2, 475);
 
   const rows = [
-    ['ЮУ', plan.activity],
-    ['ӨДӨР', config.date],
-    ['ЦАГ', config.time],
-    ['ГАЗАР', config.location],
-    ['ТӨЛӨВ', 'ТОВЛОГДЛОО ♥'],
+    ['WHAT', plan.activity],
+    ['DAY', config.date],
+    ['TIME', config.time],
+    ['PLACE', config.location],
+    ['STATUS', 'CONFIRMED ♥'],
   ];
   let y = 600;
   for (const [label, value] of rows) {
@@ -100,7 +100,7 @@ function drawPlan(ctx: CanvasRenderingContext2D, plan: DatePlan) {
   ctx.font = '31px LCD, monospace';
   const message = wrapText(
     ctx,
-    'Хамтдаа өнгөрүүлэх мөчөө тэсэн ядан хүлээж байна.',
+    "Can't wait for our time together.",
     730,
   );
   message.forEach((line, index) =>
@@ -113,7 +113,7 @@ export async function createStoryCard(plan: DatePlan): Promise<File> {
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Зургийн canvas үүссэнгүй.');
+  if (!ctx) throw new Error("Couldn't create the image canvas.");
   ctx.imageSmoothingEnabled = false;
   await drawBackground(ctx);
   drawPlan(ctx, plan);

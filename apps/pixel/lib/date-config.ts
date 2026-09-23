@@ -1,14 +1,14 @@
 // The only place to personalize the invitation. Leave startsAt/endsAt null
 // until the plan is real; the save action downloads a note in the meantime.
 export const dateConfig = {
-  date: 'Бидний сонгох өдөр',
-  time: 'Нар жаргах үеэр',
-  location: 'Чамтайгаа хаана ч байсан',
-  message: 'Хамтдаа өнгөрүүлэх мөчөө тэсэн ядан хүлээж байна.',
+  date: "A day we'll pick",
+  time: 'Around sunset',
+  location: 'Anywhere with you',
+  message: "Can't wait for our time together.",
   startsAt: null as string | null, // ISO 8601 with offset, e.g. 2026-10-10T18:00:00+08:00
   endsAt: null as string | null,
-  title: 'Бидний болзоо',
-  sender: 'Чиний хүн',
+  title: 'Our date',
+  sender: 'Your person',
   defaultTime: '18:00',
   durationMinutes: 120,
 };
@@ -26,33 +26,33 @@ export const emptyPlan: DatePlan = {
   place: '',
 };
 export const activities = [
-  'Кофе ууж ярилцах',
-  'Хамт оройн хоол идэх',
-  'Хамт кино үзэх',
-  'Нар жаргахыг харан алхах',
-  'Амттан идэх',
+  'Coffee and a chat',
+  'Dinner together',
+  'Watch a movie together',
+  'Walk and watch the sunset',
+  'Get dessert',
 ];
 export const placesByActivity: Record<string, string[]> = {
-  'Кофе ууж ярилцах': ['Тухтай кафе', 'Чиний дуртай кофе шоп', 'Шинэ газар'],
-  'Хамт оройн хоол идэх': [
-    'Бидний дуртай ресторан',
-    'Хотын төвийн тухтай газар',
-    'Гэртээ оройн хоол идэх',
+  'Coffee and a chat': ['A cozy café', 'Your favorite coffee shop', 'Somewhere new'],
+  'Dinner together': [
+    'Our favorite restaurant',
+    'A cozy spot downtown',
+    'Dinner at home',
   ],
-  'Хамт кино үзэх': [
-    'Кино театр',
-    'Гэртээ кино үзэх',
-    'Чиний дуртай кино театр',
+  'Watch a movie together': [
+    'The movie theater',
+    'A movie night at home',
+    'Your favorite theater',
   ],
-  'Нар жаргахыг харан алхах': [
-    'Голын эрэг',
-    'Нам гүм цэцэрлэгт хүрээлэн',
-    'Бидний дуртай алхах газар',
+  'Walk and watch the sunset': [
+    'By the river',
+    'A quiet park',
+    'Our favorite walking spot',
   ],
-  'Амттан идэх': [
-    'Зайрмагны газар',
-    'Жижигхэн нарийн боовны газар',
-    'Чиний дуртай амттаны газар',
+  'Get dessert': [
+    'The ice cream place',
+    'A little bakery',
+    'Your favorite dessert spot',
   ],
 };
 export function localDay(date: Date): string {
@@ -116,7 +116,7 @@ export function planConfig(
 }
 export function dateMessage(plan: DatePlan, closing?: string): string {
   const config = planConfig(plan);
-  return `Сайн уу :)\n\nБолзоогоо товлочихлоо!\n\n${plan.activity}\n${config.date}, ${config.time} цагт\n${config.location}\n\nДолоон зүрх цуглуулсан ч би чамайг л сонгоно.\n\n${closing ?? 'Уулзахыг тэсэн ядан хүлээж байна. <3'}`;
+  return `Hi :)\n\nThe date is set!\n\n${plan.activity}\n${config.date} at ${config.time}\n${config.location}\n\nSeven hearts collected, and I'd still pick you.\n\n${closing ?? "Can't wait to see you. <3"}`;
 }
 
 export function calendarEvent(config = dateConfig): string | null {

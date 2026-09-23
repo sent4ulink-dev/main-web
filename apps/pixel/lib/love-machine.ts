@@ -21,12 +21,12 @@ export type Scene =
   | 'MESSAGE'
   | 'DATE_DETAILS';
 export const noMessages = [
-  'Итгэлтэй байна уу?',
-  'Нээрээ юу?',
-  'Хмм, сонин л юм...',
-  'Дохио алдагдсан бололтой :)',
-  'Нөгөө товчийг дарах уу?',
-  'Зүрх минь дахиад асуу гэнэ.',
+  'Are you sure?',
+  'Really?',
+  'Hmm, interesting...',
+  'Signal must be lost :)',
+  'Try the other button?',
+  'My heart says ask again.',
 ];
 export type LoveState = { scene: Scene; noAttempts: number; plan: DatePlan };
 export type LoveAction =

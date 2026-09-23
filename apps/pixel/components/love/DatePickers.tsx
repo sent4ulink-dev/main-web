@@ -6,7 +6,7 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from '@/components/ui/native-select';
-import { mn } from 'date-fns/locale';
+import { enGB } from 'date-fns/locale';
 import {
   localDay,
   isFuturePlan,
@@ -103,8 +103,8 @@ export function DatePickers({
         ? item.id === activeId
         : item.label === (plan.activity || activity),
     ) ?? activities[0];
-  const places = activeEntry?.places ?? ['Шинэ газар'];
-  const customLabel = 'Өөр газар оруулах...';
+  const places = activeEntry?.places ?? ['New place'];
+  const customLabel = 'Enter another place...';
   const [place, setPlace] = useState(
     places.includes(plan.place)
       ? plan.place
@@ -140,7 +140,7 @@ export function DatePickers({
       });
     if (number === 2) {
       if (!isFuturePlan(localDay(day), chosenTime)) {
-        setError('Ирээдүйн өдөр, цаг сонгоорой.');
+        setError('Pick a day and time in the future.');
         setNow(new Date());
         return;
       }
@@ -149,12 +149,12 @@ export function DatePickers({
     if (number === 3) {
       const value = (place === customLabel ? custom : place).trim();
       if (!value) {
-        setError('Уулзах газрынхаа нэрийг оруулаарай.');
+        setError("Enter the name of where you'll meet.");
         venue.current?.focus();
         return;
       }
       if (!isFuturePlan(plan.day, plan.time)) {
-        setError('Энэ цаг өнгөрсөн байна. Буцаад шинэ цаг сонгоорой.');
+        setError('That time has passed. Go back and pick a new one.');
         return;
       }
       dispatch({ type: 'SELECT_PLACE', place: value });
@@ -171,21 +171,21 @@ export function DatePickers({
         aria-labelledby="picker-title"
       >
         <div className="picker-header">
-          <span>БИДНИЙ БЯЦХАН ТӨЛӨВЛӨГӨӨ</span>
+          <span>OUR LITTLE PLAN</span>
           <span>{number}/3</span>
         </div>
         <h1 id="picker-title" tabIndex={-1} ref={title}>
           {number === 1
-            ? 'ХАМТ ЮУ ХИЙХ ВЭ?'
+            ? 'WHAT SHALL WE DO?'
             : number === 2
-              ? 'ХЭЗЭЭ УУЛЗАХ ВЭ?'
-              : 'ХААНА УУЛЗАХ ВЭ?'}
+              ? 'WHEN SHALL WE MEET?'
+              : 'WHERE SHALL WE MEET?'}
         </h1>
         <p className="picker-subtitle">
           {number === 1
-            ? 'Чи сонго. Би догдлолоо аваад очъё.'
+            ? "You pick. I'll bring the excitement."
             : number === 2
-              ? 'Хуанлийн нэг өдөр. Зөвхөн бидэнд.'
+              ? 'One day on the calendar. Just for us.'
               : plan.activity}
         </p>
         {number === 1 && !editing && (
@@ -194,16 +194,16 @@ export function DatePickers({
             value={activity}
             onChange={setActivity}
             onConfirm={select}
-            label="Хамт хийх зүйлээ сонгох"
+            label="Choose what to do together"
           />
         )}
         {number === 1 && editing && (
-          <div className="inline-list-editor" aria-label="Хийх зүйлсийг засах">
+          <div className="inline-list-editor" aria-label="Edit the activities">
             {activities.map((item, index) => (
               <div className="inline-list-row" key={item.id}>
                 <span>{String(index + 1).padStart(2, '0')}</span>
                 <input
-                  aria-label={`${index + 1}-р хийх зүйл`}
+                  aria-label={`Activity ${index + 1}`}
                   value={item.label}
                   maxLength={70}
                   onChange={(event) =>
@@ -217,7 +217,7 @@ export function DatePickers({
                   }
                 />
                 <button
-                  aria-label={`${item.label} устгах`}
+                  aria-label={`Remove ${item.label}`}
                   disabled={activities.length === 1}
                   onClick={() =>
                     updateActivities(
@@ -237,22 +237,22 @@ export function DatePickers({
                   ...activities,
                   {
                     id: `activity-${Date.now()}`,
-                    label: 'Шинэ хийх зүйл',
-                    places: ['Шинэ газар'],
+                    label: 'New activity',
+                    places: ['New place'],
                   },
                 ])
               }
             >
-              ＋ ХИЙХ ЗҮЙЛ НЭМЭХ
+              ＋ ADD AN ACTIVITY
             </button>
           </div>
         )}
         {number === 2 && (
           <div className="date-picker-content">
             <div className="calendar-section">
-              <nav className="month-navigation" aria-label="Сар солих">
+              <nav className="month-navigation" aria-label="Change month">
                 <button
-                  aria-label="Өмнөх сар"
+                  aria-label="Previous month"
                   disabled={month <= currentMonth}
                   onClick={() =>
                     setMonth(
@@ -263,10 +263,10 @@ export function DatePickers({
                   ◀
                 </button>
                 <span aria-live="polite">
-                  {month.getFullYear()} оны {month.getMonth() + 1}-р сар
+                  {month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </span>
                 <button
-                  aria-label="Дараагийн сар"
+                  aria-label="Next month"
                   onClick={() =>
                     setMonth(
                       new Date(month.getFullYear(), month.getMonth() + 1, 1),
@@ -278,7 +278,7 @@ export function DatePickers({
               </nav>
               <Calendar
                 className="lcd-calendar"
-                locale={mn}
+                locale={enGB}
                 mode="single"
                 required
                 selected={day}
@@ -301,18 +301,18 @@ export function DatePickers({
                 weekStartsOn={1}
                 formatters={{
                   formatWeekdayName: (d) =>
-                    ['Ня', 'Да', 'Мя', 'Лх', 'Пү', 'Ба', 'Бя'][d.getDay()],
+                    ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][d.getDay()],
                 }}
                 labels={{
                   labelGrid: (d) =>
-                    `${d.getFullYear()} оны ${d.getMonth() + 1}-р сар`,
+                    d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
                   labelDayButton: (d, modifiers) =>
-                    `${d.getMonth() + 1} сарын ${d.getDate()}${modifiers.selected ? ', сонгосон' : ''}${modifiers.today ? ', өнөөдөр' : ''}`,
+                    `${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getDate()}${modifiers.selected ? ', selected' : ''}${modifiers.today ? ', today' : ''}`,
                 }}
               />
             </div>
             <div className="time-row">
-              <label htmlFor="date-time">ХЭДЭН ЦАГТ?</label>
+              <label htmlFor="date-time">WHAT TIME?</label>
               <NativeSelect
                 id="date-time"
                 value={chosenTime}
@@ -324,7 +324,7 @@ export function DatePickers({
               >
                 {!slots.length && (
                   <NativeSelectOption value="">
-                    Өнөөдрийн цаг дууссан
+                    Today's times are over
                   </NativeSelectOption>
                 )}
                 {slots.map((slot) => (
@@ -333,7 +333,7 @@ export function DatePickers({
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
-              <span className="time-hint">ТАНЫ ОРОН НУТГИЙН ЦАГ</span>
+              <span className="time-hint">YOUR LOCAL TIME</span>
             </div>
           </div>
         )}
@@ -347,18 +347,18 @@ export function DatePickers({
                 setError('');
               }}
               onConfirm={select}
-              label="Уулзах газраа сонгох"
+              label="Choose where to meet"
             />
             {place === customLabel && (
               <div className="custom-place">
-                <label htmlFor="venue">НЭР ЭСВЭЛ ХАЯГ</label>
+                <label htmlFor="venue">NAME OR ADDRESS</label>
                 <input
                   ref={venue}
                   id="venue"
                   type="text"
                   maxLength={70}
                   value={custom}
-                  placeholder="Чиний дуртай тэр газар..."
+                  placeholder="That place you love..."
                   onChange={(e) => {
                     setCustom(e.target.value);
                     setError('');
@@ -376,11 +376,11 @@ export function DatePickers({
         {number === 3 && editing && activeEntry && (
           <div
             className="inline-list-editor place-list-editor"
-            aria-label="Газруудыг засах"
+            aria-label="Edit the places"
           >
             <p className="edit-only-warning">
-              ⚠ Хийх зүйл бүр өөрийн газар сонголттой. Хийх зүйл тус бүрийн
-              газрыг тусад нь засна уу.
+              ⚠ Each activity has its own places. Edit each activity's places
+              separately.
             </p>
             <strong>{activeEntry.label}</strong>
             {activeEntry.places.map((item, index) => (
@@ -392,7 +392,7 @@ export function DatePickers({
                 <input
                   value={item}
                   maxLength={70}
-                  aria-label={`${index + 1}-р газар`}
+                  aria-label={`Place ${index + 1}`}
                   onChange={(event) =>
                     updateActivities(
                       activities.map((entry) =>
@@ -411,7 +411,7 @@ export function DatePickers({
                   }
                 />
                 <button
-                  aria-label={`${item} устгах`}
+                  aria-label={`Remove ${item}`}
                   disabled={activeEntry.places.length === 1}
                   onClick={() =>
                     updateActivities(
@@ -439,15 +439,15 @@ export function DatePickers({
                 updateActivities(
                   activities.map((entry) =>
                     entry.id === activeEntry.id
-                      ? { ...entry, places: [...entry.places, 'Шинэ газар'] }
+                      ? { ...entry, places: [...entry.places, 'New place'] }
                       : entry,
                   ),
                 )
               }
             >
-              ＋ ГАЗАР НЭМЭХ
+              ＋ ADD A PLACE
             </button>
-            <div className="activity-place-tabs" aria-label="Хийх зүйл сонгох">
+            <div className="activity-place-tabs" aria-label="Choose an activity">
               {activities.map((item) => (
                 <button
                   key={item.id}
@@ -461,32 +461,32 @@ export function DatePickers({
           </div>
         )}
         {!editing && (
-          <p className="confirm-hint">Сонгосноо дахин дарвал батална.</p>
+          <p className="confirm-hint">Tap your choice again to confirm.</p>
         )}
         <output className="picker-error" aria-live="polite">
           {error}
         </output>
-        <div className="picker-progress" aria-label={`3 алхмын ${number}`}>
-          <span className="done">ЮУ</span>
+        <div className="picker-progress" aria-label={`Step ${number} of 3`}>
+          <span className="done">WHAT</span>
           <span aria-hidden="true">···</span>
-          <span className={number >= 2 ? 'done' : ''}>ХЭЗЭЭ</span>
+          <span className={number >= 2 ? 'done' : ''}>WHEN</span>
           <span aria-hidden="true">···</span>
-          <span className={number === 3 ? 'done' : ''}>ХААНА</span>
+          <span className={number === 3 ? 'done' : ''}>WHERE</span>
         </div>
       </section>
       {!editing && (
         <footer className="softkeys picker-softkeys">
           {number > 1 ? (
-            <button onClick={() => dispatch({ type: 'BACK' })}>◀ Буцах</button>
+            <button onClick={() => dispatch({ type: 'BACK' })}>◀ Back</button>
           ) : (
-            <span className="picker-soft-note">ЗӨВХӨН БИД ХОЁР ♥</span>
+            <span className="picker-soft-note">JUST THE TWO OF US ♥</span>
           )}
           <button
             className="confirm-button"
             onClick={select}
             disabled={number === 2 && !chosenTime}
           >
-            {number === 3 ? 'Болзоогоо товлох' : 'Батлах'}{' '}
+            {number === 3 ? 'Set the date' : 'Confirm'}{' '}
             <span aria-hidden="true">▶</span>
           </button>
         </footer>

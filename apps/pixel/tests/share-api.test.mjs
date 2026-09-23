@@ -7,16 +7,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defaultShareContent } from '../lib/share-content.ts';
 
-test('share API creates, updates, counts and permanently finalizes a share', async (t) => {
+test('share API only lets the fulfillment secret mint a share, then anyone with the link can edit and permanently finalize it', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'little-signal-api-'));
-  const port = 18941;
+  const port = 18942;
+  const secret = 'test-fulfillment-secret';
   const server = spawn(process.execPath, ['server/index.mjs'], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       PORT: String(port),
       DATA_FILE: join(directory, 'shares.json'),
-      STUDIO_PASSWORD: 'test-password',
+      SHARE_CREATE_SECRET: secret,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -38,65 +39,39 @@ test('share API creates, updates, counts and permanently finalizes a share', asy
     server.stderr.on('data', (chunk) => reject(new Error(chunk.toString())));
   });
   const base = `http://127.0.0.1:${port}`;
+  const id = 'realOrderId1234567890';
 
-  const unlock = (password, ip) =>
-    fetch(`${base}/api/studio/unlock`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-forwarded-for': ip,
-      },
-      body: JSON.stringify({ password }),
-    });
+  const missingBeforeCreate = await fetch(`${base}/shares/${id}`);
+  assert.equal(missingBeforeCreate.status, 404);
 
-  const firstFailure = await unlock('wrong-password', '203.0.113.10');
-  assert.equal(firstFailure.status, 401);
-  assert.deepEqual(await firstFailure.json(), {
-    status: 'wrong',
-    attemptsRemaining: 1,
-  });
-  const secondFailure = await unlock('wrong-again', '203.0.113.10');
-  assert.equal(secondFailure.status, 429);
-  assert.equal((await secondFailure.json()).status, 'locked_out');
-  const correctButLocked = await unlock('test-password', '203.0.113.10');
-  assert.equal(correctButLocked.status, 429);
-
-  const login = await unlock('test-password', '203.0.113.11');
-  assert.equal(login.status, 200);
-  const loginBody = await login.json();
-  assert.equal(loginBody.status, 'ok');
-  const studioToken = loginBody.token;
-  assert.equal(typeof studioToken, 'string');
-
-  const denied = await fetch(`${base}/shares`, {
+  const deniedEnsure = await fetch(`${base}/shares/${id}/ensure`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ content: defaultShareContent }),
   });
-  assert.equal(denied.status, 401);
+  assert.equal(deniedEnsure.status, 403);
 
-  const createdResponse = await fetch(`${base}/shares`, {
+  const ensured = await fetch(`${base}/shares/${id}/ensure`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${studioToken}`,
-    },
-    body: JSON.stringify({ content: defaultShareContent }),
+    headers: { 'x-date-create-secret': secret },
   });
-  assert.equal(createdResponse.status, 201);
-  const created = await createdResponse.json();
-  assert.match(created.id, /^[A-Za-z0-9_-]{8}$/);
-  assert.ok(new Date(created.editUntil).getTime() > Date.now());
+  assert.equal(ensured.status, 201);
+  assert.deepEqual(await ensured.json(), { ok: true, existed: false });
 
-  const fetched = await fetch(`${base}/shares/${created.id}`).then((response) =>
+  const ensuredAgain = await fetch(`${base}/shares/${id}/ensure`, {
+    method: 'POST',
+    headers: { 'x-date-create-secret': secret },
+  });
+  assert.equal(ensuredAgain.status, 200);
+  assert.deepEqual(await ensuredAgain.json(), { ok: true, existed: true });
+
+  const fetched = await fetch(`${base}/shares/${id}`).then((response) =>
     response.json(),
   );
   assert.equal(fetched.content.sender, defaultShareContent.sender);
-  assert.equal(fetched.editToken, undefined);
-  assert.equal(fetched.editTokenHash, undefined);
+  assert.equal(fetched.finalized, false);
+  assert.ok(new Date(fetched.editUntil).getTime() > Date.now());
 
-  const changed = { ...defaultShareContent, sender: 'Туршилтын илгээгч' };
-  const updated = await fetch(`${base}/shares/${created.id}`, {
+  const changed = { ...defaultShareContent, sender: 'Test sender' };
+  const updated = await fetch(`${base}/shares/${id}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ content: changed }),
@@ -104,57 +79,29 @@ test('share API creates, updates, counts and permanently finalizes a share', asy
   assert.equal(updated.status, 200);
   assert.equal((await updated.json()).content.sender, changed.sender);
 
-  const stats = await fetch(`${base}/stats`).then((response) =>
-    response.json(),
-  );
-  assert.deepEqual(stats, { total: 1, finalized: 0, active: 1 });
-
-  const deniedFinalize = await fetch(`${base}/shares/${created.id}/finalize`, {
+  const finalized = await fetch(`${base}/shares/${id}/finalize`, {
     method: 'POST',
-  });
-  assert.equal(deniedFinalize.status, 403);
-
-  const finalized = await fetch(`${base}/shares/${created.id}/finalize`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${created.editToken}` },
   });
   assert.equal(finalized.status, 200);
   assert.equal((await finalized.json()).finalized, true);
 
-  const locked = await fetch(`${base}/shares/${created.id}`, {
+  const lockedUpdate = await fetch(`${base}/shares/${id}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ content: defaultShareContent }),
   });
-  assert.equal(locked.status, 423);
+  assert.equal(lockedUpdate.status, 423);
 
-  const createdLockedResponse = await fetch(`${base}/shares`, {
+  const lockedFinalize = await fetch(`${base}/shares/${id}/finalize`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${studioToken}`,
-    },
-    body: JSON.stringify({ content: defaultShareContent, finalized: true }),
   });
-  assert.equal(createdLockedResponse.status, 201);
-  const createdLocked = await createdLockedResponse.json();
-  assert.equal(createdLocked.finalized, true);
-  assert.equal(
-    (
-      await fetch(`${base}/shares/${createdLocked.id}`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ content: defaultShareContent }),
-      })
-    ).status,
-    423,
+  assert.equal(lockedFinalize.status, 423);
+
+  const missing = await fetch(`${base}/shares/unmintedRealLookingId12`);
+  assert.equal(missing.status, 404);
+
+  const health = await fetch(`${base}/health`).then((response) =>
+    response.json(),
   );
-  assert.deepEqual(
-    await fetch(`${base}/stats`).then((response) => response.json()),
-    {
-      total: 2,
-      finalized: 2,
-      active: 0,
-    },
-  );
+  assert.deepEqual(health, { ok: true });
 });
