@@ -195,48 +195,104 @@ await test('claims: only the owner can free a name', async () => {
 
 
 
-/* ---------------- orders ---------------- */
+/* ---------------- orders (Paddle) ---------------- */
 
-const shop = () => ({ ...env(), CHECKOUT_URL_SINGLE: 'https://pay.test/single?ref={token}', CHECKOUT_URL_PACK: 'https://pay.test/pack?ref={token}', ORDER_SECRET: 'order-secret' });
+// a stand-in for Paddle's Transactions API (POST https://paddle.test/transactions), used in place of the real `fetch` for every test below
+function fakePaddle() {
+  const calls = [];
+  let n = 0, broken = false;
+  const fetchFn = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    calls.push({ url, body });
+    if (broken) return { ok: false, status: 400, json: async () => ({ error: { detail: 'nope' } }) };
+    const id = `txn_${++n}`;
+    calls.at(-1).id = id;
+    return { ok: true, status: 201, json: async () => ({ data: { id, checkout: { url: `https://pay.test/checkout?_ptxn=${id}` } } }) };
+  };
+  return { calls, fetchFn, break: () => { broken = true; } };
+}
+
+const PADDLE_WEBHOOK_SECRET = 'whsec_test';
+const shop = () => ({
+  ...env(), ORDER_SECRET: 'order-secret',
+  PADDLE_API_KEY: 'padkey_test', PADDLE_API_BASE: 'https://paddle.test', PADDLE_WEBHOOK_SECRET,
+  PADDLE_PRICE_SINGLE: 'pri_single', PADDLE_PRICE_PACK: 'pri_pack',
+});
 const owner = { Authorization: 'Bearer order-secret' };
+
+async function hmacHex(secret, msg) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
+  return [...new Uint8Array(mac)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const paddleSig = async (secret, rawBody, ts = Math.floor(Date.now() / 1000)) => `ts=${ts};h1=${await hmacHex(secret, `${ts}:${rawBody}`)}`;
+const postWebhook = (e, rawBody, sigHeader) => worker.fetch(new Request('https://reviews.test/webhooks/paddle', {
+  method: 'POST', headers: { 'Content-Type': 'application/json', ...(sigHeader !== undefined ? { 'Paddle-Signature': sigHeader } : {}) }, body: rawBody,
+}), e);
+const completedPayload = (id, token) => JSON.stringify({ event_type: 'transaction.completed', data: { id, custom_data: token ? { orderToken: token } : undefined } });
+
 const startOrder = async (e, pack = 'pack', ip = '9.9.9.9') => (await (await call(e, '/checkout', { method: 'POST', body: { pack }, ip })).json());
-const paidOrder = async (e, pack = 'pack', ip = '9.9.9.9') => {
+const generate = (e, token, items, extra = {}) => call(e, `/orders/${token}/generate`, { method: 'POST', body: { items }, ...extra });
+
+// most order tests pay by playing Paddle's own webhook, exactly like production; a couple of tests further down check the manual
+// owner-only /confirm route and the webhook's signature checking directly
+const paidOrder = async (e, calls, pack = 'pack', ip = '9.9.9.9') => {
   const { token } = await startOrder(e, pack, ip);
-  const res = await call(e, `/orders/${token}/confirm`, { method: 'POST', headers: owner, origin: null });
+  const { id } = calls.at(-1);
+  const raw = completedPayload(id, token);
+  const res = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
   assert.equal(res.status, 200);
   return token;
 };
-const generate = (e, token, items, extra = {}) => call(e, `/orders/${token}/generate`, { method: 'POST', body: { items }, ...extra });
 
-await test('checkout is refused until the payment links are set, and only accepts the two packs', async () => {
+const realFetch = globalThis.fetch;
+globalThis.fetch = async () => { throw new Error('a test forgot to stub fetch — this would have hit the real network'); };
+
+await test('checkout is refused until Paddle is configured, and only accepts the two packs', async () => {
   const off = await call(env(), '/checkout', { method: 'POST', body: { pack: 'pack' } });
   assert.equal(off.status, 501);
   const e = shop();
+  globalThis.fetch = fakePaddle().fetchFn;
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'huge' } })).status, 422);
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'pack' }, origin: 'https://evil.example' })).status, 403);
 });
 
-await test('checkout makes a pending order and hands back the payment link with its token in it', async () => {
-  const e = shop();
+await test('checkout asks Paddle for the right price and custom data, and hands back its checkout link', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
   const res = await call(e, '/checkout', { method: 'POST', body: { pack: 'single' } });
   assert.equal(res.status, 201);
   const out = await res.json();
   assert.equal(out.token.length, 22);
-  assert.equal(out.checkoutUrl, `https://pay.test/single?ref=${out.token}`);
+  assert.equal(paddle.calls.length, 1);
+  assert.equal(paddle.calls[0].body.items[0].price_id, 'pri_single');
+  assert.equal(paddle.calls[0].body.custom_data.orderToken, out.token);
+  assert.equal(out.checkoutUrl, `https://pay.test/checkout?_ptxn=${paddle.calls[0].id}`);
   const order = await (await call(e, `/orders/${out.token}`)).json();
   assert.deepEqual([order.status, order.credits, order.remaining, order.amount, order.links.length], ['pending', 1, 1, 199, 0]);
   assert.ok(!('ipHash' in order));
 });
 
+await test('if Paddle is unreachable, checkout fails cleanly and nothing is left behind', async () => {
+  const e = shop(), paddle = fakePaddle();
+  paddle.break();
+  globalThis.fetch = paddle.fetchFn;
+  const res = await call(e, '/checkout', { method: 'POST', body: { pack: 'pack' } });
+  assert.equal(res.status, 502);
+  assert.equal([...e.BUCKET.store.keys()].filter(k => k.startsWith('orders/')).length, 0);
+});
+
 await test('an unknown order is a 404, and nothing can be made before the payment is confirmed', async () => {
   const e = shop();
+  globalThis.fetch = fakePaddle().fetchFn;
   assert.equal((await call(e, '/orders/AAAAAAAAAAAAAAAAAAAAAA')).status, 404);
   const { token } = await startOrder(e);
   assert.equal((await generate(e, token, { pixel: 1 })).status, 402);
 });
 
-await test('confirming needs the owner secret, and a repeated notice changes nothing', async () => {
+await test('the manual owner-only /confirm route still works, for fixing an order Paddle missed', async () => {
   const e = shop();
+  globalThis.fetch = fakePaddle().fetchFn;
   const { token } = await startOrder(e);
   assert.equal((await call(e, `/orders/${token}/confirm`, { method: 'POST' })).status, 403);
   assert.equal((await call(e, `/orders/${token}/confirm`, { method: 'POST', headers: { Authorization: 'Bearer wrong' } })).status, 403);
@@ -248,9 +304,61 @@ await test('confirming needs the owner secret, and a repeated notice changes not
   assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).paidAt, paidAt);
 });
 
-await test('a pack of 8 can be split as the buyer likes: 3 Pixel, 2 Pinky, 3 WinXP', async () => {
+await test('Paddle webhook: a valid transaction.completed marks the order paid, and repeats are a no-op', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const { token } = await startOrder(e);
+  const { id } = paddle.calls[0];
+  const raw = completedPayload(id, token);
+  const res = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
+  assert.equal(res.status, 200);
+  assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status, 'paid');
+  const paidAt = JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).paidAt;
+  const again = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));   // Paddle retries webhooks it isn't sure landed
+  assert.equal(again.status, 200);
+  assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).paidAt, paidAt);
+});
+
+await test('Paddle webhook: falls back to the transaction-id index when custom_data is missing', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const { token } = await startOrder(e);
+  const { id } = paddle.calls[0];
+  const raw = completedPayload(id, null);   // no custom_data at all — only the transaction id
+  const res = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
+  assert.equal(res.status, 200);
+  assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status, 'paid');
+});
+
+await test('Paddle webhook: refuses a bad, missing, wrongly-signed or stale signature', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const { token } = await startOrder(e);
+  const raw = completedPayload(paddle.calls[0].id, token);
+  assert.equal((await postWebhook(e, raw, undefined)).status, 401);                                  // no header at all
+  assert.equal((await postWebhook(e, raw, 'garbage')).status, 401);
+  assert.equal((await postWebhook(e, raw, await paddleSig('wrong-secret', raw))).status, 401);        // signed, but with the wrong secret
+  assert.equal((await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw + 'x'))).status, 401);   // signed over the wrong bytes
+  const stale = Math.floor(Date.now() / 1000) - 3600;
+  assert.equal((await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw, stale))).status, 401);  // an hour old
+  assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status, 'pending');             // none of the above touched the order
+  const good = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
+  assert.equal(good.status, 200);
+  assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status, 'paid');
+});
+
+await test('Paddle webhook: an event for an order that does not exist is acknowledged, not an error', async () => {
   const e = shop();
-  const token = await paidOrder(e);
+  globalThis.fetch = fakePaddle().fetchFn;
+  const raw = completedPayload('txn_nonexistent', 'AAAAAAAAAAAAAAAAAAAAAA');
+  const res = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
+  assert.equal(res.status, 200);   // Paddle should not be told to keep retrying forever over a mismatch on our end
+});
+
+await test('a pack of 8 can be split as the buyer likes: 3 Pixel, 2 Pinky, 3 WinXP', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
   const res = await generate(e, token, { pixel: 3, pinky: 2, winxp: 3 });
   assert.equal(res.status, 200);
   const order = await res.json();
@@ -267,8 +375,9 @@ await test('a pack of 8 can be split as the buyer likes: 3 Pixel, 2 Pinky, 3 Win
 });
 
 await test('it can be spread over several visits, and never past what was paid for', async () => {
-  const e = shop();
-  const token = await paidOrder(e);
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
   assert.equal((await (await generate(e, token, { pinky: 5 })).json()).remaining, 3);
   const tooMany = await generate(e, token, { pixel: 2, winxp: 2 });
   assert.equal(tooMany.status, 422);
@@ -278,16 +387,18 @@ await test('it can be spread over several visits, and never past what was paid f
 });
 
 await test('a single link is exactly one link', async () => {
-  const e = shop();
-  const token = await paidOrder(e, 'single');
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls, 'single');
   assert.equal((await generate(e, token, { pixel: 1, pinky: 1 })).status, 422);
   assert.equal((await generate(e, token, { winxp: 1 })).status, 200);
   assert.equal((await generate(e, token, { pixel: 1 })).status, 422);
 });
 
 await test('bad requests are refused', async () => {
-  const e = shop();
-  const token = await paidOrder(e);
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
   for (const items of [{}, { pixel: 0 }, { pixel: -1 }, { pixel: 1.5 }, { pixel: '2' }, { gameboy: 1 }, { pixel: 99 }, null, [1]]) {
     assert.equal((await generate(e, token, items)).status, 422, JSON.stringify(items));
   }
@@ -296,8 +407,9 @@ await test('bad requests are refused', async () => {
 });
 
 await test('two requests at once can never make more links than were paid for', async () => {
-  const e = shop();
-  const token = await paidOrder(e);
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
   const [a, b] = await Promise.all([generate(e, token, { pixel: 5 }), generate(e, token, { pinky: 5 })]);
   assert.deepEqual([a.status, b.status].sort(), [200, 422]);
   const order = await (await call(e, `/orders/${token}`)).json();
@@ -306,8 +418,9 @@ await test('two requests at once can never make more links than were paid for', 
 });
 
 await test('a refund stops the links working', async () => {
-  const e = shop();
-  const token = await paidOrder(e);
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
   const order = await (await generate(e, token, { pixel: 2 })).json();
   assert.equal((await call(e, `/orders/${token}/refund`, { method: 'POST' })).status, 403);
   const res = await call(e, `/orders/${token}/refund`, { method: 'POST', headers: owner });
@@ -319,8 +432,11 @@ await test('a refund stops the links working', async () => {
 
 await test('orders are limited per visitor', async () => {
   const e = shop();
+  globalThis.fetch = fakePaddle().fetchFn;
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '5.5.5.5' })).status, 201);
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '5.5.5.5' })).status, 429);   // too soon after the last one
 });
+
+globalThis.fetch = realFetch;
 
 console.log(`\n${passed} tests passed`);

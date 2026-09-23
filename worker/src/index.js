@@ -8,14 +8,16 @@
    POST   /claims         reserve a link name (first come, first served; every name is unique)
    DELETE /claims/:name   free a name again (owner only)
 
-   POST   /checkout                 start an order for a pack: { pack: "single" | "pack" }  -> { token, checkoutUrl }
+   POST   /checkout                 start an order for a pack: { pack: "single" | "pack" }  -> { token, checkoutUrl }  (creates a Paddle transaction)
    GET    /orders/:token            the order: how many links were paid for, how many are left, the links made so far
    POST   /orders/:token/generate   make links from a paid order: { items: { pixel: 3, pinky: 2, winxp: 3 } }  (never more than were paid for)
-   POST   /orders/:token/confirm    the payment arrived (owner / payment provider only: Authorization: Bearer <ORDER_SECRET>)
+   POST   /orders/:token/confirm    mark it paid by hand (owner only: Authorization: Bearer <ORDER_SECRET>) — Paddle itself uses the webhook below
    POST   /orders/:token/refund     the payment was refunded: the order's links stop working (same secret)
+   POST   /webhooks/paddle          Paddle calls this when a transaction completes (authenticated by its own signature, not a bearer token)
 
    R2 layout
      orders/<token>.json  one object per order (pack, credits, status, the links made); the token is a random 128-bit secret and is the buyer's key
+     tx/<paddleId>.json   Paddle's own transaction id -> our order token, so a webhook that lacks custom_data can still find the order
      links/<id>.json      one object per link that was made: which product it is and which order it came from (the page that serves ?share=<id> reads this)
      rlo/<hash>.json      per-visitor counters for starting orders
      reviews/<id>.json    one object per review, including the private bits (email, hashed IP)
@@ -53,6 +55,7 @@ export default {
       if (order && order[2] === 'generate' && request.method === 'POST') return await generateLinks(request, env, cors, order[1]);
       if (order && order[2] === 'confirm' && request.method === 'POST') return await confirmOrder(request, env, cors, order[1]);
       if (order && order[2] === 'refund' && request.method === 'POST') return await refundOrder(request, env, cors, order[1]);
+      if (url.pathname === '/webhooks/paddle' && request.method === 'POST') return await paddleWebhook(request, env, cors);
       if (url.pathname === '/') return reply({ ok: true, service: 'sent4u reviews' }, 200, cors);
       return reply({ error: 'Not found' }, 404, cors);
     } catch (err) {
@@ -272,17 +275,20 @@ async function deleteClaim(request, env, cors, handle) {
 }
 
 /* ---------------- orders: packs of links ----------------
-   1 link is $1.99 and a pack of 8 is $9.99. The buyer pays on the payment provider's own page (CHECKOUT_URL_SINGLE / CHECKOUT_URL_PACK hold the
-   two payment links; "{token}" in them is replaced with the order's token so the provider can hand it back). When the provider says the money
-   arrived, whatever listens to it (a webhook adapter, or you by hand) calls /confirm. Only then can the buyer make links, and never more than
-   they paid for: with 8 they can split them as they like, e.g. 3 Pixel + 2 Pinky + 3 WinXP, in one go or over several visits. */
+   1 link is $1.99 and a pack of 8 is $9.99, sold as two one-time Prices in Paddle — a Merchant of Record, so Paddle is the legal seller and
+   collects and remits VAT/GST worldwide; this Worker never has to. Checkout is Paddle's own hosted page: this Worker only creates the
+   transaction (POST /checkout) and hands back its checkout URL. When Paddle confirms the payment it POSTs to /webhooks/paddle, which this
+   Worker verifies by that request's own signature and marks the order paid — only then can the buyer make links, and never more than they
+   paid for: with 8 they can split them as they like, e.g. 3 Pixel + 2 Pinky + 3 WinXP, in one go or over several visits.
+   See worker/README.md "Orders" for how to set the Paddle side of this up. */
 
 const PACKS = { single: { credits: 1, amount: 199 }, pack: { credits: 8, amount: 999 } };
 const PRODUCTS = ['pixel', 'pinky', 'winxp'];
-const TOKEN_LENGTH = 22;                                       // 16 random bytes, base64url
 const JSON_OBJECT = { httpMetadata: { contentType: 'application/json' } };
+const WEBHOOK_TOLERANCE_S = 300;                                // reject a Paddle-Signature whose timestamp is older than this (clock skew + retry headroom)
 
 const orderKey = token => `orders/${token}.json`;
+const txKey = id => `tx/${id}.json`;                            // Paddle's transaction id -> our order token
 const publicOrder = o => ({ token: o.token, pack: o.pack, credits: o.credits, remaining: o.credits - o.links.length, amount: o.amount, status: o.status, links: o.links });
 
 function randomToken(bytes = 16) {
@@ -315,17 +321,47 @@ async function createCheckout(request, env, cors) {
   if (fail) return fail;
   const pack = String(body.pack || '');
   if (!PACKS[pack]) return reply({ error: 'Choose 1 link or a pack of 8.' }, 422, cors);
-  const template = pack === 'single' ? env.CHECKOUT_URL_SINGLE : env.CHECKOUT_URL_PACK;
-  if (!template) return reply({ error: 'Checkout isn’t switched on yet. Please check back soon.' }, 501, cors);
+  const priceId = pack === 'single' ? env.PADDLE_PRICE_SINGLE : env.PADDLE_PRICE_PACK;
+  if (!env.PADDLE_API_KEY || !priceId) return reply({ error: 'Checkout isn’t switched on yet. Please check back soon.' }, 501, cors);
 
   const ipHash = await sha256(`${env.IP_SALT || ''}|${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
   const tooMany = await orderLimit(env, ipHash);
   if (tooMany) return reply({ error: tooMany }, 429, cors);
 
   const token = randomToken();
-  const order = { token, pack, credits: PACKS[pack].credits, amount: PACKS[pack].amount, status: 'pending', createdAt: Date.now(), links: [], ipHash };
+  let paddle;
+  try {
+    paddle = await paddleCreateTransaction(env, priceId, token);
+  } catch (err) {
+    console.error('paddle: could not create a transaction', err);
+    return reply({ error: 'Checkout isn’t reachable right now. Please try again in a moment.' }, 502, cors);
+  }
+
+  const order = { token, pack, credits: PACKS[pack].credits, amount: PACKS[pack].amount, status: 'pending', createdAt: Date.now(), links: [], ipHash, paddleTransactionId: paddle.id };
   await env.BUCKET.put(orderKey(token), JSON.stringify(order), JSON_OBJECT);
-  return reply({ ok: true, token, checkoutUrl: template.replaceAll('{token}', encodeURIComponent(token)) }, 201, cors);
+  await env.BUCKET.put(txKey(paddle.id), JSON.stringify({ token }), JSON_OBJECT);   // lets a webhook that only carries the transaction id still find this order
+  return reply({ ok: true, token, checkoutUrl: paddle.checkoutUrl }, 201, cors);
+}
+
+// Creates a Paddle transaction for one price and returns its hosted checkout link. custom_data carries our own order token, so the
+// transaction.completed webhook (see paddleWebhook) can mark the right order paid without a lookup, in the normal case.
+async function paddleCreateTransaction(env, priceId, token) {
+  const base = String(env.PADDLE_API_BASE || 'https://api.paddle.com').replace(/\/+$/, '');
+  const res = await fetch(`${base}/transactions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.PADDLE_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      items: [{ price_id: priceId, quantity: 1 }],
+      collection_mode: 'automatic',
+      custom_data: { orderToken: token },
+      checkout: { url: null },   // Paddle's own hosted checkout page, redirecting afterwards to the default payment link set in the Paddle dashboard (see README)
+    }),
+  });
+  const json = await res.json().catch(() => null);
+  const id = json && json.data && json.data.id;
+  const checkoutUrl = json && json.data && json.data.checkout && json.data.checkout.url;
+  if (!res.ok || !id || !checkoutUrl) throw new Error(`paddle ${res.status}: ${JSON.stringify(json).slice(0, 500)}`);
+  return { id, checkoutUrl };
 }
 
 // a few orders an hour per visitor is plenty, and it keeps the bucket from filling with abandoned ones
@@ -348,18 +384,29 @@ async function getOrder(env, cors, token) {
   return reply(publicOrder(found.order), 200, cors, { 'Cache-Control': 'no-store' });
 }
 
-async function confirmOrder(request, env, cors, token) {
-  if (!(await isOwner(request, env))) return reply({ error: 'Not allowed.' }, 403, cors);
+// The compare-and-set loop shared by the webhook (Paddle says a transaction completed) and the manual owner-only route below (for fixing
+// an order by hand, or testing). Idempotent: a repeated "paid" notice for an already-paid order is a no-op, not an error — Paddle retries
+// webhooks it isn't sure were received, so this will be called more than once for the same transaction in normal operation.
+async function markPaid(env, token) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const found = await readOrder(env, token);
-    if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+    if (!found) return { error: 'not_found' };
     const { order, etag } = found;
-    if (order.status === 'refunded') return reply({ error: 'That order was refunded.' }, 409, cors);
-    if (order.status === 'paid') return reply(publicOrder(order), 200, cors);                 // a repeated notice from the provider: nothing to do
+    if (order.status === 'refunded') return { error: 'refunded' };
+    if (order.status === 'paid') return { order };
     const next = { ...order, status: 'paid', paidAt: Date.now() };
-    if (await env.BUCKET.put(orderKey(token), JSON.stringify(next), { ...JSON_OBJECT, onlyIf: { etagMatches: etag } })) return reply(publicOrder(next), 200, cors);
+    if (await env.BUCKET.put(orderKey(token), JSON.stringify(next), { ...JSON_OBJECT, onlyIf: { etagMatches: etag } })) return { order: next };
   }
-  return reply({ error: 'That order is busy. Please try again.' }, 409, cors);
+  return { error: 'busy' };
+}
+
+async function confirmOrder(request, env, cors, token) {
+  if (!(await isOwner(request, env))) return reply({ error: 'Not allowed.' }, 403, cors);
+  const { order, error } = await markPaid(env, token);
+  if (error === 'not_found') return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+  if (error === 'refunded') return reply({ error: 'That order was refunded.' }, 409, cors);
+  if (error === 'busy') return reply({ error: 'That order is busy. Please try again.' }, 409, cors);
+  return reply(publicOrder(order), 200, cors);
 }
 
 async function generateLinks(request, env, cors, token) {
@@ -409,6 +456,52 @@ async function refundOrder(request, env, cors, token) {
   await env.BUCKET.put(orderKey(token), JSON.stringify(next), JSON_OBJECT);
   await Promise.all(next.links.map(l => env.BUCKET.put(`links/${l.id}.json`, JSON.stringify({ id: l.id, product: l.product, order: token, createdAt: l.at, revoked: true }), JSON_OBJECT)));
   return reply(publicOrder(next), 200, cors);
+}
+
+/* ---------------- Paddle's webhook -----------------
+   Paddle POSTs here when a transaction completes. There is no Origin to check (this is server to server, not a browser) and no
+   Authorization header either — the Paddle-Signature header is the only thing that authenticates this request, so it is checked before
+   anything else touches the body. Refunds are not wired up yet: Paddle's refund payload shape needs confirming against a real refund
+   before this trusts it automatically, so for now use POST /orders/:token/refund by hand (with ORDER_SECRET) when one comes in. */
+async function paddleWebhook(request, env, cors) {
+  const raw = await request.text();                              // the signature covers these exact bytes: read before anything parses them
+  if (!env.PADDLE_WEBHOOK_SECRET) return reply({ error: 'Not configured.' }, 501, cors);
+  if (!(await verifyPaddleSignature(raw, request.headers.get('Paddle-Signature') || '', env.PADDLE_WEBHOOK_SECRET))) {
+    return reply({ error: 'Bad signature.' }, 401, cors);
+  }
+  let event;
+  try { event = JSON.parse(raw); } catch { return reply({ error: 'Bad payload.' }, 400, cors); }
+
+  if (event && event.event_type === 'transaction.completed') {
+    const data = event.data || {};
+    let token = data.custom_data && data.custom_data.orderToken;
+    if (!token && data.id) {                                      // fallback: look the transaction id up in the secondary index
+      const stored = await env.BUCKET.get(txKey(data.id));
+      if (stored) token = (await stored.json()).token;
+    }
+    if (token) {
+      const { error } = await markPaid(env, token);
+      if (error && error !== 'refunded') console.error('paddle webhook: could not mark paid', token, error);
+    } else {
+      console.error('paddle webhook: transaction.completed with no matching order', data.id);
+    }
+  }
+  // other event types (transaction.payment_failed, transaction.canceled, …) need no action here: the order just stays pending
+  // and the buyer's own "still waiting" retry loop (see script.js) picks it up whenever it does get paid.
+  return reply({ ok: true }, 200, cors);
+}
+
+// Paddle-Signature looks like "ts=<unix-seconds>;h1=<hex>" (more than one h1= can appear while a secret is being rotated — every one
+// must be checked, since the request is valid if any of them matches, but there is only ever one secret configured here).
+async function verifyPaddleSignature(rawBody, header, secret) {
+  const parts = Object.fromEntries(header.split(';').map(p => p.split('=').map(s => s.trim())));
+  const ts = Number(parts.ts);
+  if (!ts || !parts.h1) return false;
+  if (Math.abs(Date.now() / 1000 - ts) > WEBHOOK_TOLERANCE_S) return false;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${ts}:${rawBody}`));
+  const hex = [...new Uint8Array(mac)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return await safeEqual(hex, parts.h1);
 }
 
 /* ---------------- small helpers ---------------- */
