@@ -1,9 +1,29 @@
 {
   // The site itself: a Worker with static assets. `npm run build` puts the site in dist/, and `npx wrangler deploy` publishes that folder.
-  // (The reviews / claims Worker is a separate project in worker/ with its own wrangler.toml.)
+  // (The reviews / claims / orders Worker is a separate project in worker/ with its own wrangler.toml.)
   "name": "main-web",
+  // gateway/index.js decides, for every request, whether to reverse-proxy to one of the three
+  // apps (see PIXEL_ORIGIN etc. below) or fall through to this site's own static assets.
+  "main": "gateway/index.js",
   "compatibility_date": "2025-01-01",
   "assets": {
-    "directory": "./dist"
-  }
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Cloudflare serves a matching static file directly, bypassing the Worker, unless
+    // told otherwise — but the gateway needs to see every request (to check ?share=,
+    // and to fall back an app's asset requests through the cookie) before deciding
+    // whether to hand it to ASSETS itself.
+    "run_worker_first": true
+  },
+  "vars": {
+    // Each app's real deployed origin (Cloudflare Pages, or wherever it ends up). Until an
+    // app's origin is set here, its share links just fall through to the marketing site
+    // instead of erroring — safe to deploy this Worker before every app is live.
+    // "PIXEL_ORIGIN": "https://pixel-dom.pages.dev",
+    // "PINKY_ORIGIN": "https://<pinky-project>.pages.dev",
+    // "WINXP_ORIGIN": "https://<winxp-project>.pages.dev",
+    // The orders Worker (see /worker), used to look up which product a REAL (paid) share id
+    // belongs to. Demo ids (test-pixel / test-pinky / test-winxp) never need this.
+    // "ORDERS_API_BASE": "https://sent4u-reviews.<account>.workers.dev",
+  },
 }

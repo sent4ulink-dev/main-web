@@ -200,9 +200,14 @@ export type Mode = "demo" | "real";
 // There is no public studio any more: every real invitation is minted server-to-server
 // by the sent4u order Worker the moment it's paid for. A bare visit (no ?share=) has
 // nothing to show, represented here as a "real" mode with a null id.
+// 'test' is the id used locally (dev, tests). 'test-winxp' is the same demo, reached
+// through the sent4u.link gateway's "Open live demo" link — see gateway/index.js.
+const DEMO_IDS = new Set(["test", "test-winxp"]);
 export function resolveMode(search: string): { mode: Mode; id: string | null } {
   const id = new URLSearchParams(search).get("share");
-  return id === "test" ? { mode: "demo", id } : { mode: "real", id };
+  return id !== null && DEMO_IDS.has(id)
+    ? { mode: "demo", id }
+    : { mode: "real", id };
 }
 export function canEdit(
   mode: Mode,

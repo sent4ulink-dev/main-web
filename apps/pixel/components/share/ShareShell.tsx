@@ -28,9 +28,12 @@ type ShareRecord = {
   finalized: boolean;
 };
 
+// 'test' is the id used locally (dev, tests). 'test-pixel' is the same demo, reached
+// through the sent4u.link gateway's "Open live demo" link — see gateway/index.js.
+const DEMO_IDS = new Set(['test', 'test-pixel']);
 function modeFromLocation(): { mode: Mode; id: string | null } {
   const id = new URLSearchParams(location.search).get('share');
-  return { mode: id === 'test' ? 'demo' : 'real', id };
+  return { mode: id !== null && DEMO_IDS.has(id) ? 'demo' : 'real', id };
 }
 
 function demoRecord(): ShareRecord {
