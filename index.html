@@ -465,7 +465,7 @@
   <!-- Reviews are kept in a Cloudflare R2 bucket behind the Worker in /worker. Put the Worker's address in data-api (e.g. https://sent4u-reviews.<you>.workers.dev)
        and reviews go live the moment they are sent, no approval. Optional: data-turnstile takes a Cloudflare Turnstile site key for a human check.
        With data-api empty the list comes from assets/data/reviews.json and a visitor's own review is only kept in their browser. -->
-  <section class="section reviews" id="reviews" aria-label="Reviews" data-api="" data-turnstile="">
+  <section class="section reviews" id="reviews" aria-label="Reviews" data-api="https://sent4u-reviews.sent4u-link.workers.dev" data-turnstile="">
     <div class="rv-scene" id="rvScene">
     <div class="rv-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
     <!-- the background: a full-bleed, tilted wall of review cards that scrolls itself and lights up under the cursor -->
@@ -509,7 +509,7 @@
   <!-- 9. PRICING — a stage: a star network that reacts to the cursor, a perspective floor, planes and outlined words behind two cards that
        fan in as you scroll, tilt in real 3D toward the cursor (the price floats above the card) and light up under it. The popular plan has a
        spinning gradient border, a holographic foil and a rotating seal; hovering a price spins it like a slot machine; the toggle rolls the prices (see initPricing). -->
-  <section class="section pricing-section" id="pricing" aria-label="Pricing" data-api="">
+  <section class="section pricing-section" id="pricing" aria-label="Pricing" data-api="https://sent4u-reviews.sent4u-link.workers.dev">
     <div class="pr-scene" id="prScene" aria-hidden="true">
       <div class="pr-aurora"><i></i><i></i><i></i></div>
       <span class="pr-cursor"></span>

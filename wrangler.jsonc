@@ -24,6 +24,6 @@
     // "WINXP_ORIGIN": "https://<winxp-project>.pages.dev",
     // The orders Worker (see /worker), used to look up which product a REAL (paid) share id
     // belongs to. Demo ids (test-pixel / test-pinky / test-winxp) never need this.
-    // "ORDERS_API_BASE": "https://sent4u-reviews.<account>.workers.dev",
+    "ORDERS_API_BASE": "https://sent4u-reviews.sent4u-link.workers.dev",
   },
 }
