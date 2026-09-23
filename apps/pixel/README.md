@@ -14,11 +14,11 @@ Set `VITE_API_BASE_URL` to the API origin. This value is public configuration.
 
 ## Share API
 
-Deploy the included `render.yaml` as a Render Blueprint. The API exposes `POST /shares/:id/ensure`, `GET/PUT /shares/:id`, `POST /shares/:id/finalize`, and `GET /health`.
+The API is a Cloudflare Worker, in `worker/` (its own `wrangler.toml`, separate from the frontend's Pages deployment above). It exposes `POST /shares/:id/ensure`, `GET/PUT /shares/:id`, `POST /shares/:id/finalize`, and `GET /health`. Run it locally with `npm run worker:dev` (wrangler simulates R2 locally, no Cloudflare account needed for that); deploy with `npm run worker:deploy`.
 
-There is no public studio and no password: an invitation only ever comes into existence because the sent4u order Worker calls `POST /shares/:id/ensure` server-to-server the moment it's paid for, gated by the shared secret `SHARE_CREATE_SECRET`. Whoever holds the resulting share URL can edit or finalize it within its edit window — the link itself is the credential.
+There is no public studio and no password: a real invitation is created lazily, the first time its link is opened, by self-healing against the sent4u orders Worker's `GET /links/:id` (see `ORDERS_API_BASE` in `worker/wrangler.toml`) — that confirms the id was really paid for and is really for Pixel before creating anything. `POST /shares/:id/ensure` exists for a future direct-provisioning call and is gated by the shared secret `SHARE_CREATE_SECRET` (`npx wrangler secret put SHARE_CREATE_SECRET` from inside `worker/`); nothing calls it today. Whoever holds a share URL can edit or finalize it within its edit window — the link itself is the credential.
 
-The API stores records in `server/data/shares.json` by default. For durable production storage, create a private Cloudflare R2 bucket and set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET` on Render. Each invitation is stored privately as `shares/<id>.json`; the bucket is never exposed to the browser.
+Each invitation is stored as its own object in a private R2 bucket (`shares/<id>.json`, created once with `npx wrangler r2 bucket create pixel-shares`), read and written through the native R2 binding — never exposed to the browser.
 
 Sharing modes use query parameters only: a bare visit shows a "this link doesn't look right" screen, `/?share=test` is the browser-local public demo, and `/?share=<id>` loads a persisted invitation. A real invitation remains editable for five days unless it's finalized first.
 

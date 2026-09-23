@@ -1,35 +1,25 @@
-import cors from 'cors';
-import express from 'express';
-import { createStorage } from './storage.mjs';
+/* Pixel share API — a Cloudflare Worker, share content lives in R2 (see wrangler.toml).
 
-const app = express();
-const storage = createStorage();
-const port = Number(process.env.PORT || 8787);
-const editWindowMs = 5 * 24 * 60 * 60 * 1000;
+   GET    /health                what it says
+   POST   /shares/:id/ensure     create a share at a SPECIFIC id if it doesn't already exist (server-to-server only, see below)
+   GET    /shares/:id            the public share content and edit metadata; self-heals against the order Worker on a miss
+   PUT    /shares/:id            replace validated content, only during the edit window
+   POST   /shares/:id/finalize   permanently finalize, only during the edit window
 
-app.disable('x-powered-by');
-app.use(
-  cors({
-    origin(origin, callback) {
-      const allowed = (process.env.CORS_ALLOWED_ORIGINS || '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
-      if (!origin || allowed.length === 0 || allowed.includes(origin))
-        return callback(null, true);
-      callback(new Error('Origin is not allowed.'));
-    },
-  }),
-);
-app.use(express.json({ limit: '32kb' }));
+   There is no public studio and no password: an invitation only ever comes into
+   existence because the sent4u order Worker calls POST /shares/:id/ensure server-to-
+   server, gated by a shared secret, the moment it's paid for. Whoever holds the
+   resulting share URL can edit or finalize it within its edit window — the link
+   itself is the credential, same trust model as Pinky and WinXP. */
+import { createStorage } from './storage.js';
 
-const route = (handler) => (request, response, next) =>
-  Promise.resolve(handler(request, response, next)).catch(next);
+const EDIT_WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
+const JSON_TYPE = { 'Content-Type': 'application/json; charset=utf-8' };
 
 // Plain-JS mirror of lib/share-content.ts's defaultShareContent — the same starter
 // template every freshly-paid share begins from, before the buyer's first edit. Kept
-// as a literal here since this server runs directly under Node with no TS build step,
-// so it can't import that file. Bump the comment if that file's shape changes.
+// as a literal here since this Worker runs with no TS build step, so it can't import
+// that file. Bump the comment if that file's shape changes.
 function defaultShareContent() {
   return {
     networkLabel: 'LOVE NETWORK',
@@ -203,21 +193,35 @@ function validId(id) {
   return /^[A-Za-z0-9_-]{6,40}$/.test(id) && id !== 'test';
 }
 
-function publicRecord(record) {
-  return record;
+function reply(body, status, cors, extra = {}) {
+  return new Response(JSON.stringify(body), { status, headers: { ...JSON_TYPE, ...cors, ...extra } });
+}
+
+function allowedOrigins(env) {
+  return String(env.CORS_ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function corsHeaders(request, env) {
+  const origin = request.headers.get('Origin');
+  const allowed = allowedOrigins(env);
+  const h = {
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-date-create-secret',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+  if (!allowed.length) h['Access-Control-Allow-Origin'] = '*';
+  else if (origin && allowed.includes(origin)) h['Access-Control-Allow-Origin'] = origin;
+  return h;
 }
 
 // Gates POST /shares/:id/ensure — the endpoint the sent4u order Worker calls,
-// server-to-server, the moment a paid order generates this id (see
-// worker/src/index.js's generateLinks). Never called from a browser: there is no
-// public studio any more, no password, no way to mint a share id from this app at
-// all — a real invitation only ever exists because it was paid for.
-const SHARE_CREATE_SECRET = process.env.SHARE_CREATE_SECRET;
-function requireCreateSecret(request, response, next) {
-  if (!SHARE_CREATE_SECRET) return next(); // not configured yet — dev convenience only
-  if (request.get('x-date-create-secret') !== SHARE_CREATE_SECRET)
-    return response.status(403).json({ error: 'forbidden' });
-  next();
+// server-to-server, the moment a paid order generates this id. Never called from a
+// browser: there is no public studio, no password, no way to mint a share id from
+// this app at all — a real invitation only ever exists because it was paid for.
+function createSecretOk(request, env) {
+  if (!env.SHARE_CREATE_SECRET) return true; // not configured yet — dev convenience only
+  return request.headers.get('x-date-create-secret') === env.SHARE_CREATE_SECRET;
 }
 
 // Self-heal: if a share isn't in storage yet, ask the sent4u order Worker whether this
@@ -226,13 +230,13 @@ function requireCreateSecret(request, response, next) {
 // when the buyer clicks the link; without this a link nobody did anything wrong to just
 // 404s forever. A random unpaid id still gets rejected, since the Worker only confirms
 // ids that exist in a real, unrevoked order.
-const ORDERS_API_BASE = (process.env.ORDERS_API_BASE ?? '').replace(/\/$/, '');
-async function selfHealShare(id) {
-  if (!ORDERS_API_BASE) return null; // not configured — self-heal simply can't run; /ensure remains the normal path
+async function selfHealShare(id, storage, env) {
+  const ordersApiBase = String(env.ORDERS_API_BASE || '').replace(/\/$/, '');
+  if (!ordersApiBase) return null;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8_000);
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const r = await fetch(`${ORDERS_API_BASE}/links/${encodeURIComponent(id)}`, { signal: controller.signal });
+    const r = await fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, { signal: controller.signal });
     clearTimeout(timer);
     if (!r.ok) return null;
     const { ok, product } = await r.json();
@@ -247,7 +251,7 @@ async function selfHealShare(id) {
     id,
     content: defaultShareContent(),
     createdAt: createdAt.toISOString(),
-    editUntil: new Date(createdAt.getTime() + editWindowMs).toISOString(),
+    editUntil: new Date(createdAt.getTime() + EDIT_WINDOW_MS).toISOString(),
     finalized: false,
   };
   await storage.put(id, record);
@@ -255,93 +259,70 @@ async function selfHealShare(id) {
   return record;
 }
 
-app.get('/health', (_request, response) => response.json({ ok: true }));
+export default {
+  async fetch(request, env) {
+    const cors = corsHeaders(request, env);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    const url = new URL(request.url);
+    const storage = createStorage(env);
+    try {
+      if (url.pathname === '/health' && request.method === 'GET') return reply({ ok: true }, 200, cors);
 
-// POST /shares/:id/ensure — create a share at a SPECIFIC id if it doesn't already
-// exist (no-op otherwise, never overwrites existing content). This is the *only* way
-// a share ever comes into existence: there is no public, unauthenticated "create a
-// share" endpoint any more.
-app.post(
-  '/shares/:id/ensure',
-  requireCreateSecret,
-  route(async (request, response) => {
-    const id = request.params.id;
-    if (!validId(id)) return response.status(422).json({ error: 'Invalid id.' });
-    const existing = await storage.get(id);
-    if (existing) return response.json({ ok: true, existed: true });
-    const createdAt = new Date();
-    const record = {
-      id,
-      content: defaultShareContent(),
-      createdAt: createdAt.toISOString(),
-      editUntil: new Date(createdAt.getTime() + editWindowMs).toISOString(),
-      finalized: false,
-    };
-    await storage.put(id, record);
-    response.status(201).json({ ok: true, existed: false });
-  }),
-);
+      const ensure = url.pathname.match(/^\/shares\/([A-Za-z0-9_-]+)\/ensure$/);
+      if (ensure && request.method === 'POST') {
+        if (!createSecretOk(request, env)) return reply({ error: 'forbidden' }, 403, cors);
+        const id = ensure[1];
+        if (!validId(id)) return reply({ error: 'Invalid id.' }, 422, cors);
+        const existing = await storage.get(id);
+        if (existing) return reply({ ok: true, existed: true }, 200, cors);
+        const createdAt = new Date();
+        const record = {
+          id,
+          content: defaultShareContent(),
+          createdAt: createdAt.toISOString(),
+          editUntil: new Date(createdAt.getTime() + EDIT_WINDOW_MS).toISOString(),
+          finalized: false,
+        };
+        await storage.put(id, record);
+        return reply({ ok: true, existed: false }, 201, cors);
+      }
 
-app.get(
-  '/shares/:id',
-  route(async (request, response) => {
-    if (!validId(request.params.id))
-      return response.status(404).json({ error: 'Share not found.' });
-    let record = await storage.get(request.params.id);
-    if (!record) record = await selfHealShare(request.params.id);
-    if (!record) return response.status(404).json({ error: 'Share not found.' });
-    response.json(publicRecord(record));
-  }),
-);
+      const finalize = url.pathname.match(/^\/shares\/([A-Za-z0-9_-]+)\/finalize$/);
+      if (finalize && request.method === 'POST') {
+        if (!validId(finalize[1])) return reply({ error: 'Share not found.' }, 404, cors);
+        const record = await storage.get(finalize[1]);
+        if (!record) return reply({ error: 'Share not found.' }, 404, cors);
+        if (!editable(record)) return reply({ error: 'Share is locked.' }, 423, cors);
+        const updated = { ...record, finalized: true, finalizedAt: new Date().toISOString() };
+        await storage.put(record.id, updated);
+        return reply(updated, 200, cors);
+      }
 
-app.put(
-  '/shares/:id',
-  route(async (request, response) => {
-    if (!validId(request.params.id))
-      return response.status(404).json({ error: 'Share not found.' });
-    const record = await storage.get(request.params.id);
-    if (!record)
-      return response.status(404).json({ error: 'Share not found.' });
-    if (!editable(record))
-      return response.status(423).json({ error: 'Share is locked.' });
-    const content = cleanContent(request.body?.content);
-    if (!content)
-      return response.status(400).json({ error: 'Invalid content.' });
-    const updated = { ...record, content, updatedAt: new Date().toISOString() };
-    await storage.put(record.id, updated);
-    response.json(publicRecord(updated));
-  }),
-);
+      const share = url.pathname.match(/^\/shares\/([A-Za-z0-9_-]+)$/);
+      if (share && request.method === 'GET') {
+        if (!validId(share[1])) return reply({ error: 'Share not found.' }, 404, cors);
+        let record = await storage.get(share[1]);
+        if (!record) record = await selfHealShare(share[1], storage, env);
+        if (!record) return reply({ error: 'Share not found.' }, 404, cors);
+        return reply(record, 200, cors);
+      }
+      if (share && request.method === 'PUT') {
+        if (!validId(share[1])) return reply({ error: 'Share not found.' }, 404, cors);
+        const record = await storage.get(share[1]);
+        if (!record) return reply({ error: 'Share not found.' }, 404, cors);
+        if (!editable(record)) return reply({ error: 'Share is locked.' }, 423, cors);
+        const body = await request.json().catch(() => null);
+        const content = cleanContent(body?.content);
+        if (!content) return reply({ error: 'Invalid content.' }, 400, cors);
+        const updated = { ...record, content, updatedAt: new Date().toISOString() };
+        await storage.put(record.id, updated);
+        return reply(updated, 200, cors);
+      }
 
-// Whoever holds the link can finalize it within the edit window — same trust model
-// as PUT above (there is no separate owner token any more; the link itself, only
-// ever handed to the buyer who paid for it, is the credential).
-app.post(
-  '/shares/:id/finalize',
-  route(async (request, response) => {
-    if (!validId(request.params.id))
-      return response.status(404).json({ error: 'Share not found.' });
-    const record = await storage.get(request.params.id);
-    if (!record)
-      return response.status(404).json({ error: 'Share not found.' });
-    if (!editable(record))
-      return response.status(423).json({ error: 'Share is locked.' });
-    const updated = {
-      ...record,
-      finalized: true,
-      finalizedAt: new Date().toISOString(),
-    };
-    await storage.put(record.id, updated);
-    response.json(publicRecord(updated));
-  }),
-);
-
-app.use((error, _request, response, _next) => {
-  console.error(error);
-  response.status(500).json({ error: 'Internal server error.' });
-});
-
-app.listen(port, () => {
-  console.log(`Share API listening on ${port}`);
-  console.log(`Fulfillment /ensure: ${SHARE_CREATE_SECRET ? 'secret-gated' : 'OPEN (SHARE_CREATE_SECRET unset)'}`);
-});
+      return reply({ error: 'Not found.' }, 404, cors);
+    } catch (err) {
+      console.error(err);
+      return reply({ error: 'Internal server error.' }, 500, cors);
+    }
+  },
+};
