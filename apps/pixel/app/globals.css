@@ -1,0 +1,3313 @@
+@font-face {
+  font-family: LCD;
+  src: url('/fonts/LoveLCD-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+/* All scene, art, and control colors share the same LCD palette. */
+:root {
+  --lcd: #9bb477;
+  --ink: #20351b;
+  --muted: #617749;
+  --background: var(--lcd);
+  --foreground: var(--ink);
+  color-scheme: light;
+  font-family: LCD, monospace;
+  color: var(--ink);
+  background: var(--lcd);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+a {
+  font: inherit;
+  color: inherit;
+}
+button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:disabled {
+  cursor: default;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px dashed var(--ink);
+  outline-offset: 6px;
+}
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+button {
+  transition: transform 0.12s;
+}
+h1,
+h2,
+p {
+  margin: 0;
+}
+svg {
+  display: block;
+}
+.lcd {
+  position: relative;
+  isolation: isolate;
+  min-height: 540px;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--lcd);
+}
+.lcd:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0.13;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Cpath d='M0 3h4M3 0v4' stroke='%2320351b' stroke-width='.4'/%3E%3C/svg%3E");
+}
+.world {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  image-rendering: pixelated;
+  z-index: -1;
+}
+.status-bar {
+  position: absolute;
+  top: max(28px, env(safe-area-inset-top));
+  left: 4%;
+  right: 4%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 4;
+}
+.signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 39px;
+}
+.signal i {
+  display: block;
+  width: 9px;
+  background: var(--ink);
+  height: 12px;
+}
+.signal i:nth-child(2) {
+  height: 21px;
+}
+.signal i:nth-child(3) {
+  height: 30px;
+}
+.signal i:nth-child(4) {
+  height: 39px;
+}
+.signal i.empty {
+  opacity: 0.3;
+}
+.signal span {
+  font-size: 17px;
+  letter-spacing: 2px;
+  margin: 0 0 0 14px;
+}
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.battery-label {
+  font-size: 25px;
+}
+.battery {
+  display: flex;
+  gap: 4px;
+  border: 4px solid var(--ink);
+  height: 30px;
+  width: 65px;
+  padding: 3px;
+  position: relative;
+}
+.battery:after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 14px;
+  right: -8px;
+  top: 4px;
+  background: var(--ink);
+}
+.battery i {
+  flex: 1;
+  background: var(--ink);
+}
+.battery i.empty {
+  opacity: 0.3;
+}
+.sound-toggle {
+  width: 44px;
+  height: 44px;
+  padding: 9px;
+  margin-right: 9px;
+  opacity: 0.75;
+}
+.sound-toggle svg {
+  width: 26px;
+}
+.heart {
+  width: 30px;
+  height: 28px;
+}
+.status-right > .heart {
+  width: 19px;
+  height: 18px;
+  margin-left: 4px;
+}
+.scene {
+  position: absolute;
+  top: 17%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  width: min(680px, 90%);
+  z-index: 2;
+}
+.eyebrow {
+  font-size: 18px;
+  letter-spacing: 3px;
+  margin-bottom: 20px;
+}
+.scene h1 {
+  font-weight: 400;
+  font-size: clamp(68px, 7.5vw, 112px);
+  line-height: 0.87;
+  letter-spacing: 1px;
+}
+.invitation-heart {
+  margin: 24px auto 0;
+  width: 33px;
+  height: 30px;
+  animation: pulse 5s steps(2, end) infinite;
+}
+.softkeys {
+  position: absolute;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  left: 4%;
+  right: 4%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  z-index: 5;
+}
+.softkeys button {
+  font-size: clamp(34px, 4vw, 55px);
+  min-height: 50px;
+  padding: 0 8px;
+}
+.softkeys button span {
+  font-size: 0.65em;
+  vertical-align: 5%;
+}
+.footer-note {
+  font-size: 14px;
+  letter-spacing: 2px;
+  opacity: 0.72;
+  padding-top: 18px;
+}
+.softkeys.single {
+  justify-content: center;
+}
+.softkeys.single button {
+  font-size: 30px;
+}
+.subcopy {
+  font-size: 26px;
+  line-height: 1.12;
+  margin-top: 18px;
+}
+.scene h2 {
+  font-size: clamp(42px, 5vw, 68px);
+  line-height: 0.95;
+  font-weight: 400;
+}
+.scene .small-title {
+  font-size: clamp(46px, 5.5vw, 76px);
+}
+.heart-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin: 18px 0;
+}
+.heart-row .heart {
+  width: 34px;
+  height: 31px;
+}
+.achievement {
+  font-size: 27px;
+  margin-top: 16px;
+}
+.achievement strong {
+  display: block;
+  font-size: 43px;
+  font-weight: 400;
+}
+.menu-actions {
+  display: flex;
+  justify-content: center;
+  gap: 34px;
+  margin-top: 26px;
+}
+.pixel-button {
+  border: 3px solid var(--ink);
+  padding: 10px 24px;
+  font-size: 27px;
+  min-height: 48px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.text-button {
+  font-size: 23px;
+  min-height: 44px;
+  padding: 8px;
+}
+.transition-in {
+  animation: scene-in 0.4s ease-out;
+}
+.boot {
+  position: absolute;
+  inset: 0;
+  background: var(--lcd);
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  flex-direction: column;
+  gap: 24px;
+}
+.boot h1 {
+  font-size: 44px;
+  font-weight: 400;
+}
+.boot p {
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+.boot-bars {
+  display: flex;
+  gap: 5px;
+}
+.boot-bars i {
+  width: 16px;
+  height: 24px;
+  border: 2px solid var(--ink);
+  animation: load 1.8s steps(1) both;
+  animation-delay: calc(var(--i)*0.14s);
+}
+.boot .text-button {
+  position: absolute;
+  bottom: 12%;
+  opacity: 0.7;
+  font-size: 18px;
+}
+.processing {
+  top: 28%;
+}
+.processing h1 {
+  font-size: clamp(42px, 5vw, 65px);
+}
+.processing p {
+  font-size: 24px;
+  margin-top: 24px;
+}
+.notice {
+  font-size: 23px;
+  margin: 16px 0 0;
+  min-height: 28px;
+}
+.date-scene {
+  top: 15%;
+}
+.date-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 28px;
+  text-align: left;
+  width: fit-content;
+  max-width: 100%;
+  margin: 21px auto;
+  font-size: 27px;
+}
+.date-grid dt {
+  font-size: 18px;
+  align-self: center;
+  letter-spacing: 2px;
+}
+.date-grid dd {
+  margin: 0;
+}
+.date-message {
+  font-size: 25px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@keyframes pulse {
+  0%,
+  90%,
+  100% {
+    transform: scale(1);
+  }
+  95% {
+    transform: scale(1.12);
+  }
+}
+@keyframes scene-in {
+  from {
+    opacity: 0;
+    filter: brightness(0.85);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+@keyframes load {
+  to {
+    background: var(--ink);
+  }
+}
+@media (orientation: portrait) {
+  .lcd {
+    min-height: 600px;
+  }
+  .status-bar {
+    top: max(23px, env(safe-area-inset-top));
+    left: 7%;
+    right: 7%;
+  }
+  .signal {
+    height: 34px;
+    gap: 4px;
+  }
+  .signal i {
+    width: 7px;
+  }
+  .signal i:nth-child(4) {
+    height: 34px;
+  }
+  .signal span {
+    display: none;
+  }
+  .status-right {
+    gap: 9px;
+  }
+  .battery-label {
+    font-size: 22px;
+  }
+  .battery {
+    width: 54px;
+    height: 27px;
+    border-width: 3px;
+    gap: 3px;
+  }
+  .battery:after {
+    top: 4px;
+    right: -7px;
+    height: 12px;
+  }
+  .sound-toggle {
+    margin-right: 1px;
+    padding: 10px;
+  }
+  .scene {
+    top: 28%;
+    width: 94%;
+  }
+  .eyebrow {
+    font-size: 15px;
+    letter-spacing: 2px;
+    margin-bottom: 22px;
+  }
+  .scene h1 {
+    font-size: clamp(58px, 14vw, 94px);
+    line-height: 0.95;
+  }
+  .invitation-heart {
+    margin-top: 23px;
+    width: 29px;
+    height: 26px;
+  }
+  .softkeys {
+    left: 6%;
+    right: 6%;
+    bottom: max(17px, env(safe-area-inset-bottom));
+  }
+  .softkeys button {
+    font-size: 39px;
+  }
+  .footer-note {
+    display: none;
+  }
+  .scene h2 {
+    font-size: 53px;
+  }
+  .scene .small-title {
+    font-size: 55px;
+  }
+  .celebration,
+  .bonus,
+  .date-scene {
+    top: 23%;
+  }
+  .subcopy,
+  .achievement {
+    font-size: 23px;
+  }
+  .achievement strong {
+    font-size: 35px;
+  }
+  .heart-row {
+    margin: 15px 0;
+  }
+  .heart-row .heart {
+    width: 27px;
+    height: 25px;
+  }
+  .date-grid {
+    font-size: 25px;
+    gap: 10px 18px;
+    margin: 22px auto;
+  }
+  .date-grid dt {
+    font-size: 16px;
+  }
+  .date-message {
+    font-size: 23px;
+  }
+  .processing {
+    top: 35%;
+  }
+  .processing h1 {
+    font-size: 44px;
+  }
+  .menu-actions {
+    gap: 15px;
+    margin-top: 22px;
+  }
+  .pixel-button {
+    font-size: 25px;
+    padding: 8px 18px;
+  }
+}
+@media (max-height: 650px) and (orientation: landscape) {
+  .lcd {
+    min-height: 360px;
+  }
+  .status-bar {
+    top: 12px;
+  }
+  .signal {
+    transform: scale(0.8);
+    transform-origin: left center;
+  }
+  .scene {
+    top: 18%;
+  }
+  .eyebrow {
+    font-size: 14px;
+    margin-bottom: 9px;
+  }
+  .scene h1 {
+    font-size: 64px;
+  }
+  .invitation-heart {
+    width: 22px;
+    height: 20px;
+    margin-top: 12px;
+  }
+  .softkeys {
+    bottom: 10px;
+  }
+  .softkeys button {
+    font-size: 34px;
+  }
+  .scene h2 {
+    font-size: 42px;
+  }
+  .heart-row {
+    margin: 8px 0;
+  }
+  .heart-row .heart {
+    width: 22px;
+    height: 20px;
+  }
+  .achievement,
+  .subcopy {
+    font-size: 20px;
+    margin-top: 8px;
+  }
+  .achievement strong {
+    font-size: 29px;
+  }
+  .date-grid {
+    font-size: 21px;
+    margin: 9px auto;
+    gap: 2px 24px;
+  }
+  .date-message {
+    font-size: 20px;
+  }
+  .menu-actions {
+    margin-top: 12px;
+  }
+  .pixel-button {
+    font-size: 22px;
+    min-height: 42px;
+    padding: 6px 16px;
+  }
+}
+
+/* Inline studio editing keeps the invitation itself as the canvas. */
+.inline-edit {
+  display: inline;
+  white-space: pre-line;
+}
+
+.inline-edit.is-editing {
+  cursor: text;
+  outline: 2px dashed color-mix(in srgb, var(--ink) 65%, transparent);
+  outline-offset: 4px;
+  background: var(--lcd);
+  box-shadow: 0 0 0 2px var(--lcd);
+}
+
+.inline-edit.is-editing:focus {
+  outline-style: solid;
+  background: color-mix(in srgb, var(--lcd) 88%, var(--ink));
+}
+
+.inline-editor-nav {
+  position: static;
+  font-size: 13px;
+}
+
+.inline-editor-nav button,
+.inline-list-editor button,
+.inline-list-editor input {
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--lcd);
+  color: var(--ink);
+  font: inherit;
+}
+
+.inline-editor-nav button {
+  position: fixed;
+  z-index: 45;
+  top: 50%;
+  transform: translateY(-50%);
+  min-height: 34px;
+  padding: 4px 9px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.inline-editor-nav button:first-child {
+  left: 10px;
+}
+
+.inline-editor-nav button:last-child {
+  right: 10px;
+}
+
+.inline-editor-nav > span {
+  position: fixed;
+  z-index: 45;
+  top: 112px;
+  left: 12px;
+  border: 2px solid var(--ink);
+  background: var(--lcd);
+  padding: 4px 7px;
+}
+
+.inline-list-editor {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  font-size: clamp(15px, 2vw, 21px);
+}
+
+.inline-list-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 40px;
+  align-items: center;
+  gap: 7px;
+}
+
+.inline-list-row input {
+  min-width: 0;
+  padding: 5px 8px;
+}
+
+.inline-list-row button {
+  min-height: 34px;
+  font-size: 24px;
+}
+
+.inline-add-button {
+  justify-self: start;
+  padding: 7px 10px;
+}
+
+.edit-only-warning {
+  margin: 0 0 3px;
+  border: 2px solid var(--ink);
+  background: var(--lcd);
+  padding: 7px 9px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.activity-place-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.activity-place-tabs button {
+  padding: 4px 7px;
+  font-size: 13px;
+}
+
+.activity-place-tabs button.active {
+  background: var(--ink);
+  color: var(--lcd);
+}
+
+.letter-editor {
+  display: block;
+  min-height: 210px;
+  padding: 8px;
+  line-height: 1.25;
+}
+
+.snake-message-editor {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 6px;
+  width: min(100%, 430px);
+  margin: 6px auto;
+}
+
+.snake-message-editor button {
+  min-height: 32px;
+  border: 2px solid var(--ink);
+  background: var(--lcd);
+  color: var(--ink);
+  font: inherit;
+}
+
+.snake-message-editor .game-feedback {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.snake-message-editor small {
+  font-size: 12px;
+}
+
+.no-message-editor .notice {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.finalize-dialog p {
+  margin: 14px 0 20px;
+  line-height: 1.35;
+}
+
+@media (max-width: 600px), (max-height: 700px) {
+  .inline-editor-nav {
+    font-size: 11px;
+  }
+
+  .inline-editor-nav button {
+    min-height: 30px;
+    padding: 3px 5px;
+  }
+
+  .inline-editor-nav > span {
+    top: 82px;
+    left: 6px;
+    max-width: 120px;
+  }
+
+  .inline-list-editor {
+    gap: 3px;
+    font-size: 14px;
+  }
+
+  .inline-list-row {
+    grid-template-columns: 24px 1fr 34px;
+    gap: 4px;
+  }
+
+  .inline-list-row input,
+  .inline-list-row button,
+  .inline-add-button {
+    min-height: 28px;
+    padding-block: 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+.scene:focus {
+  outline: none;
+}
+.save-feedback {
+  font-size: 18px;
+  margin-top: 13px;
+}
+.story-share {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 2px solid var(--ink);
+  background: var(--lcd);
+  padding: 10px 15px;
+  font-size: 21px;
+  box-shadow: 0 0 0 2px var(--lcd);
+}
+.date-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: min(100%, 520px);
+  margin: 14px auto 0;
+}
+.date-actions .story-share {
+  min-width: 0;
+}
+.message-plan {
+  grid-column: 1 / -1;
+  color: var(--ink);
+  text-align: center;
+  text-decoration: none;
+}
+@media (max-width: 480px) {
+  .date-actions .story-share {
+    padding-inline: 5px;
+    font-size: 14px;
+  }
+}
+.story-share:disabled {
+  opacity: 0.55;
+}
+.date-softkeys button {
+  font-size: 30px;
+}
+.date-softkeys .replay {
+  font-size: 20px;
+}
+.date-signoff {
+  font-size: 20px;
+}
+.ending-canvas {
+  width: 300px;
+  height: 130px;
+  image-rendering: pixelated;
+  margin: 10px auto;
+  display: block;
+}
+.game-scene {
+  position: absolute;
+  inset: 100px 0 20px;
+  margin: auto;
+  width: min(420px, 88vw);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.game-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.game-heading h1 {
+  font-size: 46px;
+  font-weight: 400;
+  line-height: 0.9;
+}
+.game-heading .eyebrow {
+  font-size: 14px;
+  letter-spacing: 2px;
+  margin-bottom: 7px;
+}
+.game-heading > .heart {
+  width: 25px;
+  height: 23px;
+}
+.love-meter {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 15px 0 12px;
+  font-size: 20px;
+}
+.pixel-progress {
+  flex: 1;
+  min-width: 50px;
+}
+.pixel-progress [data-slot='progress-track'] {
+  height: 14px;
+  border: 2px solid var(--ink);
+  position: relative;
+  width: 100%;
+  background: transparent;
+  border-radius: 0;
+  overflow: hidden;
+}
+.pixel-progress [data-slot='progress-indicator'] {
+  background: var(--ink);
+  height: 100%;
+}
+.game-area {
+  position: relative;
+  aspect-ratio: 1;
+  max-height: calc(100dvh - 355px);
+  align-self: center;
+  width: auto;
+  height: 420px;
+  max-width: 100%;
+  border: 3px solid var(--ink);
+  background: var(--lcd);
+  touch-action: none;
+  box-shadow: 5px 5px 0 #20351b40;
+}
+.game-area:focus-visible {
+  outline: 3px dashed var(--ink);
+  outline-offset: 5px;
+}
+.game-area canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--lcd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  text-align: center;
+  padding: 15px;
+}
+.game-overlay h2 {
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1;
+}
+.game-overlay p {
+  font-size: 20px;
+  line-height: 1;
+}
+.game-overlay .pixel-button {
+  font-size: 24px;
+}
+.game-overlay > .heart {
+  width: 27px;
+  height: 25px;
+}
+.game-feedback {
+  text-align: center;
+  min-height: 24px;
+  font-size: 20px;
+  margin: 9px 0;
+}
+.game-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.control-hint {
+  font-size: 14px;
+  line-height: 1.25;
+  letter-spacing: 0.5px;
+}
+.dpad {
+  display: grid;
+  grid-template-columns: 44px 44px 44px;
+  grid-template-rows: 38px 38px;
+  gap: 3px;
+}
+.dpad button {
+  border: 2px solid var(--ink);
+  font-size: 18px;
+  padding: 0;
+  min-height: 38px;
+  background: var(--lcd);
+}
+.dpad .up {
+  grid-column: 2;
+}
+.dpad .left {
+  grid-row: 2;
+  grid-column: 1;
+}
+.dpad .down {
+  grid-row: 2;
+  grid-column: 2;
+}
+.dpad .right {
+  grid-row: 2;
+  grid-column: 3;
+}
+.game-controls > .text-button {
+  font-size: 18px;
+  min-width: 58px;
+}
+.game-skip {
+  font-size: 19px;
+  margin: 8px auto 0;
+  padding: 4px;
+}
+.state-love_snake .world {
+  opacity: 0.3;
+}
+.state-love_snake .game-scene {
+  background: var(--lcd);
+}
+@media (orientation: portrait) {
+  .date-softkeys {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 20px;
+  }
+  .date-softkeys button {
+    font-size: 25px;
+  }
+  .date-softkeys .replay {
+    font-size: 18px;
+  }
+  .date-signoff {
+    display: none;
+  }
+  .game-scene {
+    top: 90px;
+    bottom: 8px;
+    width: min(400px, 88vw);
+  }
+  .game-heading h1 {
+    font-size: 40px;
+  }
+  .game-area {
+    height: auto;
+    width: 100%;
+    max-height: calc(100dvh - 350px);
+  }
+  .love-meter {
+    margin-top: 12px;
+    font-size: 19px;
+  }
+  .game-overlay {
+    gap: 12px;
+  }
+  .game-overlay h2 {
+    font-size: 27px;
+  }
+  .game-overlay p {
+    font-size: 18px;
+  }
+  .game-controls {
+    gap: 4px;
+  }
+  .control-hint {
+    font-size: 13px;
+  }
+  .dpad {
+    grid-template-columns: 44px 44px 44px;
+    grid-template-rows: 44px 44px;
+  }
+  .dpad button {
+    min-height: 44px;
+  }
+  .game-feedback {
+    font-size: 18px;
+  }
+  .game-skip {
+    margin-top: 6px;
+  }
+  .save-feedback {
+    font-size: 17px;
+  }
+  .ending-canvas {
+    width: 270px;
+    height: 117px;
+  }
+  .notice {
+    font-size: 20px;
+  }
+}
+@media (max-height: 720px) and (orientation: portrait) {
+  .scene {
+    top: 25%;
+  }
+  .scene h1 {
+    font-size: 58px;
+  }
+  .scene .small-title {
+    font-size: 47px;
+  }
+  .eyebrow {
+    margin-bottom: 15px;
+  }
+  .scene.date-scene {
+    top: 21%;
+  }
+  .date-grid {
+    font-size: 23px;
+    gap: 6px 15px;
+    margin: 14px auto;
+  }
+  .date-message {
+    font-size: 21px;
+  }
+  .game-scene {
+    top: 78px;
+  }
+  .game-area {
+    max-height: calc(100dvh - 335px);
+  }
+  .game-heading h1 {
+    font-size: 34px;
+  }
+  .game-heading .eyebrow {
+    font-size: 13px;
+  }
+  .game-overlay {
+    gap: 8px;
+  }
+  .game-overlay > .heart {
+    width: 20px;
+    height: 18px;
+  }
+  .game-overlay h2 {
+    font-size: 23px;
+  }
+  .game-overlay .pixel-button {
+    font-size: 20px;
+    padding: 5px 12px;
+  }
+  .game-feedback {
+    margin: 6px 0;
+  }
+  .game-overlay p {
+    font-size: 16px;
+  }
+}
+@media (max-height: 650px) and (orientation: landscape) {
+  .game-scene {
+    inset: 75px 0 12px;
+    width: min(700px, 88vw);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 50px 33px 25px 90px 40px;
+    column-gap: 30px;
+    align-content: center;
+  }
+  .game-heading {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .game-heading h1 {
+    font-size: 35px;
+  }
+  .love-meter {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+    font-size: 17px;
+  }
+  .game-area {
+    grid-column: 1;
+    grid-row: 1/6;
+    height: auto;
+    width: 100%;
+    max-height: calc(100dvh - 110px);
+    align-self: center;
+  }
+  .game-feedback {
+    grid-column: 2;
+    grid-row: 3;
+    font-size: 17px;
+    margin: 5px 0;
+  }
+  .game-controls {
+    grid-column: 2;
+    grid-row: 4;
+  }
+  .game-skip {
+    grid-column: 2;
+    grid-row: 5;
+  }
+  .control-hint {
+    display: none;
+  }
+  .date-scene {
+    top: 18%;
+  }
+  .date-scene .small-title {
+    font-size: 45px;
+  }
+  .save-feedback {
+    font-size: 16px;
+    margin-top: 5px;
+  }
+  .ending-canvas {
+    width: 210px;
+    height: 91px;
+    margin: 3px auto;
+  }
+  .date-softkeys button {
+    font-size: 25px;
+  }
+}
+@media (max-width: 360px) {
+  .scene h1 {
+    font-size: 54px;
+  }
+  .scene .small-title {
+    font-size: 42px;
+  }
+  .date-grid {
+    font-size: 21px;
+  }
+  .game-controls > .text-button {
+    min-width: 45px;
+    font-size: 16px;
+  }
+  .control-hint {
+    font-size: 12px;
+  }
+  .game-heading h1 {
+    font-size: 33px;
+  }
+}
+/* Short screens keep every soft key reachable and the Snake grid square. */
+.lcd {
+  min-height: 100dvh;
+}
+@media (orientation: portrait) {
+  .game-area {
+    width: min(100%, calc(100dvh - 350px));
+    height: auto;
+    max-height: none;
+    flex-shrink: 0;
+  }
+}
+@media (max-height: 720px) and (orientation: portrait) {
+  .game-area {
+    width: min(100%, calc(100dvh - 355px));
+    max-height: none;
+  }
+}
+@media (max-height: 650px) and (orientation: portrait) {
+  .scene.date-scene {
+    top: 15%;
+  }
+  .date-scene > .eyebrow {
+    display: none;
+  }
+  .date-grid {
+    font-size: 20px;
+    line-height: 1;
+    gap: 4px 14px;
+    margin: 10px auto;
+  }
+  .date-grid dt {
+    font-size: 15px;
+  }
+  .date-message {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .save-feedback {
+    font-size: 15px;
+    line-height: 1;
+    margin-top: 7px;
+  }
+  .story-share {
+    padding: 7px 10px;
+    font-size: 17px;
+  }
+  .date-actions {
+    gap: 5px;
+    margin-top: 7px;
+  }
+}
+
+/* Private studio and time-limited share editing surfaces. */
+.share-state {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--lcd);
+  color: var(--ink);
+  font-size: 28px;
+  text-align: center;
+}
+.studio-lock {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(20px, env(safe-area-inset-top)) 20px
+    max(20px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  background-color: var(--lcd);
+  background-image:
+    linear-gradient(#18301612 1px, transparent 1px),
+    linear-gradient(90deg, #18301612 1px, transparent 1px);
+  background-size: 4px 4px;
+  color: var(--ink);
+}
+.studio-lock form,
+.studio-lockout {
+  position: relative;
+  width: min(440px, 100%);
+  display: grid;
+  gap: 13px;
+  border: 3px solid var(--ink);
+  background: var(--lcd);
+  padding: clamp(22px, 6vw, 42px);
+  box-shadow: 8px 8px 0 var(--ink);
+  text-align: center;
+}
+.studio-lockout output {
+  margin-block: 10px;
+}
+.studio-lock-signal {
+  font-size: 24px;
+  letter-spacing: 2px;
+}
+.studio-lock p,
+.studio-lock h1 {
+  margin: 0;
+  font-weight: 400;
+}
+.studio-lock p {
+  font-size: 15px;
+  letter-spacing: 3px;
+}
+.studio-lock h1 {
+  font-size: clamp(30px, 8vw, 44px);
+  line-height: 1;
+}
+.studio-lock label {
+  margin-top: 8px;
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-align: left;
+}
+.studio-lock input,
+.studio-lock button {
+  width: 100%;
+  min-height: 50px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--lcd);
+  color: var(--ink);
+  padding: 9px 12px;
+  font:
+    23px LCD,
+    monospace;
+}
+.studio-lock button:not(:disabled) {
+  background: var(--ink);
+  color: var(--lcd);
+  cursor: pointer;
+}
+.studio-lock button:disabled {
+  opacity: 0.5;
+}
+.studio-lock output {
+  border: 2px solid var(--ink);
+  padding: 8px;
+  font-size: 16px;
+  line-height: 1.1;
+}
+.studio-lock small {
+  font-size: 14px;
+  line-height: 1.2;
+}
+.studio-bar,
+.share-edit-tools {
+  position: fixed;
+  z-index: 40;
+  top: max(92px, calc(env(safe-area-inset-top) + 78px));
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 2px solid var(--ink);
+  background: var(--lcd);
+  padding: 8px;
+  box-shadow: 0 0 0 2px var(--lcd);
+}
+.studio-bar p {
+  max-width: 220px;
+  font-size: 13px;
+  line-height: 1.15;
+}
+.studio-bar p span {
+  display: block;
+  margin-top: 3px;
+}
+.studio-bar button,
+.share-edit-tools button,
+.share-dialog button,
+.share-dialog a,
+.edit-panel button {
+  border: 2px solid var(--ink);
+  background: var(--lcd);
+  color: var(--ink);
+  padding: 8px 10px;
+  text-decoration: none;
+}
+.share-edit-tools {
+  right: 14px;
+  left: auto;
+  transform: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: min(520px, calc(100vw - 28px));
+}
+.countdown-badge {
+  white-space: nowrap;
+  font-size: 15px;
+}
+.compact-label {
+  display: none;
+}
+.share-global-error {
+  position: fixed;
+  z-index: 90;
+  right: 14px;
+  bottom: 100px;
+  max-width: min(380px, calc(100vw - 28px));
+  border: 2px solid var(--ink);
+  background: var(--lcd);
+  padding: 10px 12px;
+  font-size: 16px;
+}
+.share-modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: #20351b99;
+}
+.share-dialog {
+  width: min(520px, 100%);
+  border: 3px solid var(--ink);
+  background: var(--lcd);
+  padding: 22px;
+  box-shadow: 8px 8px 0 #10250e;
+}
+.share-dialog h2 {
+  margin: 0 0 18px;
+  font-size: 30px;
+  font-weight: 400;
+}
+.share-dialog label,
+.edit-panel label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.share-dialog input,
+.edit-panel input,
+.edit-panel textarea {
+  width: 100%;
+  border: 2px solid #10250e;
+  border-radius: 0;
+  background: var(--lcd);
+  color: #10250e;
+  padding: 9px;
+  font:
+    20px LCD,
+    monospace;
+}
+.share-dialog p,
+.share-dialog output {
+  display: block;
+  margin: 12px 0;
+  font-size: 17px;
+  line-height: 1.2;
+}
+.share-dialog-actions,
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 16px;
+}
+.edit-backdrop {
+  justify-items: end;
+  padding: 0;
+}
+.edit-panel {
+  width: min(520px, 100%);
+  height: 100dvh;
+  border-left: 3px solid var(--ink);
+  background: var(--lcd);
+  box-shadow: -8px 0 0 #10250e55;
+}
+.edit-panel > header {
+  height: auto;
+  position: static;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid var(--ink);
+  padding: 16px;
+}
+.edit-panel header span {
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+.edit-panel h2 {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 400;
+}
+.edit-panel-body {
+  height: calc(100dvh - 82px);
+  overflow-y: auto;
+  padding: 16px 18px 32px;
+  scrollbar-color: var(--ink) var(--lcd);
+}
+.edit-panel fieldset {
+  display: grid;
+  gap: 13px;
+  border: 2px solid var(--ink);
+  margin: 0 0 18px;
+  padding: 15px;
+}
+.edit-panel legend {
+  padding: 0 7px;
+  font-size: 16px;
+}
+.edit-panel textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+.studio-note {
+  border: 2px solid var(--ink);
+  padding: 10px;
+  font-size: 16px;
+}
+.finalize-button {
+  width: 100%;
+  margin-top: 24px;
+  background: var(--ink) !important;
+  color: var(--lcd) !important;
+}
+.studio-bar .finalize-button,
+.share-edit-tools .finalize-button {
+  width: auto;
+  margin-top: 0;
+}
+@media (max-width: 700px) {
+  .studio-bar {
+    top: auto;
+    right: 8px;
+    bottom: 78px;
+    left: 8px;
+    justify-content: center;
+  }
+  .studio-bar p {
+    display: none;
+  }
+  .share-edit-tools {
+    top: 82px;
+    right: 8px;
+    max-width: calc(100vw - 16px);
+  }
+  .studio-bar.is-editing {
+    top: 82px;
+    right: 8px;
+    bottom: auto;
+    left: auto;
+  }
+  .studio-bar.is-editing,
+  .share-edit-tools.is-editing {
+    width: auto;
+    max-width: calc(100vw - 16px);
+    justify-content: flex-end;
+    padding: 5px;
+  }
+  .studio-bar.is-editing button,
+  .share-edit-tools.is-editing button {
+    padding: 6px 8px;
+  }
+  .full-label {
+    display: none;
+  }
+  .compact-label {
+    display: inline;
+  }
+  .studio-bar .finalize-button,
+  .share-edit-tools .finalize-button {
+    font-size: 13px;
+  }
+}
+.boot-title {
+  font-size: 44px;
+  font-weight: 400;
+}
+.boot-tagline {
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+.boot:hover:not(:disabled),
+.boot:active:not(:disabled) {
+  transform: none;
+}
+.save-feedback {
+  display: block;
+}
+.notice {
+  display: block;
+}
+/* A Nokia menu sits inside the same LCD world, above the waterfront. */
+.picker-scene,
+.sms-scene {
+  position: absolute;
+  z-index: 3;
+  top: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(470px, 90%);
+  background: var(--lcd);
+  padding: 18px 20px 14px;
+  text-align: left;
+  max-height: 70%;
+  overflow-y: auto;
+  scrollbar-color: var(--ink) var(--lcd);
+  scrollbar-width: thin;
+}
+.picker-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 17px;
+  letter-spacing: 2px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 9px;
+  margin-bottom: 18px;
+}
+.picker-scene h1 {
+  font-size: 37px;
+  font-weight: 400;
+  line-height: 1;
+  outline: none;
+}
+.picker-subtitle {
+  font-size: 20px;
+  line-height: 1.1;
+  margin: 12px 0 22px;
+}
+.nokia-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.nokia-menu-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 10px 12px;
+  min-height: 48px;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.nokia-menu-row.chosen {
+  background: var(--ink);
+  color: var(--lcd);
+}
+.nokia-menu-row:focus-within {
+  outline: 2px dashed var(--ink);
+  outline-offset: 3px;
+}
+.nokia-menu-row [data-slot='radio-group-item'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border-radius: 0;
+}
+.nokia-menu-row [data-slot='radio-group-item']:hover {
+  transform: none;
+}
+.menu-index {
+  font-size: 17px;
+  opacity: 0.65;
+}
+.selection-arrow {
+  margin-left: auto;
+  font-size: 17px;
+  visibility: hidden;
+}
+.chosen .selection-arrow {
+  visibility: visible;
+}
+.picker-progress {
+  display: flex;
+  justify-content: center;
+  gap: 11px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  margin-top: 12px;
+}
+.picker-progress > span:not(.done) {
+  opacity: 0.4;
+}
+.picker-error {
+  display: block;
+  min-height: 20px;
+  font-size: 18px;
+  line-height: 1.1;
+  margin-top: 12px;
+}
+.picker-softkeys button {
+  font-size: 34px;
+}
+.picker-soft-note {
+  font-size: 17px;
+  letter-spacing: 2px;
+}
+.custom-place {
+  margin-top: 17px;
+  position: relative;
+}
+.custom-place label {
+  font-size: 16px;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 6px;
+}
+.custom-place input {
+  width: 100%;
+  min-height: 44px;
+  background: var(--lcd);
+  color: #10250e;
+  caret-color: #10250e;
+  border: 2px solid #10250e;
+  border-radius: 0;
+  box-shadow: 0 0 0 2px var(--lcd);
+  font:
+    22px LCD,
+    monospace;
+  padding: 8px;
+  text-shadow: var(--text-shield);
+}
+.custom-place input::placeholder {
+  color: #304725;
+  opacity: 1;
+  text-shadow: var(--text-shield);
+}
+.custom-place > span {
+  display: block;
+  text-align: right;
+  font-size: 14px;
+  margin-top: 3px;
+}
+.custom-place input:focus-visible,
+.time-row input:focus-visible {
+  outline: 2px dashed var(--ink);
+  outline-offset: 3px;
+}
+.lcd-calendar {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  --cell-size: 42px;
+  padding: 0;
+}
+.lcd-calendar .rdp-months,
+.lcd-calendar .rdp-month {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.lcd-calendar .rdp-nav {
+  display: flex;
+  justify-content: space-between;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 42px;
+  pointer-events: none;
+}
+.lcd-calendar .rdp-nav button {
+  pointer-events: auto;
+  width: 44px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  padding: 0;
+}
+.lcd-calendar .rdp-month_caption {
+  height: 42px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.lcd-calendar .rdp-caption_label {
+  font-size: 25px;
+  font-weight: 400;
+}
+.lcd-calendar .rdp-month_grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.lcd-calendar .rdp-weekday {
+  height: 26px;
+  font-size: 16px;
+  font-weight: 400;
+  opacity: 0.65;
+  text-align: center;
+}
+.lcd-calendar .rdp-day {
+  height: 42px;
+  text-align: center;
+  padding: 0;
+  position: relative;
+}
+.lcd-calendar .rdp-day button {
+  font:
+    24px LCD,
+    monospace;
+  width: 100%;
+  height: 42px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+}
+.lcd-calendar .rdp-day button span {
+  display: block;
+}
+.lcd-calendar .rdp-selected button {
+  background: var(--ink);
+  color: var(--lcd);
+}
+.lcd-calendar .rdp-today:not(.rdp-selected) button {
+  border-bottom: 2px solid var(--ink);
+}
+.lcd-calendar .rdp-outside {
+  opacity: 0.4;
+}
+.lcd-calendar .rdp-disabled {
+  opacity: 0.25;
+}
+.lcd-calendar button:disabled {
+  cursor: default;
+}
+.lcd-calendar .rdp-hidden {
+  visibility: hidden;
+}
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  border-top: 2px solid var(--ink);
+  padding-top: 13px;
+}
+.time-row label {
+  font-size: 17px;
+  letter-spacing: 1px;
+}
+.time-row input {
+  background: transparent;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  color: var(--ink);
+  padding: 5px 7px;
+  font:
+    22px LCD,
+    monospace;
+  min-height: 42px;
+}
+.time-hint {
+  font-size: 13px;
+  opacity: 0.7;
+}
+.picker-2 {
+  top: 11%;
+  max-height: 76%;
+}
+.picker-2 .picker-subtitle {
+  margin-bottom: 12px;
+}
+.message-notification {
+  position: absolute;
+  z-index: 3;
+  top: 24%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  width: min(450px, 90%);
+}
+.message-alert {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  width: 100%;
+  gap: 24px;
+  padding: 12px;
+}
+.pixel-envelope {
+  width: 74px;
+  height: 60px;
+}
+.message-count {
+  font-size: 62px;
+  line-height: 0.9;
+}
+.message-from {
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+.message-alert .pixel-envelope {
+  animation: message-arrival 0.7s steps(2) 3;
+}
+.message-alert:hover:not(:disabled) {
+  transform: none;
+}
+.sms-scene {
+  top: 13%;
+  padding: 20px 22px;
+  max-height: 74%;
+  width: min(500px, 90%);
+}
+.sms-scene:focus {
+  outline: none;
+}
+.sms-header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border-bottom: 3px solid var(--ink);
+  padding-bottom: 10px;
+}
+.sms-header .pixel-envelope {
+  width: 30px;
+  height: 24px;
+}
+.sms-header h1 {
+  font-size: 30px;
+  font-weight: 400;
+  margin: 0;
+}
+.sms-header > span {
+  font-size: 23px;
+  margin-left: auto;
+}
+.sms-sender {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin: 15px 0;
+  font-size: 23px;
+}
+.sms-sender strong {
+  font-weight: 400;
+}
+.sms-label {
+  margin-left: auto;
+  opacity: 0.65;
+  font-size: 14px;
+}
+.sms-body {
+  font-size: 29px;
+  line-height: 1.03;
+  min-height: 345px;
+}
+.sms-body p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sms-cursor {
+  animation: pulse 1s steps(1) infinite;
+}
+.sms-bottom {
+  border-top: 2px solid var(--ink);
+  margin-top: 18px;
+  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.sms-bottom button {
+  font-size: 17px;
+  min-height: 36px;
+}
+.game-goal {
+  text-align: center;
+  font-size: 17px;
+  margin-top: 15px;
+}
+.state-date_details .date-grid dd {
+  max-width: 320px;
+  overflow-wrap: anywhere;
+}
+.state-date_details .scene {
+  max-height: 69%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink) var(--lcd);
+}
+@keyframes message-arrival {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+@media (orientation: portrait) {
+  .picker-scene {
+    top: 16%;
+    width: 88%;
+    padding: 12px 10px;
+    max-height: 70%;
+  }
+  .picker-scene h1 {
+    font-size: 31px;
+  }
+  .picker-header {
+    font-size: 14px;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+  }
+  .picker-subtitle {
+    font-size: 18px;
+    margin-bottom: 20px;
+  }
+  .nokia-menu-row {
+    font-size: 23px;
+    padding: 10px 8px;
+    min-height: 48px;
+    gap: 9px;
+  }
+  .picker-progress {
+    font-size: 13px;
+    gap: 9px;
+  }
+  .picker-softkeys {
+    left: 5%;
+    right: 5%;
+  }
+  .picker-softkeys button {
+    font-size: 29px;
+  }
+  .picker-soft-note {
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+  .picker-2 {
+    top: 12%;
+    max-height: 76%;
+    width: 92%;
+  }
+  .lcd-calendar .rdp-day,
+  .lcd-calendar .rdp-day button {
+    height: 40px;
+  }
+  .time-row {
+    gap: 9px;
+  }
+  .time-row label {
+    font-size: 16px;
+  }
+  .time-row input {
+    font-size: 21px;
+  }
+  .time-hint {
+    font-size: 12px;
+  }
+  .message-notification {
+    top: 28%;
+  }
+  .message-count {
+    font-size: 58px;
+  }
+  .message-from {
+    font-size: 16px;
+  }
+  .sms-scene {
+    top: 15%;
+    max-height: 70%;
+    width: 90%;
+    padding: 14px 16px;
+  }
+  .sms-body {
+    font-size: 25px;
+    min-height: 315px;
+  }
+  .sms-sender {
+    font-size: 21px;
+  }
+  .sms-label {
+    font-size: 12px;
+  }
+  .sms-bottom {
+    font-size: 12px;
+    letter-spacing: 0;
+  }
+  .state-date_details .date-grid {
+    font-size: 23px;
+    gap: 6px 15px;
+  }
+  .state-date_details .date-grid dd {
+    max-width: 240px;
+  }
+  .game-goal {
+    font-size: 15px;
+  }
+}
+@media (max-height: 720px) and (orientation: portrait) {
+  .picker-scene {
+    top: 15%;
+    max-height: 70%;
+  }
+  .picker-2 {
+    top: 13%;
+    max-height: 73%;
+  }
+  .picker-header {
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+  }
+  .picker-subtitle {
+    margin: 8px 0 12px;
+    font-size: 17px;
+  }
+  .picker-scene h1 {
+    font-size: 28px;
+  }
+  .nokia-menu-row {
+    font-size: 22px;
+    min-height: 44px;
+    padding: 8px;
+  }
+  .picker-error {
+    font-size: 16px;
+    margin-top: 8px;
+  }
+  .picker-progress {
+    margin-top: 6px;
+  }
+  .picker-softkeys button {
+    font-size: 26px;
+  }
+  .picker-soft-note {
+    font-size: 13px;
+  }
+  .lcd-calendar .rdp-day,
+  .lcd-calendar .rdp-day button {
+    height: 32px;
+  }
+  .lcd-calendar .rdp-day button {
+    font-size: 22px;
+  }
+  .lcd-calendar .rdp-weekday {
+    height: 22px;
+  }
+  .lcd-calendar .rdp-month_caption,
+  .lcd-calendar .rdp-nav {
+    height: 34px;
+  }
+  .lcd-calendar .rdp-nav button {
+    height: 34px;
+  }
+  .lcd-calendar .rdp-caption_label {
+    font-size: 23px;
+  }
+  .time-row {
+    padding-top: 8px;
+    margin-top: 8px;
+  }
+  .time-hint {
+    display: none;
+  }
+  .custom-place {
+    margin-top: 12px;
+  }
+  .sms-scene {
+    top: 15%;
+    max-height: 70%;
+  }
+  .sms-body {
+    font-size: 23px;
+    min-height: 270px;
+  }
+  .sms-sender {
+    margin: 10px 0;
+  }
+  .sms-header {
+    padding-bottom: 7px;
+  }
+  .sms-bottom {
+    margin-top: 10px;
+  }
+  .state-date_details .date-grid {
+    font-size: 20px;
+    line-height: 1;
+    gap: 4px 12px;
+  }
+  .state-date_details .date-grid dd {
+    max-width: 210px;
+  }
+}
+@media (max-height: 650px) and (orientation: landscape) {
+  .picker-scene {
+    top: 17%;
+    max-height: 67%;
+    width: min(570px, 72%);
+    padding: 9px 18px;
+  }
+  .picker-header {
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    font-size: 14px;
+  }
+  .picker-scene h1 {
+    font-size: 29px;
+  }
+  .picker-subtitle {
+    font-size: 17px;
+    margin: 6px 0 12px;
+  }
+  .nokia-menu {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+  }
+  .nokia-menu-row {
+    font-size: 20px;
+    padding: 7px;
+    min-height: 42px;
+    gap: 8px;
+  }
+  .picker-2 {
+    width: min(650px, 82%);
+    top: 16%;
+    max-height: 68%;
+  }
+  .date-picker-content {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 25px;
+  }
+  .lcd-calendar .rdp-day,
+  .lcd-calendar .rdp-day button {
+    height: 26px;
+  }
+  .lcd-calendar .rdp-day button {
+    font-size: 20px;
+  }
+  .lcd-calendar .rdp-weekday {
+    height: 20px;
+    font-size: 14px;
+  }
+  .lcd-calendar .rdp-month_caption,
+  .lcd-calendar .rdp-nav,
+  .lcd-calendar .rdp-nav button {
+    height: 28px;
+  }
+  .lcd-calendar .rdp-caption_label {
+    font-size: 21px;
+  }
+  .time-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .picker-error {
+    font-size: 16px;
+    margin-top: 7px;
+  }
+  .picker-progress {
+    margin-top: 4px;
+  }
+  .picker-softkeys button {
+    font-size: 29px;
+  }
+  .sms-scene {
+    top: 16%;
+    max-height: 68%;
+    padding: 10px 20px;
+    width: 65%;
+  }
+  .sms-header {
+    padding-bottom: 7px;
+  }
+  .sms-body {
+    font-size: 23px;
+    min-height: 0;
+  }
+  .sms-sender {
+    margin: 8px 0;
+  }
+  .message-notification {
+    top: 23%;
+  }
+  .message-count {
+    font-size: 44px;
+  }
+  .message-alert {
+    gap: 12px;
+  }
+  .message-alert .pixel-envelope {
+    width: 48px;
+    height: 39px;
+  }
+  .message-from {
+    font-size: 15px;
+  }
+  .game-goal {
+    grid-column: 2;
+    grid-row: 5;
+    font-size: 15px;
+    margin: 8px 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-alert .pixel-envelope,
+  .sms-cursor {
+    animation: none;
+  }
+}
+/* Menus scroll like an old handset while the two cats remain visible below. */
+.picker-scene {
+  max-height: 56%;
+}
+.picker-2 {
+  max-height: 59%;
+}
+.sms-scene {
+  max-height: 57%;
+}
+@media (orientation: portrait) {
+  .picker-scene {
+    max-height: 54%;
+  }
+  .picker-2 {
+    max-height: 58%;
+  }
+  .sms-scene {
+    max-height: 56%;
+  }
+}
+@media (max-height: 650px) and (orientation: landscape) {
+  .picker-scene,
+  .picker-2,
+  .sms-scene {
+    max-height: 62%;
+  }
+}
+.lcd-calendar .rdp-week {
+  display: table-row;
+}
+.lcd-calendar td.rdp-day {
+  display: table-cell;
+  width: 14.285714%;
+}
+.lcd-calendar button.rdp-day {
+  display: flex;
+}
+.state-date_details .scene {
+  background: var(--lcd);
+  padding: 12px 10px;
+  max-height: 55%;
+}
+@media (orientation: portrait) {
+  .state-date_details .scene {
+    top: 18%;
+    max-height: 52%;
+  }
+}
+@media (max-height: 650px) and (orientation: landscape) {
+  .state-date_details .scene {
+    max-height: 64%;
+  }
+}
+/* Responsive LCD reading surfaces and a centered identity. */
+.lcd {
+  --header-height: 100px;
+  --text-shield:
+    -2px -2px 0 var(--lcd), -1px -2px 0 var(--lcd), 0 -2px 0 var(--lcd),
+    1px -2px 0 var(--lcd), 2px -2px 0 var(--lcd), -2px -1px 0 var(--lcd),
+    -1px -1px 0 var(--lcd), 0 -1px 0 var(--lcd), 1px -1px 0 var(--lcd),
+    2px -1px 0 var(--lcd), -2px 0 0 var(--lcd), -1px 0 0 var(--lcd),
+    1px 0 0 var(--lcd), 2px 0 0 var(--lcd), -2px 1px 0 var(--lcd),
+    -1px 1px 0 var(--lcd), 0 1px 0 var(--lcd), 1px 1px 0 var(--lcd),
+    2px 1px 0 var(--lcd), -2px 2px 0 var(--lcd), -1px 2px 0 var(--lcd),
+    0 2px 0 var(--lcd), 1px 2px 0 var(--lcd), 2px 2px 0 var(--lcd);
+  text-shadow: var(--text-shield);
+}
+.status-bar {
+  top: max(16px, env(safe-area-inset-top));
+  left: 4%;
+  right: 4%;
+  display: grid;
+  grid-template-columns: 1fr minmax(130px, 300px) 1fr;
+  gap: clamp(6px, 2vw, 20px);
+  height: 65px;
+}
+.status-right {
+  justify-self: end;
+  gap: 8px;
+}
+.signal span {
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.brand-logo {
+  width: 100%;
+  height: 58px;
+  display: block;
+  overflow: hidden;
+}
+.scene,
+.picker-scene,
+.sms-scene,
+.message-alert {
+  background: transparent;
+  border: 0;
+  padding: 18px 22px;
+  z-index: 2;
+}
+.scene {
+  top: max(var(--header-height), 17%);
+  width: min(620px, 90%);
+  max-height: calc(72% - var(--header-height));
+  overflow-y: auto;
+}
+.scene h1 {
+  font-size: clamp(42px, 5.5vw, 78px);
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+.scene h1.small-title {
+  font-size: clamp(32px, 3.5vw, 48px);
+}
+.scene .eyebrow {
+  font-size: 17px;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+.scene .notice {
+  font-size: 25px;
+  line-height: 1.2;
+  margin-top: 12px;
+}
+.scene .invitation-heart {
+  width: 32px;
+  height: 30px;
+  margin-top: 18px;
+}
+.scene .subcopy,
+.scene .achievement {
+  font-size: 25px;
+  line-height: 1.25;
+}
+.scene .achievement strong {
+  font-size: 35px;
+}
+.state-date_details .scene {
+  top: max(var(--header-height), 16%);
+  max-height: calc(75% - var(--header-height));
+  padding: 18px 22px;
+}
+.picker-scene,
+.picker-2,
+.sms-scene {
+  top: var(--header-height);
+  max-height: calc(77% - var(--header-height));
+  width: min(500px, 92%);
+}
+.picker-header {
+  font-size: 15px;
+  letter-spacing: 1px;
+  gap: 12px;
+}
+.picker-scene h1 {
+  font-size: 32px;
+}
+.picker-subtitle {
+  font-size: 21px;
+  line-height: 1.2;
+}
+.nokia-menu-row {
+  font-size: 24px;
+  line-height: 1.15;
+  min-height: 46px;
+}
+.confirm-hint {
+  font-size: 17px;
+  margin-top: 14px;
+  line-height: 1.2;
+}
+.softkeys {
+  gap: 14px;
+}
+.softkeys button {
+  line-height: 1.1;
+  min-height: 48px;
+}
+.softkeys .confirm-button {
+  background: var(--ink);
+  color: var(--lcd);
+  border: 1px solid var(--ink);
+  padding: 12px 20px;
+  font-size: 29px;
+  box-shadow: 4px 4px 0 #20351b55;
+}
+.softkeys .confirm-button:disabled {
+  opacity: 0.45;
+}
+.picker-softkeys button {
+  font-size: 26px;
+}
+.month-navigation {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 24px;
+}
+.month-navigation button {
+  border: 1px solid var(--ink);
+  min-height: 44px;
+  font-size: 21px;
+}
+.month-navigation button:disabled {
+  opacity: 0.25;
+}
+.lcd-calendar .rdp-month_caption {
+  display: none;
+}
+.lcd-calendar .rdp-day,
+.lcd-calendar .rdp-day button {
+  height: 38px;
+}
+.lcd-calendar .rdp-day button {
+  font-size: 24px;
+}
+.time-row [data-slot='native-select-wrapper'] {
+  position: relative;
+}
+.time-row select {
+  appearance: none;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  font: inherit;
+  font-size: 25px;
+  color: var(--ink);
+  background: var(--lcd);
+  padding: 8px 30px 8px 12px;
+  width: 100%;
+  min-height: 44px;
+}
+.time-row [data-slot='native-select-icon'] {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: calc(50% - 8px);
+  right: 8px;
+  pointer-events: none;
+}
+.time-row label {
+  font-size: 19px;
+}
+.time-hint {
+  font-size: 13px;
+}
+.message-notification {
+  top: max(var(--header-height), 24%);
+  width: min(450px, 90%);
+}
+.message-alert {
+  width: 100%;
+}
+.message-count {
+  font-size: 48px;
+}
+.message-from {
+  font-size: 18px;
+}
+.sms-body {
+  font-size: 26px;
+  line-height: 1.25;
+  min-height: 0;
+}
+.sms-bottom {
+  font-size: 15px;
+  letter-spacing: 0;
+}
+.sms-sender {
+  font-size: 23px;
+}
+.state-love_snake .game-scene {
+  top: var(--header-height);
+  bottom: 12px;
+  width: min(520px, 92vw);
+  border: 0;
+  background: transparent;
+  padding: 14px;
+  overflow: hidden;
+}
+
+/* Filled LCD controls already isolate their labels from the scenery. */
+.nokia-menu-row.chosen,
+.lcd-calendar .rdp-selected button,
+.softkeys .confirm-button {
+  text-shadow: none;
+}
+.game-heading h1 {
+  font-size: 36px;
+  line-height: 1.1;
+}
+.game-heading .eyebrow {
+  font-size: 14px;
+}
+.love-meter {
+  font-size: 19px;
+  margin: 10px 0;
+}
+.game-area {
+  width: min(100%, 500px, calc(100dvh - 465px));
+  height: auto;
+  max-height: none;
+  flex-shrink: 0;
+}
+.game-controls {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+}
+.dpad {
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(2, 64px);
+  gap: 6px;
+}
+.dpad button {
+  min-width: 64px;
+  min-height: 64px;
+  font-size: 30px;
+  border-width: 1px;
+}
+.game-controls > .text-button {
+  font-size: 19px;
+  min-height: 48px;
+  overflow-wrap: anywhere;
+}
+.game-feedback {
+  font-size: 19px;
+  line-height: 1.15;
+}
+.game-goal {
+  font-size: 15px;
+  line-height: 1.2;
+}
+.game-overlay {
+  gap: 10px;
+}
+.game-overlay h2 {
+  font-size: 27px;
+}
+.game-overlay p {
+  font-size: 19px;
+}
+@media (max-width: 1000px) {
+  .signal span {
+    display: none;
+  }
+  .status-bar {
+    grid-template-columns: 1fr minmax(150px, 260px) 1fr;
+    gap: 14px;
+  }
+}
+@media (orientation: portrait) {
+  .lcd {
+    --header-height: 82px;
+  }
+  .status-bar {
+    height: 58px;
+    top: max(12px, env(safe-area-inset-top));
+    left: 3%;
+    right: 3%;
+    grid-template-columns: 40px minmax(105px, 1fr) auto;
+    grid-template-rows: 58px;
+    gap: 5px;
+  }
+  .brand-logo {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    height: 52px;
+  }
+  .status-right {
+    grid-column: 3;
+    grid-row: 1;
+    gap: 3px;
+  }
+  .status-right > .heart {
+    display: none;
+  }
+  .signal {
+    grid-column: 1;
+    grid-row: 1;
+    height: 39px;
+    transform: scale(0.72);
+    transform-origin: center;
+  }
+  .sound-toggle {
+    margin-right: 0;
+  }
+  .battery-label {
+    display: none;
+  }
+  .scene {
+    top: max(var(--header-height), 23%);
+    max-height: calc(76% - max(var(--header-height), 23%));
+    padding: 16px;
+    width: 88%;
+  }
+  .scene h1 {
+    font-size: clamp(42px, 12vw, 66px);
+    line-height: 1.12;
+  }
+  .scene h1.small-title {
+    font-size: 32px;
+  }
+  .scene .eyebrow {
+    font-size: 15px;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .scene .subcopy,
+  .scene .achievement {
+    font-size: 22px;
+  }
+  .scene .notice {
+    font-size: 22px;
+  }
+  .picker-scene,
+  .picker-2,
+  .sms-scene {
+    padding: 14px;
+    max-height: calc(79% - var(--header-height));
+  }
+  .picker-scene h1 {
+    font-size: 29px;
+  }
+  .picker-header {
+    font-size: 13px;
+  }
+  .picker-subtitle {
+    font-size: 19px;
+    margin: 10px 0;
+  }
+  .nokia-menu-row {
+    font-size: 23px;
+    padding: 10px 8px;
+  }
+  .picker-softkeys {
+    left: 5%;
+    right: 5%;
+  }
+  .picker-soft-note {
+    font-size: 13px;
+    max-width: 110px;
+  }
+  .softkeys .confirm-button {
+    font-size: 25px;
+    padding: 12px;
+  }
+  .picker-softkeys button {
+    font-size: 23px;
+  }
+  .month-navigation {
+    font-size: 21px;
+  }
+  .sms-body {
+    font-size: 24px;
+  }
+  .sms-sender {
+    flex-wrap: wrap;
+    font-size: 22px;
+    gap: 7px;
+  }
+  .sms-label {
+    font-size: 13px;
+  }
+  .message-count {
+    font-size: 44px;
+  }
+  .state-date_details .date-grid {
+    font-size: 23px;
+    line-height: 1.15;
+  }
+  .date-softkeys button {
+    font-size: 23px;
+  }
+  .date-softkeys .replay {
+    font-size: 18px;
+  }
+  .state-love_snake .game-scene {
+    padding: 10px;
+  }
+  .game-area {
+    width: min(100%, calc(100dvh - 420px));
+  }
+  .game-controls {
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+  }
+  .control-hint {
+    display: none;
+  }
+  .dpad {
+    grid-template-columns: repeat(3, 64px);
+    grid-template-rows: repeat(2, 64px);
+  }
+  .game-heading h1 {
+    font-size: 32px;
+  }
+  .game-feedback {
+    font-size: 17px;
+  }
+  .game-goal {
+    font-size: 13px;
+    margin: 6px 0 0;
+  }
+}
+@media (max-height: 650px) and (orientation: portrait) {
+  .lcd {
+    --header-height: 74px;
+  }
+  .status-bar {
+    height: 54px;
+  }
+  .brand-logo {
+    height: 48px;
+  }
+  .scene {
+    top: var(--header-height);
+    max-height: calc(77% - var(--header-height));
+  }
+  .scene h1 {
+    font-size: 42px;
+  }
+  .scene .invitation-heart {
+    margin-top: 10px;
+    width: 24px;
+    height: 22px;
+  }
+  .scene .notice {
+    font-size: 20px;
+  }
+  .game-area {
+    width: min(100%, calc(100dvh - 376px));
+    min-width: 180px;
+  }
+  .game-overlay h2 {
+    font-size: 22px;
+  }
+  .game-overlay p {
+    font-size: 16px;
+  }
+  .game-overlay > .heart {
+    display: none;
+  }
+  .game-heading .eyebrow {
+    display: none;
+  }
+  .game-heading h1 {
+    font-size: 29px;
+  }
+  .game-feedback {
+    margin: 6px 0;
+  }
+  .game-goal {
+    display: none;
+  }
+}
+@media (max-height: 650px) and (orientation: landscape) {
+  .lcd {
+    --header-height: 78px;
+  }
+  .status-bar {
+    height: 48px;
+    top: 10px;
+    grid-template-columns: 1fr 230px 1fr;
+  }
+  .scene {
+    top: var(--header-height);
+    max-height: calc(80% - var(--header-height));
+    width: min(520px, 70%);
+    padding: 12px 18px;
+  }
+  .scene h1 {
+    font-size: 35px;
+  }
+  .scene h1.small-title {
+    font-size: 29px;
+  }
+  .scene .eyebrow {
+    font-size: 13px;
+    margin-bottom: 7px;
+  }
+  .scene .invitation-heart {
+    width: 20px;
+    height: 18px;
+    margin-top: 8px;
+  }
+  .scene .notice,
+  .scene .subcopy,
+  .scene .achievement {
+    font-size: 20px;
+  }
+  .picker-scene,
+  .picker-2,
+  .sms-scene {
+    width: min(660px, 83%);
+    top: var(--header-height);
+    max-height: calc(81% - var(--header-height));
+  }
+  .date-picker-content {
+    grid-template-columns: 1.5fr 1fr;
+  }
+  .month-navigation {
+    font-size: 20px;
+  }
+  .month-navigation button {
+    min-height: 40px;
+  }
+  .lcd-calendar .rdp-day,
+  .lcd-calendar .rdp-day button {
+    height: 32px;
+  }
+  .state-love_snake .game-scene {
+    width: min(740px, 94%);
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    grid-template-rows: auto auto 1fr;
+    gap: 6px 24px;
+  }
+  .game-area {
+    grid-column: 1;
+    grid-row: 1 / 5;
+    width: min(100%, calc(100dvh - 115px));
+    min-width: 0;
+    align-self: center;
+    justify-self: center;
+  }
+  .game-heading {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .love-meter {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 3px 0;
+  }
+  .game-controls {
+    grid-column: 2;
+    grid-row: 3;
+    grid-template-columns: auto 1fr;
+  }
+  .control-hint,
+  .game-feedback,
+  .game-goal {
+    display: none;
+  }
+  .dpad {
+    grid-template-columns: repeat(3, 64px);
+    grid-template-rows: repeat(2, 64px);
+  }
+  .softkeys {
+    bottom: 10px;
+  }
+  .softkeys button,
+  .softkeys .confirm-button {
+    font-size: 23px;
+    min-height: 42px;
+  }
+}
+@media (orientation: portrait) {
+  .game-area {
+    width: min(100%, calc(100dvh - 455px));
+  }
+  .game-controls > .text-button {
+    padding: 4px;
+    font-size: 16px;
+    min-width: 0;
+    overflow-wrap: normal;
+  }
+}
+@media (max-width: 460px) {
+  .sound-toggle {
+    width: 34px;
+    height: 40px;
+    padding: 7px;
+  }
+  .battery {
+    width: 52px;
+    height: 26px;
+    border-width: 3px;
+    gap: 3px;
+  }
+  .status-right > .heart {
+    display: none;
+  }
+}
+@media (max-height: 650px) and (orientation: portrait) {
+  .game-area {
+    width: min(100%, calc(100dvh - 405px));
+    min-width: 180px;
+  }
+  .love-meter {
+    margin: 6px 0;
+  }
+  .game-feedback {
+    min-height: 20px;
+    margin: 5px 0;
+  }
+}
+
+/* Keep every interaction inside the LCD viewport without scrollbars. */
+.scene,
+.picker-scene,
+.sms-scene,
+.state-date_details .scene {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.picker-scene,
+.picker-2,
+.sms-scene {
+  top: var(--header-height);
+  bottom: 86px;
+  max-height: none;
+}
+
+.game-controls {
+  grid-template-columns: 1fr auto 1fr;
+  width: 100%;
+}
+
+.game-controls .dpad {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.game-controls > .text-button {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* Compact phones keep the final plan and edit controls inside the LCD. */
+@media (max-width: 430px) and (orientation: portrait) {
+  .lcd {
+    --header-height: 86px;
+  }
+  .status-bar {
+    left: 3%;
+    right: 3%;
+    grid-template-columns: 52px minmax(105px, 1fr) 112px;
+    gap: 4px;
+    height: 54px;
+  }
+  .signal {
+    transform: scale(0.72);
+    transform-origin: left center;
+  }
+  .brand-logo {
+    height: 47px;
+  }
+  .status-right {
+    gap: 3px;
+  }
+  .battery-label {
+    display: none;
+  }
+  .sound-toggle {
+    width: 29px;
+    padding: 5px;
+  }
+  .battery {
+    width: 45px;
+    height: 23px;
+  }
+  .share-edit-tools,
+  .share-edit-tools.is-editing {
+    top: 70px;
+    right: 5px;
+    left: 5px;
+    width: auto;
+    max-width: none;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 4px;
+  }
+  .countdown-badge {
+    font-size: 12px;
+  }
+  .share-edit-tools button {
+    padding: 5px 7px;
+    font-size: 12px;
+  }
+  .state-date_details .scene {
+    top: 132px;
+    width: 96%;
+    max-height: calc(100dvh - 245px);
+    padding: 6px 8px;
+  }
+  .state-date_details .scene .eyebrow {
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .state-date_details .scene h1.small-title {
+    font-size: 31px;
+  }
+  .state-date_details .date-grid {
+    gap: 4px 10px;
+    margin: 9px auto;
+    font-size: 18px;
+    line-height: 1.05;
+  }
+  .state-date_details .date-grid dt {
+    font-size: 12px;
+  }
+  .state-date_details .date-grid dd {
+    max-width: 215px;
+  }
+  .state-date_details .date-message {
+    font-size: 16px;
+    line-height: 1.08;
+  }
+  .state-date_details .save-feedback {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+  .state-date_details .date-actions {
+    gap: 4px;
+    margin-top: 5px;
+  }
+  .state-date_details .story-share {
+    min-height: 39px;
+    padding: 4px;
+    font-size: 12px;
+    line-height: 1.05;
+  }
+  .date-softkeys button,
+  .date-softkeys .replay {
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 430px) and (max-height: 720px) and (orientation: portrait) {
+  .state-date_details .scene {
+    top: 118px;
+    max-height: calc(100dvh - 205px);
+  }
+  .state-date_details .scene .eyebrow,
+  .state-date_details .date-message {
+    display: none;
+  }
+  .state-date_details .scene h1.small-title {
+    font-size: 27px;
+  }
+  .state-date_details .date-grid {
+    margin: 5px auto;
+    font-size: 16px;
+  }
+}
+
+@media (orientation: portrait) {
+  .picker-scene,
+  .picker-2,
+  .sms-scene {
+    bottom: 82px;
+  }
+
+  .picker-2 {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .date-picker-content,
+  .calendar-section {
+    min-height: 0;
+  }
+
+  .date-picker-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .lcd-calendar .rdp-day,
+  .lcd-calendar .rdp-day button {
+    height: clamp(30px, 4.3dvh, 38px);
+  }
+
+  .game-controls {
+    grid-template-columns: 1fr auto 1fr;
+  }
+}
+
+@media (max-height: 650px) and (orientation: portrait) {
+  .picker-scene,
+  .picker-2,
+  .sms-scene {
+    bottom: 72px;
+    padding-block: 8px;
+  }
+
+  .picker-header {
+    margin-bottom: 6px;
+  }
+
+  .picker-subtitle {
+    margin: 5px 0 7px;
+  }
+
+  .nokia-menu-row {
+    min-height: 38px;
+    padding-block: 5px;
+  }
+
+  .lcd-calendar .rdp-day,
+  .lcd-calendar .rdp-day button {
+    height: clamp(22px, 4.3dvh, 26px);
+  }
+
+  .lcd-calendar .rdp-weekday {
+    height: 18px;
+  }
+
+  .month-navigation,
+  .month-navigation button {
+    min-height: 30px;
+  }
+
+  .time-row {
+    margin-top: 5px;
+    padding-top: 5px;
+  }
+
+  .confirm-hint,
+  .time-hint {
+    display: none;
+  }
+
+  .picker-error {
+    min-height: 16px;
+    margin-top: 3px;
+  }
+
+  .picker-progress {
+    margin-top: 2px;
+  }
+}
+
+@media (max-height: 650px) and (orientation: landscape) {
+  .picker-scene,
+  .picker-2,
+  .sms-scene {
+    top: var(--header-height);
+    bottom: 62px;
+    max-height: none;
+  }
+
+  .game-controls {
+    grid-template-columns: 1fr auto 1fr;
+  }
+}

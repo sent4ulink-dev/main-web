@@ -1,0 +1,6 @@
+{
+  "name": "Date Invitation RSVP",
+  "description": "Ultra-minimalist full-screen Yes/No decision interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

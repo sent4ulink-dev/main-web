@@ -15,6 +15,10 @@
    POST   /orders/:token/refund     the payment was refunded: the order's links stop working (same secret)
    POST   /webhooks/paddle          Paddle calls this when a transaction completes (authenticated by its own signature, not a bearer token)
 
+   GET    /links/:id                is this a real, still-good link, and which product is it? -> { ok: true, product } or 404  (public, read-only —
+                                     this is what the gateway that picks which app to serve for sent4u.link/?share=<id> calls, and what each app's
+                                     own backend calls to self-heal a link that's opened before /generate has fully landed)
+
    R2 layout
      orders/<token>.json  one object per order (pack, credits, status, the links made); the token is a random 128-bit secret and is the buyer's key
      tx/<paddleId>.json   Paddle's own transaction id -> our order token, so a webhook that lacks custom_data can still find the order
@@ -56,6 +60,8 @@ export default {
       if (order && order[2] === 'confirm' && request.method === 'POST') return await confirmOrder(request, env, cors, order[1]);
       if (order && order[2] === 'refund' && request.method === 'POST') return await refundOrder(request, env, cors, order[1]);
       if (url.pathname === '/webhooks/paddle' && request.method === 'POST') return await paddleWebhook(request, env, cors);
+      const link = url.pathname.match(/^\/links\/([A-Za-z0-9_-]{22})$/);
+      if (link && request.method === 'GET') return await getLink(env, cors, link[1]);
       if (url.pathname === '/') return reply({ ok: true, service: 'sent4u reviews' }, 200, cors);
       return reply({ error: 'Not found' }, 404, cors);
     } catch (err) {
@@ -458,6 +464,17 @@ async function refundOrder(request, env, cors, token) {
   await env.BUCKET.put(orderKey(token), JSON.stringify(next), JSON_OBJECT);
   await Promise.all(next.links.map(l => env.BUCKET.put(`links/${l.id}.json`, JSON.stringify({ id: l.id, product: l.product, order: token, createdAt: l.at, revoked: true }), JSON_OBJECT)));
   return reply(publicOrder(next), 200, cors);
+}
+
+// Public and read-only, on purpose: this is called both by whatever picks which app to serve for a given share id, and by
+// each app's own backend (to self-heal a link opened in the gap before its content record exists — see each app's /ensure).
+// It only ever confirms "this id is real, for this product" or 404s; it never returns anything about the order it came from.
+async function getLink(env, cors, id) {
+  const stored = await env.BUCKET.get(`links/${id}.json`);
+  if (!stored) return reply({ error: 'Not found.' }, 404, cors, { 'Cache-Control': 'no-store' });
+  const link = await stored.json();
+  if (link.revoked) return reply({ error: 'This link was refunded.' }, 404, cors, { 'Cache-Control': 'no-store' });
+  return reply({ ok: true, product: link.product }, 200, cors, { 'Cache-Control': 'public, max-age=60' });
 }
 
 /* ---------------- Paddle's webhook -----------------

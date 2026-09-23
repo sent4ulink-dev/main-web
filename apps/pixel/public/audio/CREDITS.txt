@@ -1,0 +1,17 @@
+ЗУРВАСЫН ДУУ
+Old Nokia Sms — MrDrum (2011-09-05).
+https://www.zedge.net/notification-sounds/dedf7bdf-396b-3d47-8e0f-785822d0ab7e
+The uploader identifies this as a recording from a Nokia 3310.
+Unmodified downloaded recording. No claim of independent hardware verification.
+
+ТОВЧЛУУРЫН ДУУ
+Nokia Keypad Beep.wav — edinc90 (2015-04-03).
+https://freesound.org/people/edinc90/sounds/268917/
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Unmodified high quality MP3 preview.
+Recorded from a Nokia 6820, NOT a verified Nokia 3310 recording.
+Used as an authentic Nokia fallback because a verifiable 3310 key recording
+could not be located. Do not describe this asset as an exact 3310 key sound.
+
+БАЯРЫН АЯ
+Original three-second melody synthesized in useSound.ts. No recording copied.

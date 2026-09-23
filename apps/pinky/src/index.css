@@ -1,0 +1,738 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-overflow-scrolling: touch;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #000000;
+    color: #ffffff;
+    overscroll-behavior: none;
+  }
+}
+
+/* GPU Hardware Acceleration Utilities */
+.will-change-transform {
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Fluid responsive typography clamps */
+.responsive-title-no {
+  font-size: clamp(4.5rem, 18vmin, 18rem);
+  line-height: 0.9;
+}
+
+.responsive-title-yes {
+  font-size: clamp(4.5rem, 18vmin, 18rem);
+  line-height: 0.9;
+}
+
+.responsive-title-active {
+  font-size: clamp(5.5rem, 24vmin, 22rem);
+  line-height: 0.85;
+}
+
+.font-serif-display {
+  font-family: 'Instrument Serif', 'Bodoni Moda', Georgia, serif;
+}
+
+.font-serif-italic {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+}
+
+.font-display {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+}
+
+.font-editorial-body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Custom smooth drag & card perspective */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Glassmorphism subtle tints */
+.glass-panel {
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Hide scrollbars for clean editorial finish */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes dramaticShake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  15% { transform: translateX(-12px) rotate(-6deg); }
+  30% { transform: translateX(10px) rotate(5deg); }
+  45% { transform: translateX(-8px) rotate(-3deg); }
+  60% { transform: translateX(7px) rotate(3deg); }
+  75% { transform: translateX(-4px) rotate(-1deg); }
+  90% { transform: translateX(2px) rotate(1deg); }
+}
+
+@keyframes cuteWiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-4deg) scale(0.97); }
+  75% { transform: rotate(4deg) scale(1.03); }
+}
+
+@keyframes floatPlea {
+  0% { opacity: 0; transform: translateY(10px) scale(0.9); }
+  20% { opacity: 1; transform: translateY(0) scale(1); }
+  85% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0.9; transform: translateY(-4px) scale(1); }
+}
+
+.animate-dramatic-shake {
+  animation: dramaticShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.animate-cute-wiggle {
+  animation: cuteWiggle 1.5s ease-in-out infinite;
+}
+
+.animate-float-plea {
+  animation: floatPlea 0.4s ease-out forwards;
+}
+
+/* Vector Love Animations: Heart Shockwave */
+@keyframes heartPulseExpand {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.2);
+    opacity: 0;
+  }
+}
+
+.animate-heart-pulse {
+  animation: heartPulseExpand 1.6s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+}
+
+/* Enhanced 3D Butterfly Wing Flap & Flutter Flight */
+@keyframes butterflyWingLeft {
+  0% { transform: perspective(400px) rotateY(0deg) rotateZ(0deg); }
+  50% { transform: perspective(400px) rotateY(70deg) rotateZ(-6deg); }
+  100% { transform: perspective(400px) rotateY(-20deg) rotateZ(3deg); }
+}
+
+@keyframes butterflyWingRight {
+  0% { transform: perspective(400px) rotateY(0deg) rotateZ(0deg); }
+  50% { transform: perspective(400px) rotateY(-70deg) rotateZ(6deg); }
+  100% { transform: perspective(400px) rotateY(20deg) rotateZ(-3deg); }
+}
+
+@keyframes butterflyFlight {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6) rotate(var(--flight-rot, 0deg));
+  }
+  12% {
+    opacity: 1;
+    transform: translate(calc(var(--flight-x, 0px) * 0.15), calc(var(--flight-y, -250px) * 0.15 - 15px)) scale(0.9) rotate(calc(var(--flight-rot, 0deg) + 8deg));
+  }
+  45% {
+    transform: translate(calc(var(--flight-x, 0px) * 0.45), calc(var(--flight-y, -250px) * 0.45 + 10px)) scale(1.05) rotate(calc(var(--flight-rot, 0deg) - 10deg));
+  }
+  75% {
+    opacity: 0.95;
+    transform: translate(calc(var(--flight-x, 0px) * 0.75), calc(var(--flight-y, -250px) * 0.75 - 12px)) scale(1.1) rotate(calc(var(--flight-rot, 0deg) + 12deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--flight-x, 0px), var(--flight-y, -250px)) scale(1.15) rotate(calc(var(--flight-rot, 0deg) - 15deg));
+  }
+}
+
+.animate-butterfly-flight {
+  animation: butterflyFlight 3.8s cubic-bezier(0.22, 0.8, 0.36, 1) forwards;
+}
+
+.animate-wing-left {
+  transform-origin: right center;
+  animation: butterflyWingLeft 0.2s ease-in-out infinite alternate;
+}
+
+.animate-wing-right {
+  transform-origin: left center;
+  animation: butterflyWingRight 0.2s ease-in-out infinite alternate;
+}
+
+/* Rising Flower Bloom from bottom */
+@keyframes flowerRiseBloom {
+  0% {
+    opacity: 0;
+    transform: translateY(110px) scale(0.2) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-14px) scale(1.08) rotate(2deg);
+  }
+  100% {
+    opacity: 0.98;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.animate-flower-rise {
+  animation: flowerRiseBloom 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Realistic Sun Glow & Corona Keyframes */
+@keyframes sunCoronaPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.75;
+    filter: blur(16px);
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 0.95;
+    filter: blur(24px);
+  }
+}
+
+@keyframes cloudDriftLeft {
+  0% { transform: translateX(0px) translateY(0px); }
+  50% { transform: translateX(35px) translateY(-4px); }
+  100% { transform: translateX(0px) translateY(0px); }
+}
+
+@keyframes cloudDriftRight {
+  0% { transform: translateX(0px) translateY(0px); }
+  50% { transform: translateX(-40px) translateY(5px); }
+  100% { transform: translateX(0px) translateY(0px); }
+}
+
+.animate-sun-corona {
+  animation: sunCoronaPulse 4s ease-in-out infinite;
+}
+
+.animate-cloud-drift-1 {
+  animation: cloudDriftLeft 18s ease-in-out infinite;
+}
+
+.animate-cloud-drift-2 {
+  animation: cloudDriftRight 22s ease-in-out infinite;
+}
+
+/* Cupid Angel Levitating & Divine Shimmer Keyframes */
+@keyframes cupidLevitate {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes cupidWingShimmer {
+  0%, 100% {
+    filter: drop-shadow(0 8px 24px rgba(251, 191, 36, 0.45));
+  }
+  50% {
+    filter: drop-shadow(0 12px 36px rgba(245, 158, 11, 0.75));
+  }
+}
+
+@keyframes cupidArrowGlint {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4) rotate(45deg);
+  }
+}
+
+@keyframes cupidWingFlutter {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(4deg) scale(1.04);
+  }
+}
+
+.animate-cupid-wing {
+  animation: cupidWingFlutter 2s ease-in-out infinite alternate;
+  transform-origin: 35% 45%;
+}
+
+.animate-cupid-float {
+  animation: cupidLevitate 5s ease-in-out infinite;
+}
+
+.animate-cupid-shimmer {
+  animation: cupidWingShimmer 3.5s ease-in-out infinite;
+}
+
+.animate-arrow-glint {
+  animation: cupidArrowGlint 2s ease-in-out infinite;
+}
+
+@keyframes floatSalute {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--target-x) * 0.3), calc(-50% + var(--target-y) * 0.3)) scale(1.3) rotate(calc(var(--target-rotate) * 0.3));
+  }
+  70% {
+    opacity: 0.9;
+    transform: translate(calc(-50% + var(--target-x) * 0.8), calc(-50% + var(--target-y) * 0.8)) scale(1) rotate(calc(var(--target-rotate) * 0.8));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--target-x)), calc(-50% + var(--target-y) - 80px)) scale(0.6) rotate(var(--target-rotate));
+  }
+}
+
+.animate-float-salute {
+  animation-name: floatSalute;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: forwards;
+}
+
+/* Kinetic Typographic YES Repeating Marquee & Fill Screen Effects */
+.stroke-text-white {
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.95);
+  text-stroke: 1.5px rgba(255, 255, 255, 0.95);
+}
+
+@keyframes marqueeLeft {
+  0% { transform: translate3d(0%, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes marqueeRight {
+  0% { transform: translate3d(-50%, 0, 0); }
+  100% { transform: translate3d(0%, 0, 0); }
+}
+
+/* Scene 2: 2-second direct YES text zoom-in to engulf the screen in the text's orange color */
+@keyframes yesZoomDirect {
+  0% {
+    transform: scale(1) translateZ(0);
+    opacity: 1;
+  }
+  20% {
+    transform: scale(2.8) translateZ(0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(45) translateZ(0);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(250) translateZ(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(700) translateZ(0);
+    opacity: 1;
+  }
+}
+
+.animate-yes-zoom-direct {
+  animation: yesZoomDirect 2s cubic-bezier(0.4, 0, 0.15, 1) forwards;
+  will-change: transform;
+}
+
+.animate-scene3-intro {
+  animation: scene3Intro 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+.animate-marquee-left {
+  animation: marqueeLeft 18s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-left-fast {
+  animation: marqueeLeft 12s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-left-slow {
+  animation: marqueeLeft 26s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-right {
+  animation: marqueeRight 18s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-right-fast {
+  animation: marqueeRight 11s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-right-slow {
+  animation: marqueeRight 24s linear infinite;
+  will-change: transform;
+}
+
+/* Interactive YES line hover & glow — used to also pulse/scale (a "heartbeat"),
+   now just the glow so the text holds still while it lights up. */
+.interactive-yes-line {
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.interactive-yes-line:hover,
+.interactive-yes-line.is-active-line {
+  opacity: 1 !important;
+  z-index: 20;
+}
+
+.interactive-yes-line:hover .yes-text-span,
+.interactive-yes-line.is-active-line .yes-text-span {
+  color: #FFFFFF !important;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.9), 0 0 40px rgba(255, 46, 126, 0.9), 0 0 60px rgba(255, 255, 255, 0.7);
+}
+
+/* Floating 3D Glossy Hearts */
+@keyframes heartFloat3D_1 {
+  0%, 100% { transform: translateY(0px) rotate(-3deg) scale(1); }
+  50% { transform: translateY(-12px) rotate(2deg) scale(1.03); }
+}
+
+@keyframes heartFloat3D_2 {
+  0%, 100% { transform: translateY(0px) rotate(1deg) scale(1.05); }
+  50% { transform: translateY(-16px) rotate(-2deg) scale(1.09); }
+}
+
+@keyframes heartFloat3D_3 {
+  0%, 100% { transform: translateY(0px) rotate(3deg) scale(1); }
+  50% { transform: translateY(-11px) rotate(-1deg) scale(1.03); }
+}
+
+@keyframes sparkleTwinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.2) rotate(45deg); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)); }
+}
+
+@keyframes sparkleTwinkleAlt {
+  0%, 100% { opacity: 0.8; transform: scale(1.1) rotate(20deg); filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.8)); }
+  50% { opacity: 0.2; transform: scale(0.7) rotate(-25deg); }
+}
+
+@keyframes pulseAuraGlow {
+  0%, 100% { transform: scale(0.95); opacity: 0.55; }
+  50% { transform: scale(1.1); opacity: 0.85; filter: blur(28px); }
+}
+
+.animate-heart-float-1 {
+  animation: heartFloat3D_1 4.2s ease-in-out infinite;
+}
+
+.animate-heart-float-2 {
+  animation: heartFloat3D_2 3.8s ease-in-out infinite;
+}
+
+.animate-heart-float-3 {
+  animation: heartFloat3D_3 4.6s ease-in-out infinite;
+}
+
+.animate-sparkle-twinkle {
+  animation: sparkleTwinkle 2.4s ease-in-out infinite;
+}
+
+.animate-sparkle-twinkle-alt {
+  animation: sparkleTwinkleAlt 3.1s ease-in-out infinite;
+}
+
+.animate-aura-glow {
+  animation: pulseAuraGlow 3s ease-in-out infinite;
+}
+
+/* 3D Heart Click & Zoom to Fill Page */
+@keyframes heartZoomToPage {
+  0% {
+    transform: scale(0.18) rotate(-6deg);
+    opacity: 0;
+    filter: blur(12px);
+  }
+  40% {
+    transform: scale(1.08) rotate(2deg);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  75% {
+    transform: scale(0.97) rotate(0deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes heartShrinkBack {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.2) translateY(60px);
+    opacity: 0;
+  }
+}
+
+.animate-heart-zoom-page {
+  animation: heartZoomToPage 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-heart-shrink-back {
+  animation: heartShrinkBack 0.4s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+/* Liquid Bubble Uniting & Merging into One Big Heart */
+@keyframes bubbleMergeLeftToCenter {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: translate(60px, -20px) scale(1.2) rotate(12deg);
+    opacity: 0.95;
+  }
+  80% {
+    transform: translate(140px, -5px) scale(0.6) rotate(30deg);
+    opacity: 0.7;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translate(170px, 0) scale(0);
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+@keyframes bubbleMergeRightToCenter {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: translate(-60px, -20px) scale(1.2) rotate(-12deg);
+    opacity: 0.95;
+  }
+  80% {
+    transform: translate(-140px, -5px) scale(0.6) rotate(-30deg);
+    opacity: 0.7;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translate(-170px, 0) scale(0);
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+@keyframes bubbleMergeCenterAbsorb {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.3) rotate(6deg);
+  }
+  70% {
+    transform: scale(0.8) rotate(-4deg);
+  }
+  100% {
+    transform: scale(1.6);
+  }
+}
+
+@keyframes bigHeartUnitedEntrance {
+  0% {
+    transform: scale(0.15) rotate(-15deg);
+    opacity: 0;
+    filter: blur(16px) drop-shadow(0 0 0 rgba(255,46,126,0));
+  }
+  50% {
+    transform: scale(1.18) rotate(3deg);
+    opacity: 1;
+    filter: blur(0px) drop-shadow(0 0 60px rgba(255,46,126,1));
+  }
+  75% {
+    transform: scale(0.95) rotate(-1deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    filter: blur(0px) drop-shadow(0 0 45px rgba(255,46,126,0.85));
+  }
+}
+
+@keyframes pulseGlowingHeart {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 15px 40px rgba(255, 46, 126, 0.7));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 20px 65px rgba(255, 46, 126, 0.95));
+  }
+}
+
+.animate-merge-left {
+  animation: bubbleMergeLeftToCenter 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-merge-right {
+  animation: bubbleMergeRightToCenter 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes bubbleMergeTopToCenter {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: translate(0, 60px) scale(1.2) rotate(12deg);
+    opacity: 0.95;
+  }
+  80% {
+    transform: translate(0, 140px) scale(0.6) rotate(30deg);
+    opacity: 0.7;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translate(0, 170px) scale(0);
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+@keyframes bubbleMergeBottomToCenter {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: translate(0, -60px) scale(1.2) rotate(-12deg);
+    opacity: 0.95;
+  }
+  80% {
+    transform: translate(0, -140px) scale(0.6) rotate(-30deg);
+    opacity: 0.7;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translate(0, -170px) scale(0);
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+.animate-merge-top {
+  animation: bubbleMergeTopToCenter 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-merge-bottom {
+  animation: bubbleMergeBottomToCenter 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-merge-center {
+  animation: bubbleMergeCenterAbsorb 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-big-heart-united {
+  animation: bigHeartUnitedEntrance 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-big-heart-pulse {
+  animation: pulseGlowingHeart 2.4s ease-in-out infinite;
+}
+
+/* ---------------- inline edit mode ----------------
+   EditableText (src/components/edit/EditableText.tsx) renders text with the exact same
+   tag/className/style as the live design — this is the ONLY visual difference edit mode
+   is allowed to add: a subtle dashed outline marking something as clickable-to-edit,
+   never a change to font/color/position. */
+.inline-editable {
+  cursor: text;
+  outline: 1px dashed rgba(255, 255, 255, 0.38);
+  outline-offset: 3px;
+  border-radius: 4px;
+  transition: outline-color 0.15s ease, background-color 0.15s ease;
+}
+.inline-editable:hover {
+  outline-color: rgba(255, 46, 126, 0.65);
+}
+.inline-editable:focus {
+  outline: 1.5px solid #ff2e7e;
+  outline-offset: 3px;
+  background-color: rgba(255, 46, 126, 0.08);
+}
+.inline-editable:empty:before {
+  content: attr(data-placeholder);
+  opacity: 0.45;
+}
+
+
+

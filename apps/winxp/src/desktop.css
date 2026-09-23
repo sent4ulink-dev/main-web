@@ -1,0 +1,839 @@
+/* Desktop window manager: the workspace reserves room for the editor and taskbar. */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+.desktop,
+.desktop * {
+  font-family: Tahoma, Arial, sans-serif;
+}
+.desktop {
+  height: 100dvh;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.desktop-workspace,
+.studio-bar ~ .desktop-workspace {
+  flex: 1;
+  min-height: 0;
+  display: block;
+  overflow: hidden;
+  isolation: isolate;
+}
+.desktop .studio-bar {
+  flex: none;
+  max-height: 36dvh;
+  overflow-y: auto;
+  z-index: 2;
+}
+.desktop .studio-bar.active {
+  padding: 6px 8px;
+}
+.desktop .studio-bar.active .editor-row {
+  width: 100%;
+  flex-basis: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, auto));
+  justify-content: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+}
+.desktop .studio-bar.active .editor-row button {
+  min-height: 34px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+.desktop .main-stage,
+.desktop:not(.desktop-invitation):not(.is-editing) .main-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  z-index: auto;
+  pointer-events: none;
+}
+.desktop .desktop-icons {
+  display: flex;
+  flex-flow: column wrap;
+  align-content: flex-start;
+  justify-content: flex-start;
+  gap: 14px 22px;
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  bottom: 18px;
+  width: auto;
+  max-width: 100%;
+  padding: 0;
+}
+.desktop .desktop-shortcut {
+  flex: none;
+  width: 94px;
+  min-height: 76px;
+  font-size: 12px;
+  touch-action: manipulation;
+}
+.desktop-shortcut:focus {
+  background: #0e59bb70;
+  outline: 1px dotted #fff;
+  outline-offset: 2px;
+}
+.desktop-shortcut:focus span {
+  background: #0755ab;
+}
+.invitation-pulse .icon {
+  animation: invite-pulse 1.8s ease-in-out infinite;
+}
+@keyframes invite-pulse {
+  50% {
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 13px #ffe4f0);
+  }
+}
+.managed-app {
+  position: absolute;
+  pointer-events: auto;
+  width: min(640px, calc(100% - 32px));
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-height: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
+}
+.managed-app[hidden] {
+  display: none !important;
+}
+.managed-app .xp-window {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+.managed-app .titlebar {
+  flex: none;
+  cursor: default;
+  user-select: none;
+}
+.app-scroll {
+  overflow: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-color: #bdcce5 #f1efe7;
+}
+.managed-app.maximized {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  top: 0;
+  left: 0;
+  transform: none;
+}
+.managed-app.maximized > .xp-window {
+  height: 100%;
+  border-radius: 0;
+}
+.managed-app.maximized .app-scroll {
+  flex: 1;
+}
+.utility-app {
+  width: min(650px, calc(100% - 32px));
+}
+.app-music {
+  left: 58%;
+  top: 44%;
+  width: min(690px, calc(100% - 32px));
+}
+.app-notes {
+  width: min(480px, calc(100% - 32px));
+  left: 65%;
+  top: 56%;
+}
+.desktop .window-chrome {
+  flex: none;
+  display: flex;
+  gap: 3px;
+}
+.window-chrome button {
+  padding: 0;
+  min-width: 27px;
+  width: 27px;
+  height: 27px;
+  min-height: 27px;
+  border: 1px solid white;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #83bdff, #176bf3 65%, #0050d1);
+  color: white;
+  font-size: 22px;
+  line-height: 1;
+  box-shadow: inset 1px 1px #ffffff66;
+  text-shadow: 1px 1px #1651aa;
+}
+.window-chrome button:last-child {
+  background: linear-gradient(135deg, #ffb497, #ed633d 50%, #c62b16);
+}
+.window-chrome button:hover {
+  filter: brightness(1.2);
+}
+.desktop .invitation-body h1 {
+  font-family: Tahoma, Arial, sans-serif;
+  font-weight: bold;
+  font-size: clamp(28px, 3.6vw, 46px);
+  line-height: 1.25;
+}
+.desktop .invitation-body {
+  min-height: 0;
+  padding: 28px 24px 12px;
+}
+.desktop .invitation-actions {
+  margin-bottom: 12px;
+}
+.desktop .section-prompt,
+.desktop .keepsake h1,
+.desktop .scene-celebration h1 {
+  font-family: Tahoma, Arial, sans-serif;
+}
+.desktop .keepsake h1 {
+  font-size: 30px;
+}
+.desktop .taskbar {
+  position: relative;
+  flex: none;
+  height: 46px;
+  z-index: 3;
+}
+.task-list {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.desktop .task-button {
+  flex: 1 0 105px;
+  max-width: 210px;
+  min-height: 32px;
+  height: 32px;
+  min-width: 44px;
+  color: white;
+  background: linear-gradient(#4695ff, #347ded);
+  border: 1px solid #1952b9;
+  box-shadow: inset 1px 1px #80b4ff;
+}
+.desktop .task-button.active {
+  background: #1854b6;
+  box-shadow: inset 1px 1px 3px #074297;
+}
+.desktop .system-tray {
+  flex: none;
+}
+.main-stage > .xp-window {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow: auto;
+}
+.main-stage .status-error {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 6px;
+  left: 12px;
+  right: 12px;
+  z-index: 99999;
+}
+.notes-paper {
+  background: white;
+  color: #111;
+  min-height: 270px;
+  padding: 18px;
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.notes-paper label {
+  display: block;
+}
+.notes-paper textarea {
+  display: block;
+  width: 100%;
+  min-height: 210px;
+  resize: vertical;
+  border: 1px solid #7f9db9;
+  background: white;
+  padding: 8px;
+  color: #111;
+}
+.note-editor {
+  padding: 10px;
+  border-top: 1px solid #bbb;
+}
+.explorer-address {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  gap: 12px;
+  border-block: 1px solid #bbb;
+  font-size: 12px;
+}
+.explorer-address span {
+  flex: 1;
+  padding: 4px;
+  background: white;
+  border: 1px solid #9bacc7;
+}
+.explorer-content {
+  min-height: 260px;
+  background: white;
+  padding: 20px;
+  color: #111;
+}
+.explorer-content h3 {
+  margin-top: 0;
+  border-bottom: 1px solid #bdc9da;
+  padding-bottom: 8px;
+  font-size: 14px;
+}
+.explorer-file {
+  margin: 6px;
+  border: 1px solid transparent;
+  background: none;
+  box-shadow: none;
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 13px;
+  touch-action: manipulation;
+}
+.explorer-file .icon {
+  width: 36px;
+  height: 36px;
+}
+/* Windows Media Player 9 inspired shell. */
+.player-window.xp-window {
+  background: #dce2ee;
+  border-color: #0648d1;
+  border-radius: 8px 8px 3px 3px;
+}
+.player-window .titlebar {
+  background: linear-gradient(
+    #73b5ff 0%,
+    #1781ff 9%,
+    #0059f2 28%,
+    #0051e9 75%,
+    #0041ce 91%,
+    #1942b7
+  );
+  color: white;
+  font-size: 13px;
+  text-shadow: 1px 1px #12398b;
+}
+.player-window .window-chrome button {
+  background: linear-gradient(135deg, #83bdff, #176bf3 65%, #0050d1);
+  border-color: white;
+  color: white;
+  text-shadow: 1px 1px #1651aa;
+}
+.player-window .window-chrome button:last-child {
+  background: linear-gradient(135deg, #ffb497, #ed633d 50%, #c62b16);
+}
+.wmp-shell {
+  padding: 5px 8px 5px;
+  background: linear-gradient(120deg, #b8c7e1, #eff5ff 30%, #b3bfd7);
+}
+.wmp-main {
+  display: flex;
+  gap: 8px;
+}
+.wmp-sidebar {
+  width: 110px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(90deg, #9aaace, #e8edf7);
+  border-radius: 9px 0 0 25px;
+  color: #28385b;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 10px 0;
+}
+.wmp-sidebar > span,
+.wmp-sidebar strong {
+  padding: 10px 9px;
+}
+.wmp-sidebar strong {
+  background: #f0f5ff;
+  border-block: 1px solid #7c8db0;
+}
+.wmp-sidebar .wmp-mark {
+  margin-top: auto;
+  font-size: 28px;
+  text-align: center;
+  color: #ffbd39;
+}
+.wmp-content {
+  flex: 1;
+  min-width: 0;
+  background: #02020a;
+  border: 2px inset #abb8d5;
+}
+.track-heading {
+  padding: 8px 12px;
+  color: white;
+}
+.track-heading small {
+  color: #acb0c2;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.track-heading > div {
+  font-size: 18px;
+  margin-top: 2px;
+}
+.visualizer {
+  position: relative;
+  overflow: hidden;
+  background: #080613;
+}
+.visualizer canvas {
+  display: block;
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+}
+.visualizer > span {
+  position: absolute;
+  bottom: 6px;
+  left: 10px;
+  font-size: 10px;
+  color: #d1c8d8;
+}
+.visualizer.compact canvas {
+  height: 86px;
+}
+.wmp-status {
+  border-top: 1px solid #646580;
+  padding: 6px;
+  color: #b9dc8c;
+  font-size: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+}
+.wmp-status span {
+  margin-left: auto;
+  color: #c4cae0;
+}
+.music-editor {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: #edf1f8;
+  margin-bottom: 8px;
+}
+.music-editor .field {
+  margin: 0;
+}
+.music-editor input {
+  width: 100%;
+}
+.music-editor > button {
+  justify-self: start;
+}
+.youtube-player iframe {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.youtube-player {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding-left: 10px;
+  border-top: 1px solid #3d4059;
+  background: #0a0913;
+}
+.youtube-audio-label {
+  color: #9dcaff;
+  font-size: 11px;
+}
+.youtube-player a {
+  margin-left: auto;
+  display: inline-block;
+  padding: 6px 10px;
+  color: #b1d9ff;
+  font-size: 11px;
+}
+/* A separate Outlook Express style mail application. */
+.scene-message {
+  background: #c0c0c0;
+  border-color: #0648d1;
+}
+.scene-message .titlebar {
+  background: linear-gradient(
+    #73b5ff 0%,
+    #1781ff 9%,
+    #0059f2 28%,
+    #0051e9 75%,
+    #0041ce 91%,
+    #1942b7
+  );
+}
+.mail-menu {
+  background: #c0c0c0;
+  border-bottom: 1px solid #808080;
+  gap: 18px;
+  padding: 5px 10px;
+}
+.mail-meta {
+  background: #c0c0c0;
+  color: #111;
+  border: 0;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.scene-message .message-body {
+  background: white;
+  color: #111;
+  border: 2px inset #ddd;
+  margin: 0 5px 5px;
+  min-height: 260px;
+  padding: 18px 22px;
+}
+.desktop .final-actions {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 0;
+  width: 100%;
+  padding: 3px;
+  background: #ece9d8;
+  border-bottom: 1px solid #a9a793;
+}
+.desktop .final-actions > * {
+  flex: 1 1 120px;
+  min-width: 0;
+  font-size: 11px;
+  min-height: 34px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid transparent;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.desktop .final-actions > *:hover {
+  background: #d9e6f7;
+  border-color: #8aa9d3;
+}
+.desktop-final:not(.is-editing) .story-app[data-app="plan"] {
+  height: min(680px, calc(100% - 12px));
+}
+.desktop-final:not(.is-editing) .scene-final .app-scroll {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+.desktop-final:not(.is-editing) .scene-final .final-actions,
+.desktop-final:not(.is-editing) .scene-final .window-status {
+  flex: none;
+}
+.desktop-final:not(.is-editing) .scene-final .keepsake {
+  flex: 1;
+  min-height: 0;
+  margin: 2px;
+  padding: 14px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+}
+.desktop-final:not(.is-editing) .scene-final .keepsake .big-heart {
+  font-size: 42px;
+  line-height: 1;
+}
+.desktop-final:not(.is-editing) .scene-final .keepsake h1 {
+  margin: 6px 0;
+  font-size: 28px;
+  line-height: 1.15;
+}
+.desktop-final:not(.is-editing) .scene-final .keepsake dl {
+  margin: 8px 0;
+}
+.desktop-final:not(.is-editing) .scene-final .keepsake dl > div {
+  padding: 7px 0;
+}
+.desktop-final:not(.is-editing) .scene-final .keepsake dt {
+  margin-bottom: 3px;
+}
+.desktop-final:not(.is-editing) .scene-final .keepsake dd {
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.desktop-final:not(.is-editing) .scene-final .confirmed,
+.desktop-final:not(.is-editing) .scene-final .closing {
+  margin: 5px 0;
+}
+@media (max-width: 600px), (max-height: 700px) {
+  .desktop-final:not(.is-editing) .story-app[data-app="plan"] {
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+    max-height: calc(100% - 12px);
+  }
+  .desktop-final:not(.is-editing) .scene-final .final-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 2px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .final-actions > * {
+    min-height: 29px;
+    padding: 3px;
+    font-size: 9px;
+    line-height: 1.15;
+  }
+  .desktop-final:not(.is-editing) .scene-final .keepsake {
+    padding: 5px 12px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .keepsake .big-heart {
+    font-size: 27px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .keepsake h1 {
+    margin: 2px 0;
+    font-size: 19px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .keepsake dl {
+    margin: 2px 0;
+  }
+  .desktop-final:not(.is-editing) .scene-final .keepsake dl > div {
+    padding: 3px 0;
+  }
+  .desktop-final:not(.is-editing) .scene-final .keepsake dt {
+    margin-bottom: 1px;
+    font-size: 8px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .keepsake dd {
+    font-size: 12px;
+    line-height: 1.15;
+  }
+  .desktop-final:not(.is-editing) .scene-final .confirmed {
+    margin: 2px 0;
+    font-size: 9px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .memory-meter {
+    margin: 2px auto;
+    gap: 4px;
+    font-size: 8px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .memory-meter i {
+    height: 10px;
+  }
+  .desktop-final:not(.is-editing) .scene-final .closing {
+    margin: 2px 0;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  .desktop-final:not(.is-editing) .scene-final .window-status {
+    min-height: 20px;
+    padding: 2px 7px;
+  }
+}
+.xp-startup {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #aaa;
+}
+.startup-logo {
+  background: url("/xp-startup.png") top center / 300px auto no-repeat;
+  width: 300px;
+  max-width: 100%;
+  height: 205px;
+}
+.startup-progress {
+  width: 126px;
+  height: 16px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  margin: 20px 0 28px;
+}
+.startup-progress i {
+  flex: none;
+  width: 8px;
+  height: 10px;
+  margin: 1px;
+  background: linear-gradient(#9dbdff, #244ab0, #7198ee);
+  animation: startup 1.4s linear infinite;
+}
+.xp-startup > span {
+  font-size: 11px;
+}
+@keyframes startup {
+  from {
+    transform: translateX(-30px);
+  }
+  to {
+    transform: translateX(126px);
+  }
+}
+@media (max-width: 900px) {
+  .app-music,
+  .app-notes {
+    left: 50%;
+    top: 50%;
+  }
+  .desktop .quick-launch {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .desktop .desktop-icons {
+    left: 12px;
+    top: 16px;
+    gap: 14px 16px;
+  }
+  .desktop .desktop-shortcut {
+    width: 84px;
+    min-height: 72px;
+    font-size: 11px;
+  }
+  .managed-app,
+  .utility-app {
+    width: calc(100% - 12px);
+    max-height: calc(100% - 12px);
+  }
+  .managed-app .titlebar {
+    min-height: 35px;
+    font-size: 12px;
+  }
+  .window-chrome button {
+    width: 27px;
+    min-width: 27px;
+  }
+  .desktop .invitation-body {
+    padding: 22px 12px 8px;
+  }
+  .desktop .invitation-body h1 {
+    font-size: 29px;
+    margin-bottom: 24px;
+  }
+  .desktop .invitation-actions {
+    gap: 14px;
+  }
+  .desktop .invitation-actions button {
+    min-width: 104px;
+  }
+  .desktop .start-button {
+    min-width: 80px;
+    font-size: 21px;
+    padding: 4px 9px;
+  }
+  .desktop .start-button span {
+    font-size: 19px;
+  }
+  .desktop .system-tray {
+    padding: 0 5px;
+    gap: 3px;
+  }
+  .desktop .system-tray .connection,
+  .desktop .system-tray time small {
+    display: none;
+  }
+  .desktop .task-button {
+    flex-basis: 44px;
+    padding: 0 6px;
+  }
+  .desktop .task-button span {
+    display: none;
+  }
+  .wmp-sidebar {
+    display: flex;
+    width: 82px;
+    font-size: 10px;
+  }
+  .wmp-sidebar > span,
+  .wmp-sidebar strong {
+    padding: 7px 5px;
+  }
+  .wmp-shell {
+    padding: 4px;
+  }
+  .visualizer canvas {
+    height: 210px;
+  }
+  .notes-paper {
+    min-height: 210px;
+    padding: 14px;
+  }
+  .mail-menu {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .desktop .keepsake {
+    padding: 20px 16px;
+  }
+  .desktop .keepsake h1 {
+    font-size: 26px;
+  }
+  .desktop .studio-bar.active {
+    padding: 6px 8px;
+    gap: 5px;
+  }
+  .desktop .editor-row {
+    gap: 5px;
+    padding-top: 5px;
+  }
+  .desktop .editor-row > small {
+    display: none;
+  }
+  .desktop .studio-bar.active .studio-brand {
+    display: none;
+  }
+  .desktop .studio-bar.active .editor-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0;
+  }
+  .desktop .studio-bar.active .editor-row button {
+    min-height: 42px;
+    padding: 5px 4px;
+    white-space: normal;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .invitation-pulse .icon,
+  .startup-progress i {
+    animation: none;
+  }
+}
+
+.desktop .final-actions {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}

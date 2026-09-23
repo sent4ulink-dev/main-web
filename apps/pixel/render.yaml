@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: pixel-share-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm run server
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: 22.13.0
+      - key: STUDIO_PASSWORD
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://pixel-dom.pages.dev
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false

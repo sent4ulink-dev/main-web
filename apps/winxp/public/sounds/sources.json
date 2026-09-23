@@ -1,0 +1,44 @@
+[
+  {
+    "file": "error.wav",
+    "original": "Windows XP Error.wav",
+    "source": "https://raw.githubusercontent.com/MCPlayer2015/all-windows-sounds/main/(2001)%20Windows%20XP/Windows%20XP%20Error.wav",
+    "gitBlob": "74483b1d81daa2ead2a8d820d9993df17c57bd12"
+  },
+  {
+    "file": "menu.wav",
+    "original": "Windows XP Menu Command.wav",
+    "source": "https://raw.githubusercontent.com/MCPlayer2015/all-windows-sounds/main/(2001)%20Windows%20XP/Windows%20XP%20Menu%20Command.wav",
+    "gitBlob": "aca68c99b930a29f8911c02f7aacb4363f131d8b"
+  },
+  {
+    "file": "minimize.wav",
+    "original": "Windows XP Minimize.wav",
+    "source": "https://raw.githubusercontent.com/MCPlayer2015/all-windows-sounds/main/(2001)%20Windows%20XP/Windows%20XP%20Minimize.wav",
+    "gitBlob": "45fd998a85b1af8abf5e75f1e68a63285e19f4e2"
+  },
+  {
+    "file": "notification.wav",
+    "original": "Windows XP Notify.wav",
+    "source": "https://raw.githubusercontent.com/MCPlayer2015/all-windows-sounds/main/(2001)%20Windows%20XP/Windows%20XP%20Notify.wav",
+    "gitBlob": "5559eb6f60fc312f2836b1ca32894ab2e47805fa"
+  },
+  {
+    "file": "restore.wav",
+    "original": "Windows XP Restore.wav",
+    "source": "https://raw.githubusercontent.com/MCPlayer2015/all-windows-sounds/main/(2001)%20Windows%20XP/Windows%20XP%20Restore.wav",
+    "gitBlob": "8374aeee3b6bf77a5e4de3b4b3dcca52e0013f76"
+  },
+  {
+    "file": "click.wav",
+    "original": "Windows XP Start.wav",
+    "source": "https://raw.githubusercontent.com/MCPlayer2015/all-windows-sounds/main/(2001)%20Windows%20XP/Windows%20XP%20Start.wav",
+    "gitBlob": "b6ecb0605e6883030bb05101889a58684bf6e06f"
+  },
+  {
+    "file": "startup.wav",
+    "original": "Windows XP Startup.wav",
+    "source": "https://raw.githubusercontent.com/MCPlayer2015/all-windows-sounds/main/(2001)%20Windows%20XP/Windows%20XP%20Startup.wav",
+    "gitBlob": "201a37018080ff46cbda4bc7d9215c87650e3620"
+  }
+]

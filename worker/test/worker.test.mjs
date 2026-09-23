@@ -368,6 +368,21 @@ await test('Paddle webhook: an event for an order that does not exist is acknowl
   assert.equal(res.status, 200);   // Paddle should not be told to keep retrying forever over a mismatch on our end
 });
 
+await test('GET /links/:id says which product a real link is for, and nothing about a fake or revoked one', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  const order = await (await generate(e, token, { winxp: 1 })).json();
+  const id = order.links[0].id;
+  const found = await call(e, `/links/${id}`);
+  assert.equal(found.status, 200);
+  assert.deepEqual(await found.json(), { ok: true, product: 'winxp' });
+  assert.equal((await call(e, '/links/AAAAAAAAAAAAAAAAAAAAAA')).status, 404);   // well-formed but never issued
+  await call(e, `/orders/${token}/refund`, { method: 'POST', headers: owner });
+  const afterRefund = await call(e, `/links/${id}`);
+  assert.equal(afterRefund.status, 404);   // exists, but revoked — treated the same as not found from the outside
+});
+
 await test('a pack of 8 can be split as the buyer likes: 3 Pixel, 2 Pinky, 3 WinXP', async () => {
   const e = shop(), paddle = fakePaddle();
   globalThis.fetch = paddle.fetchFn;

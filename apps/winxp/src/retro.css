@@ -1,0 +1,501 @@
+/* Original desktop artwork and bundled bitmap-inspired type. No remote assets. */
+.desktop {
+  background-image: url("/wallpaper-photo.png");
+  background-position: center center;
+  background-color: #298ade;
+}
+.desktop-shortcut {
+  font-size: 13px;
+  text-shadow:
+    1px 2px 2px #123a75,
+    0 0 3px #123a75;
+}
+.desktop-shortcut .icon {
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(2px 3px 2px #163a7470);
+}
+.desktop-icons {
+  width: 105px;
+  left: 24px;
+  gap: 24px;
+}
+.xp-window {
+  border-color: #0648d1;
+  border-width: 4px;
+  border-top: 0;
+  box-shadow:
+    inset 1px 0 #8caefd,
+    inset -1px 0 #1730a6,
+    2px 5px 12px #092b626b;
+  background: #eeecdc;
+}
+.titlebar {
+  min-height: 39px;
+  background: linear-gradient(
+    #73b5ff 0%,
+    #1781ff 9%,
+    #0059f2 28%,
+    #0051e9 75%,
+    #0041ce 91%,
+    #1942b7
+  );
+  font-size: 16px;
+  padding: 4px 5px 4px 7px;
+}
+.window-title .icon {
+  width: 25px;
+  height: 25px;
+}
+.window-chrome i {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  font-size: 22px;
+}
+.window-chrome i:last-child {
+  background: linear-gradient(135deg, #ffb997, #e96334 40%, #d83217);
+  font-size: 28px;
+}
+.menu {
+  font-size: 14px;
+  gap: 24px;
+  color: #20202c;
+  padding: 8px 12px;
+}
+.main-stage {
+  width: 620px;
+  max-width: calc(100% - 440px);
+  padding: 38px 0 54px;
+}
+.invitation-body {
+  background: #f8f7ed;
+  background-image: none;
+  padding: 40px 30px 10px;
+  min-height: 390px;
+}
+.pixel-heart {
+  display: block;
+  width: 58px;
+  height: 55px;
+  margin: 0 auto 23px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 0 #ae42644a);
+}
+.invitation-body h1 {
+  font-family: "Tiny5", "Courier New", monospace;
+  font-weight: 400;
+  font-size: 58px;
+  letter-spacing: 0;
+  color: #00264c;
+  line-height: 1.1;
+  margin: 12px 0 35px;
+}
+.invitation-actions {
+  gap: 30px;
+}
+.invitation-actions button {
+  min-width: 155px;
+  font:
+    20px Tahoma,
+    Arial,
+    sans-serif;
+  min-height: 45px;
+  border: 2px solid #254c7b;
+  border-radius: 2px;
+  color: #062b59;
+  background: linear-gradient(#fff, #eeede4);
+}
+.invitation-actions .yes-button {
+  min-width: 155px;
+  font-weight: 400;
+  color: #062b59;
+  border-color: #145489;
+  background: linear-gradient(#fff, #eeede4);
+  box-shadow:
+    inset 0 0 0 2px #82caff,
+    inset 0 0 0 3px white;
+}
+.invitation-actions button:hover {
+  border-color: #075fe9;
+  background: #fafdff;
+}
+.no-response {
+  font-size: 13px;
+  min-height: 36px;
+}
+.scene-invitation .window-status {
+  display: none;
+}
+.desktop-extras {
+  position: absolute;
+  right: 24px;
+  top: 36px;
+  width: 270px;
+  display: grid;
+  gap: 26px;
+}
+.desktop-extras .titlebar {
+  font-size: 15px;
+  min-height: 34px;
+}
+.desktop-extras .window-chrome i {
+  width: 22px;
+  height: 22px;
+  font-size: 18px;
+}
+.desktop-extras .window-title .icon {
+  width: 21px;
+  height: 21px;
+}
+.desktop-extras .menu {
+  padding: 5px 8px;
+  font-size: 12px;
+  gap: 16px;
+}
+.notes-paper {
+  padding: 17px 18px 21px;
+  min-height: 150px;
+  background: linear-gradient(115deg, #fffbdc, #fffbb0);
+  color: #23231a;
+  font:
+    15px/1.45 Tahoma,
+    Arial,
+    sans-serif;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.player-screen {
+  margin: 5px;
+  background: radial-gradient(ellipse at center, #071f1d, #020404);
+  color: #8fd6bd;
+  font:
+    28px/1.2 "Tiny5",
+    monospace;
+  text-align: center;
+  min-height: 128px;
+  padding: 23px 13px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow-wrap: anywhere;
+}
+.equalizer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  margin-top: 13px;
+  opacity: 0.6;
+}
+.equalizer i {
+  display: block;
+  width: 5px;
+  background: repeating-linear-gradient(
+    to top,
+    #61cdb0 0 3px,
+    transparent 3px 5px
+  );
+  transform: scaleY(0.15);
+  transform-origin: bottom;
+}
+.is-playing .equalizer i {
+  animation: equalize 0.7s ease-in-out infinite alternate;
+}
+.player-seek {
+  margin: 8px 11px;
+  height: 10px;
+  background: #b6c3d4;
+  border: 1px solid #91a1b7;
+  border-radius: 5px;
+  box-shadow: inset 1px 1px 2px #68798a;
+  overflow: hidden;
+}
+.player-seek span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(#c9ffb3, #57bc39, #248e23);
+  transition: width 0.25s linear;
+}
+.player-controls {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 1px 9px 9px;
+}
+.player-controls button {
+  min-width: 32px;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: linear-gradient(130deg, white, #e0e9f5 65%, #9cb0cf);
+  border: 1px solid #8095b5;
+  color: #18395e;
+  font-size: 18px;
+  box-shadow: inset 0 0 0 2px #f6f8fc;
+}
+.player-controls .player-play {
+  min-height: 38px;
+  width: 38px;
+  min-width: 38px;
+}
+.player-controls > span {
+  font-size: 10px;
+  color: #5e7085;
+  margin-right: auto;
+}
+.volume-bars {
+  font-size: 21px;
+  color: #859ab5;
+}
+.desktop:not(.desktop-invitation):not(.is-editing) .desktop-extras {
+  display: none;
+}
+.scene-celebration h1,
+.section-prompt,
+.keepsake h1 {
+  font-family: "Tiny5", "Courier New", monospace;
+}
+.keepsake h1 {
+  font-size: 36px;
+}
+.start-button {
+  border-radius: 0 12px 12px 0;
+}
+.taskbar {
+  height: 46px;
+}
+.system-tray {
+  background: linear-gradient(#4ac0ff, #1499eb 20%, #118ae0);
+}
+.system-tray time {
+  font-size: 13px;
+}
+.system-tray time small {
+  font-size: 10px;
+}
+@keyframes equalize {
+  from {
+    transform: scaleY(0.25);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  .main-stage {
+    width: calc(100% - 430px);
+    max-width: none;
+    margin-left: 126px;
+    margin-right: auto;
+  }
+  .desktop-extras {
+    width: 250px;
+    right: 18px;
+  }
+  .invitation-body h1 {
+    font-size: 48px;
+  }
+  .invitation-actions {
+    gap: 16px;
+  }
+  .invitation-actions button,
+  .invitation-actions .yes-button {
+    min-width: 125px;
+  }
+}
+@media (min-width: 901px) {
+  .final-stage {
+    padding: 16px 0 28px;
+  }
+  .final-stage .keepsake h1 {
+    font-size: 34px;
+  }
+  .desktop:not(.desktop-invitation):not(.is-editing) .main-stage {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+@media (max-width: 900px) {
+  .desktop-workspace {
+    flex-direction: column;
+  }
+  .desktop-icons {
+    position: relative;
+    left: auto;
+    top: auto;
+    display: flex;
+    justify-content: space-around;
+    width: auto;
+    gap: 8px;
+    padding: 18px 16px 10px;
+  }
+  .desktop-shortcut {
+    width: 90px;
+    min-height: 74px;
+    font-size: 12px;
+  }
+  .desktop-shortcut .icon {
+    width: 43px;
+    height: 43px;
+  }
+  .main-stage {
+    width: calc(100% - 32px);
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 12px 0 20px;
+    order: 1;
+  }
+  .desktop-extras {
+    position: static;
+    width: calc(100% - 32px);
+    max-width: 620px;
+    margin: 0 auto 30px;
+    order: 2;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .desktop-extras .notes-paper {
+    font-size: 14px;
+  }
+  .desktop:not(.desktop-invitation) .desktop-extras {
+    display: none;
+  }
+  .desktop.is-editing .desktop-extras {
+    display: grid;
+  }
+  .is-editing .main-stage {
+    max-width: 620px;
+  }
+}
+@media (max-width: 600px) {
+  .desktop {
+    background-position: 48% center;
+  }
+  .desktop-icons {
+    padding: 12px 8px 8px;
+    gap: 4px;
+  }
+  .desktop-shortcut {
+    width: 62px;
+    font-size: 10px;
+    min-height: 65px;
+  }
+  .desktop-shortcut .icon {
+    width: 38px;
+    height: 38px;
+  }
+  .main-stage {
+    width: calc(100% - 24px);
+    padding-top: 8px;
+  }
+  .titlebar {
+    min-height: 33px;
+    font-size: 12px;
+  }
+  .window-title .icon {
+    width: 19px;
+    height: 19px;
+  }
+  .window-chrome i {
+    width: 22px;
+    height: 22px;
+    font-size: 18px;
+  }
+  .window-chrome i:last-child {
+    font-size: 22px;
+  }
+  .menu {
+    gap: 16px;
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+  .invitation-body {
+    padding: 28px 14px 8px;
+    min-height: 330px;
+  }
+  .pixel-heart {
+    width: 48px;
+    height: 45px;
+    margin-bottom: 22px;
+  }
+  .invitation-body h1 {
+    font-size: 42px;
+    margin: 12px 0 30px;
+  }
+  .invitation-actions {
+    gap: 16px;
+  }
+  .invitation-actions button,
+  .invitation-actions .yes-button {
+    min-width: 110px;
+    font-size: 16px;
+    min-height: 44px;
+    padding: 8px;
+  }
+  .desktop-extras {
+    width: calc(100% - 24px);
+    max-width: 400px;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .desktop-extras .notes-window {
+    order: 1;
+  }
+  .desktop-extras .player-window {
+    order: 0;
+  }
+  .player-screen {
+    min-height: 120px;
+  }
+  .player-controls button {
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+  }
+  .player-controls .player-play {
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+  }
+  .player-controls {
+    gap: 10px;
+  }
+  .player-controls > span {
+    font-size: 12px;
+  }
+  .notes-paper {
+    padding: 20px;
+  }
+  .desktop-date:not(.is-editing) .main-stage {
+    padding: 6px 0 0;
+  }
+  .desktop-date:not(.is-editing) .titlebar {
+    min-height: 31px;
+  }
+  .desktop-game:not(.is-editing) .main-stage {
+    padding-top: 12px;
+  }
+  .final-stage .keepsake h1 {
+    font-size: 32px;
+  }
+  .system-tray time {
+    font-size: 11px;
+  }
+  .system-tray time small {
+    font-size: 8px;
+  }
+  .studio-bar .titlebar {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .equalizer i {
+    animation: none !important;
+  }
+  .player-seek span {
+    transition: none;
+  }
+}
