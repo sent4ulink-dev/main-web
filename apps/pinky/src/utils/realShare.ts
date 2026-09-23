@@ -1,8 +1,8 @@
 import { ShareContent } from '../types';
 
-// In dev this stays relative and hits the Vite proxy to the local API.
-// In production (frontend on Cloudflare, backend on Render) set VITE_API_BASE_URL
-// to the deployed API's origin, e.g. https://urilga-api.onrender.com
+// In dev this stays relative and hits the Vite proxy to the local Worker (see
+// vite.config.ts). In production set VITE_API_BASE_URL to the deployed Worker's
+// origin, e.g. https://pinky-share-api.<you>.workers.dev — see worker/wrangler.toml.
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/shares`;
 
 export interface LoadShareResult {

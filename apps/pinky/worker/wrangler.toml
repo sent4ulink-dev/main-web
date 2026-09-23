@@ -1,0 +1,27 @@
+name = "pinky-share-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# The bucket that holds share content (create it once: npx wrangler r2 bucket create pinky-shares)
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "pinky-shares"
+
+[vars]
+# The deployed frontend's exact origin, no trailing slash. Empty allows any origin,
+# which is fine for local dev but should be set for production.
+CORS_ORIGIN = ""
+# The sent4u orders Worker (see /worker at the repo root), used to self-heal a share
+# that isn't in this bucket yet by confirming with it that the id was really paid for
+# and is really for Pinky. Leave empty to disable self-heal.
+ORDERS_API_BASE = ""
+
+# Secrets (never put these in this file — set with `npx wrangler secret put NAME`):
+#   SHARE_CREATE_SECRET     gates POST /api/shares/:id/ensure. Nothing calls that endpoint
+#                           today — every share is actually created lazily, the first time
+#                           it's opened, by self-heal against the orders Worker above.
+#                           /ensure exists for a future direct provisioning call; until
+#                           then this secret just keeps it from minting shares for free.
+#   GOOGLE_PLACES_API_KEY   optional — powers "Fetch from Maps" in the Restaurant editor.
+#                           Create one in Google Cloud Console (enable "Places API").
+#                           Leave unset to disable that feature; the manual fields still work.
