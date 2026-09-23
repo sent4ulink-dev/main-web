@@ -1,6 +1,6 @@
 # Heart Desktop ♡
 
-A complete romantic invitation in an original early-2000s desktop. React + TypeScript + Vite frontend; Node + Express backend. Story text is in English. The landscape and SVG icons are original. The startup image was supplied by the user. Archived Microsoft Windows XP WAV sounds are included locally with source records in `public/sounds/sources.json`; see `public/ASSETS.md`.
+A complete romantic invitation in an original early-2000s desktop. React + TypeScript + Vite frontend; a Cloudflare Worker backend. Story text is in English. The landscape and SVG icons are original. The startup image was supplied by the user. Archived Microsoft Windows XP WAV sounds are included locally with source records in `public/sounds/sources.json`; see `public/ASSETS.md`.
 
 ## Local development
 
@@ -8,17 +8,16 @@ Use Node 22.12+ and npm. From this directory:
 
 ```sh
 npm ci
-cp .env.example .env
 ```
 
-There is no public studio and no password: an invitation only ever comes into existence because the sent4u order Worker calls `POST /shares/:id/ensure` server-to-server, gated by a shared secret. Set that secret as `SHARE_CREATE_SECRET` in `.env` (leave unset in local dev for an open, unsecured `/ensure`), then use two terminals:
+There is no public studio and no password: an invitation only ever comes into existence because the sent4u order Worker calls `POST /shares/:id/ensure` server-to-server, gated by a shared secret. Use two terminals:
 
 ```sh
-npm run server
-npm run dev
+npm run worker:dev    # the Worker itself, at http://localhost:8787 (wrangler simulates R2 + KV locally, no Cloudflare account needed)
+npm run dev            # frontend at http://localhost:5173, proxies /shares and /photos to the local Worker
 ```
 
-Open `http://127.0.0.1:5173/?share=test` for the public demo. A bare `http://127.0.0.1:5173/` has nothing to show, since no real invitation exists yet — mint one first with `curl -X POST http://127.0.0.1:3001/shares/<id>/ensure -H "x-date-create-secret: <your secret>"`, then open `http://127.0.0.1:5173/?share=<id>`. Opening `index.html` as a file does not run the application. Vite proxies API calls to port 3001; `DEV_API_TARGET` can override this locally. No `.env` file is committed.
+Open `http://127.0.0.1:5173/?share=test` for the public demo. A bare `http://127.0.0.1:5173/` has nothing to show, since no real invitation exists yet — mint one first with `curl -X POST http://127.0.0.1:8787/shares/<id>/ensure -H "x-date-create-secret: <your secret>"` (the secret is only required once `SHARE_CREATE_SECRET` is set in `worker/wrangler.toml`; open in dev otherwise), then open `http://127.0.0.1:5173/?share=<id>`. Opening `index.html` as a file does not run the application. Vite proxies API calls to port 8787; `DEV_API_TARGET` can override this locally.
 
 The demo makes **no backend requests**, including image uploads. It saves edited story content only when Save is clicked, using a separate `localStorage` key. Start → Reset demonstration restores the sample content and restarts the experience. Generated demo images use native file sharing or a local download. The sound preference is also local. Browser storage must be available for demo persistence.
 
@@ -45,9 +44,9 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-`npm run check` runs all checks in order. To use an already installed Chrome, set `PLAYWRIGHT_CHANNEL=chrome`. Browser tests start isolated servers on ports 5174 and 3002 with an in-memory test database. They never touch the development shares. The test fulfillment secret is a fixture only and is not included in the frontend bundle.
+`npm run check` runs all checks in order. To use an already installed Chrome, set `PLAYWRIGHT_CHANNEL=chrome`. Browser tests start an isolated frontend on port 5174 and a real local Worker instance (`wrangler dev`, simulating R2 + KV) on port 3002, with its own test fulfillment secret. They never touch the development shares. That secret is a fixture only and is not included in the frontend bundle.
 
-Coverage includes the story gate, duplicate events, game solvability, date validation, exports, strict content validation, the fulfillment secret, self-heal against the order Worker, create/read/update/finalize, async JSON failures and atomic storage. Browser checks complete the flow at 320×568, 375×667, 390×844, 430×932, 768×1024, 1366×768 and 1920×1080; they check overflow, editor spacing, calendar navigation, image dimensions, local-only demo persistence, and that a finalized real invitation stays viewable but never editable again. Screenshots go to `artifacts/screenshots`; failed traces and the HTML report go to `test-results` and `playwright-report`.
+Coverage includes the story gate, duplicate events, game solvability, date validation, exports, strict content validation, the fulfillment secret, self-heal against the order Worker, create/read/update/finalize, concurrent-write safety (R2 conditional writes with retry — see `worker/src/storage.ts`), and the photo endpoint's PNG validation and per-IP throttle. Browser checks complete the flow at 320×568, 375×667, 390×844, 430×932, 768×1024, 1366×768 and 1920×1080; they check overflow, editor spacing, calendar navigation, image dimensions, local-only demo persistence, and that a finalized real invitation stays viewable but never editable again. Screenshots go to `artifacts/screenshots`; failed traces and the HTML report go to `test-results` and `playwright-report`.
 
 ## Frontend — Cloudflare Pages
 
@@ -56,40 +55,24 @@ Connect the repository to Cloudflare Pages. Use:
 - Build command: `npm ci --include=dev && npm run build`
 - Output directory: `dist`
 - Node version: 22.12 or newer
-- `VITE_API_BASE_URL=https://your-render-service.onrender.com`
+- `VITE_API_BASE_URL=https://winxp-share-api.<you>.workers.dev` (the Worker's deployed address, see below)
 
-This frontend value is public build-time configuration. **Never put `SHARE_CREATE_SECRET`, R2 keys, or any secret in Vite or Cloudflare Pages variables.** Redeploy Pages whenever a Vite variable changes. `public/_headers` supplies basic security headers and `public/_redirects` supports the SPA. The only sharing format is `/?share=<id>`.
+This frontend value is public build-time configuration. **Never put `SHARE_CREATE_SECRET` or any secret in Vite or Cloudflare Pages variables.** Redeploy Pages whenever a Vite variable changes. `public/_headers` supplies basic security headers and `public/_redirects` supports the SPA. The only sharing format is `/?share=<id>`.
 
-## Backend — Render
+## Backend — Cloudflare Worker
 
-`render.yaml` is a Blueprint for one Node web service. Alternatively create a Web Service manually:
+The API is a Cloudflare Worker, in `worker/` (its own `wrangler.toml`, separate from the frontend's Pages deployment above). Deploy with `npm run worker:deploy`.
 
-- Build: `npm ci --include=dev && npm run build`
-- Start: `npm start`
-- Health check: `/health`
-- `SHARE_CREATE_SECRET`: shared secret matching the sent4u order Worker; gates `POST /shares/:id/ensure`
-- `ORDERS_API_BASE`: the order Worker's origin, used to self-heal a share that isn't in storage yet
-- `CORS_ALLOWED_ORIGINS`: exact frontend origins separated by commas; no trailing slash
-- `PHOTO_TTL_MINUTES`: optional, defaults to 15, clamped to 1–60
-- `DATA_FILE`: optional local storage path
-- Use Render's supplied `PORT`
+Before the first deploy:
 
-Deploy the API first, copy its HTTPS URL into the Pages Vite configuration, deploy Pages, then set its actual origin in Render's CORS configuration and redeploy the API. The API can be built before the frontend origin is known; browser access will be rejected until CORS is configured correctly.
+1. **Create the R2 bucket** that holds share content: `npx wrangler r2 bucket create winxp-shares` (run from `worker/`, or pass `--config worker/wrangler.toml`).
+2. **Create the KV namespace** that holds temporary story photos and the upload throttle counter: `npx wrangler kv namespace create winxp-photos`, then paste the id it prints into `worker/wrangler.toml`'s `[[kv_namespaces]]` block (replacing `REPLACE_WITH_KV_NAMESPACE_ID`).
+3. **Set the fulfillment secret**: `npx wrangler secret put SHARE_CREATE_SECRET --config worker/wrangler.toml` — give it the same value the sent4u order Worker uses. Nothing calls `POST /shares/:id/ensure` today (every share is created lazily by self-heal, see below), but this keeps the endpoint from being a way to mint shares for free once something does.
+4. **Set `CORS_ALLOWED_ORIGINS`** and **`ORDERS_API_BASE`** in `worker/wrangler.toml`'s `[vars]` — the deployed frontend's exact origin, and the sent4u orders Worker's address (see `/worker` at the repo root).
 
-The JSON fallback writes atomically and creates a missing file. Invalid existing storage is preserved and produces a structured error rather than being overwritten. The Blueprint attaches a 1 GB persistent disk at `/var/data` and sets `DATA_FILE=/var/data/shares.json`. For an existing manually configured Render service, attach that disk and set the variable yourself, or configure R2. Committing the Blueprint does not attach a disk to a service created outside a Blueprint. Render's ordinary filesystem is ephemeral; do not rely on it for lasting invitations.
+Deploy the Worker first, copy its `*.workers.dev` URL into the Pages `VITE_API_BASE_URL` above, deploy Pages, then set its actual origin in `CORS_ALLOWED_ORIGINS` and redeploy the Worker. The Worker can be built before the frontend origin is known; browser access will be rejected until CORS is configured correctly.
 
-## Cloudflare R2
-
-Create a private bucket and an R2 API token with Object Read & Write access scoped to that bucket. Set these **on Render only**:
-
-```text
-R2_ACCOUNT_ID=your-account-id
-R2_ACCESS_KEY_ID=your-access-key
-R2_SECRET_ACCESS_KEY=your-secret-key
-R2_BUCKET_NAME=your-bucket
-```
-
-All four must be present, or none. The S3-compatible adapter stores each share as `shares/<id>.json`, validates loaded objects, and paginates aggregate listing. Keep the bucket private; all public access is through the API. The Blueprint lists R2 fields because R2 is recommended; omit all four when using a persistent local disk.
+Each invitation is stored as its own object in the R2 bucket (`shares/<id>.json`), read and written through the native R2 binding — never exposed to the browser. Concurrent writes to the same share (an update racing a finalize) are safe: mutations use R2's conditional write and retry from a fresh read on conflict, so neither can silently overwrite the other (see `worker/src/storage.ts`).
 
 ## API
 
@@ -106,15 +89,15 @@ All responses use string `status` discriminants. Invalid content/IDs return 400,
 
 ## Security and operational limits
 
-- `SHARE_CREATE_SECRET` is compared only on the server via a direct header check, and gates `/ensure` alone. It is never sent to or checked by the browser; the frontend has no password or unlock flow at all.
-- `trust proxy` is exactly `1`, intended for Render's single trusted reverse-proxy hop (used by the photo-upload throttle). Configure the deployment so clients cannot bypass that hop. If the hosting topology changes, reassess IP trust before deployment.
+- `SHARE_CREATE_SECRET` is compared only on the Worker via a direct header check, and gates `/ensure` alone. It is never sent to or checked by the browser; the frontend has no password or unlock flow at all.
+- The client IP for the photo-upload throttle comes from Cloudflare's own `CF-Connecting-IP` header, set at the edge — not a client-supplied or proxy-chain-dependent value, so there's no "trust proxy" configuration to get wrong.
 - Possession of a real share URL intentionally grants editing during the open window — the URL is a capability, not a secondary secret. Do not post editable invitations publicly.
-- Local JSON and R2 mutations are serialized within **one API process** so finalization and update requests cannot race. Run a single Render instance. Horizontal scaling requires distributed conditional writes/locking; the current storage contract does not provide those.
-- Upload throttling and temporary images are in memory. They reset on process restart. Durable state would be needed for multiple instances.
-- Temporary images expire automatically, have a 64 MiB total memory limit, and are limited to six uploads per IP per minute. Photos and demo data never count as invitations. Generated image links can stop working early after server restarts.
+- Share mutations use R2's conditional write (compare-and-swap on the object's etag) with a bounded retry, so a finalize racing an update can never silently lose one of them — see `worker/src/storage.ts`. This replaces the old Express server's single-process write queue, which doesn't generalize to a Worker (different requests can land on different isolates).
+- The upload throttle (six per IP per minute) is a soft, best-effort limit backed by a KV counter — KV is eventually consistent, so two requests racing at the exact same instant from the same IP could both slip through. That's acceptable for anti-abuse (not a security boundary); the per-file 5 MiB cap and PNG validation are what actually bound the damage a burst can do. The old Express server's additional 64 MiB *total* photo storage cap is dropped — it existed to protect that one process's own RAM, which doesn't apply to KV.
+- Temporary images expire automatically via KV's native TTL. Photos and demo data never count as invitations.
 - Content has strict schemas, per-field limits, list limits and a 32 KB serialized limit. Unknown keys are rejected. React renders text without raw HTML. There are no import/export draft controls.
-- The system does not automatically send messages, make reservations, or persist recipient selections to the share backend. Reloading a recipient link restarts their invitation. Shared content persists through JSON/R2; recipient choices stay in memory.
-- Live Render, Cloudflare Pages, R2 credentials, CORS against the real domain, and physical-device share sheets require deployment-account access and are not configured by local testing.
+- The system does not automatically send messages, make reservations, or persist recipient selections to the share backend. Reloading a recipient link restarts their invitation. Shared content persists through R2; recipient choices stay in memory.
+- Live Cloudflare account access (Workers, Pages, R2, KV), CORS against the real domain, and physical-device share sheets require deployment-account access and are not configured by local testing.
 - Optional WebMCP tools expose read-back and calendar download for an already confirmed plan. They are feature-detected and cannot bypass the invitation. Native WebMCP integration was not verified because this local browser test environment does not provide that proposed API.
 
 ## Desktop apps

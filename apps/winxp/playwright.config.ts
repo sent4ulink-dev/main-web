@@ -14,7 +14,9 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "npx tsx tests/serve.ts",
+      // See tests/fulfillmentSecret.ts for why this exact secret value.
+      command:
+        'npx wrangler dev --config worker/wrangler.toml --port 3002 --var SHARE_CREATE_SECRET:browser-test-fulfillment-secret-only --var CORS_ALLOWED_ORIGINS:http://127.0.0.1:5174',
       url: "http://127.0.0.1:3002/health",
       reuseExistingServer: false,
     },

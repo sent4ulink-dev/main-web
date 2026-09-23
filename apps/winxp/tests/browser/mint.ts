@@ -3,8 +3,8 @@ import { testCreateSecret } from "../fulfillmentSecret";
 // There is no public studio any more: a real invitation only ever comes into
 // existence because the sent4u order Worker calls POST /shares/:id/ensure
 // server-to-server. These specs mint shares the same way, directly against the
-// browser-test API server (tests/serve.ts), then load /?share=<id> like a buyer
-// would after checkout.
+// browser-test Worker instance playwright.config.ts spawns on :3002, then load
+// /?share=<id> like a buyer would after checkout.
 export function freshId() {
   return `Test${crypto.randomUUID().replace(/-/g, "")}`.slice(0, 20);
 }

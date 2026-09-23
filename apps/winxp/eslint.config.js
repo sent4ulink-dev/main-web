@@ -10,6 +10,7 @@ export default ts.config(
       "test-results/**",
       "playwright-report/**",
       "artifacts/**",
+      "**/.wrangler/**",
     ],
   },
   js.configs.recommended,

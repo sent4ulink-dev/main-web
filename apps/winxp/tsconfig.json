@@ -12,5 +12,8 @@
     "noEmit": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "shared", "tests", "server", "*.ts"]
+  "include": ["src", "shared", "tests", "*.ts"],
+  // Imports the Worker's own source (Workers-only globals like R2Bucket, incompatible
+  // with this config's DOM lib) — type-checked instead by worker/tsconfig.json.
+  "exclude": ["tests/api.test.ts"]
 }

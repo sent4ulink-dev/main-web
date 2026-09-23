@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-server/
+.wrangler/
 .env
 data/
 test-results/
