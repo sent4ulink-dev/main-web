@@ -1,6 +1,6 @@
 # Heart Desktop ♡
 
-A complete romantic invitation in an original early-2000s desktop. React + TypeScript + Vite frontend; Node + Express backend. Story text defaults to Mongolian. The landscape and SVG icons are original. The startup image was supplied by the user. Archived Microsoft Windows XP WAV sounds are included locally with source records in `public/sounds/sources.json`; see `public/ASSETS.md`.
+A complete romantic invitation in an original early-2000s desktop. React + TypeScript + Vite frontend; Node + Express backend. Story text is in English. The landscape and SVG icons are original. The startup image was supplied by the user. Archived Microsoft Windows XP WAV sounds are included locally with source records in `public/sounds/sources.json`; see `public/ASSETS.md`.
 
 ## Local development
 
@@ -11,22 +11,22 @@ npm ci
 cp .env.example .env
 ```
 
-Set a private `STUDIO_PASSWORD` of at least 8 characters in `.env`, then use two terminals:
+There is no public studio and no password: an invitation only ever comes into existence because the sent4u order Worker calls `POST /shares/:id/ensure` server-to-server, gated by a shared secret. Set that secret as `SHARE_CREATE_SECRET` in `.env` (leave unset in local dev for an open, unsecured `/ensure`), then use two terminals:
 
 ```sh
 npm run server
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173/` for Studio or `http://127.0.0.1:5173/?share=test` for the public demo. Opening `index.html` as a file does not run the application. Vite proxies API calls to port 3001; `DEV_API_TARGET` can override this locally. The API requires a configured password; there is no built-in production password. No `.env` file is committed.
+Open `http://127.0.0.1:5173/?share=test` for the public demo. A bare `http://127.0.0.1:5173/` has nothing to show, since no real invitation exists yet — mint one first with `curl -X POST http://127.0.0.1:3001/shares/<id>/ensure -H "x-date-create-secret: <your secret>"`, then open `http://127.0.0.1:5173/?share=<id>`. Opening `index.html` as a file does not run the application. Vite proxies API calls to port 3001; `DEV_API_TARGET` can override this locally. No `.env` file is committed.
 
 The demo makes **no backend requests**, including image uploads. It saves edited story content only when Save is clicked, using a separate `localStorage` key. Start → Reset demonstration restores the sample content and restarts the experience. Generated demo images use native file sharing or a local download. The sound preference is also local. Browser storage must be available for demo persistence.
 
 ## Using the invitation
 
-Studio always locks on a fresh load. Unlock, then edit text directly where it appears inside the invitation. Editable text keeps its existing typography and layout with only a dotted outline. The compact toolbar provides Save, Previous screen, Next screen, and Permanently finish editing. It occupies its own row above the desktop only while editing, including on phones. Outside editing mode the desktop has no extra top bar. The Start menu contains Edit Invitation and Finish edit, with the remaining five-day edit time above them; the demo also has Reset demonstration. Editor navigation is separate from the recipient state machine and does not bypass the game. URL navigation remounts the selected mode, clearing in-memory access and the previous mode's invitation state. Empty, malformed and unknown share IDs remain unavailable invitations rather than falling back to Studio or the demo.
+There is no public studio: a real invitation only ever exists because it was paid for, and whoever holds its share URL can edit or finalize it within its edit window — the link itself is the credential, same trust model as Pinky and Pixel. Choose Edit Invitation from Start, then edit text directly where it appears inside the invitation. Editable text keeps its existing typography and layout with only a dotted outline. The compact toolbar provides Save, Previous screen, Next screen, and Permanently finish editing. It occupies its own row above the desktop only while editing, including on phones. Outside editing mode the desktop has no extra top bar. The Start menu contains Edit Invitation and Finish edit, with the remaining five-day edit time above them; the demo also has Reset demonstration. Editor navigation is separate from the recipient state machine and does not bypass the game. URL navigation remounts the selected mode, clearing in-memory access and the previous mode's invitation state. Empty, malformed and unknown share IDs remain unavailable invitations rather than falling back to the demo.
 
-The authorization token stays only in React memory. Studio Save creates a backend invitation, then shows its URL with Copy Link; later saves update that invitation while its editing window is open. A new record is created when the previous one is finalized or expired. Failed saves never produce a link. Save in a real share writes the whole validated content object and returns to preview without closing editing access. Real links remain editable for five days, then become read-only. Permanently Finish Editing requires confirmation, saves and irreversibly finalizes the link on the backend. In the demo it saves locally and returns to preview, with reset and editing still available from Start.
+Save in a real share writes the whole validated content object and returns to preview without closing editing access. Real links remain editable for five days, then become read-only. Permanently Finish Editing requires confirmation, saves and irreversibly finalizes the link on the backend. In the demo it saves locally and returns to preview, with reset and editing still available from Start.
 
 Recipients must click Yes and find all five hearts in Heart Sweeper. The first tile always contains a heart; numbers count adjacent hearts. Wrong tiles display harmless dialogs. A repeated click on the selected activity, date (with valid time), or place confirms the choice. Confirm buttons provide an alternative. Back preserves scheduling choices; changing activity clears the old place. Dates and times are checked in the visitor's local timezone, including confirmation-time validation.
 
@@ -45,9 +45,9 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-`npm run check` runs all checks in order. To use an already installed Chrome, set `PLAYWRIGHT_CHANNEL=chrome`. Browser tests start isolated servers on ports 5174 and 3002 with an in-memory test database. They never touch the development shares. The test password is a fixture only and is not included in the frontend bundle.
+`npm run check` runs all checks in order. To use an already installed Chrome, set `PLAYWRIGHT_CHANNEL=chrome`. Browser tests start isolated servers on ports 5174 and 3002 with an in-memory test database. They never touch the development shares. The test fulfillment secret is a fixture only and is not included in the frontend bundle.
 
-Coverage includes the story gate, duplicate events, game solvability, date validation, exports, strict content validation, authorization expiry, IP lockout, reserved/colliding IDs, create/read/update/finalize, aggregate statistics, async JSON failures and atomic storage. Browser checks complete the flow at 320×568, 375×667, 390×844, 430×932, 768×1024, 1366×768 and 1920×1080; they check overflow, editor spacing, calendar navigation, image dimensions, local-only demo persistence, link generation, clipboard fallback and reload locking. Screenshots go to `artifacts/screenshots`; failed traces and the HTML report go to `test-results` and `playwright-report`.
+Coverage includes the story gate, duplicate events, game solvability, date validation, exports, strict content validation, the fulfillment secret, self-heal against the order Worker, create/read/update/finalize, async JSON failures and atomic storage. Browser checks complete the flow at 320×568, 375×667, 390×844, 430×932, 768×1024, 1366×768 and 1920×1080; they check overflow, editor spacing, calendar navigation, image dimensions, local-only demo persistence, and that a finalized real invitation stays viewable but never editable again. Screenshots go to `artifacts/screenshots`; failed traces and the HTML report go to `test-results` and `playwright-report`.
 
 ## Frontend — Cloudflare Pages
 
@@ -57,9 +57,8 @@ Connect the repository to Cloudflare Pages. Use:
 - Output directory: `dist`
 - Node version: 22.12 or newer
 - `VITE_API_BASE_URL=https://your-render-service.onrender.com`
-- `VITE_LOCK_ENABLED=true`
 
-The lock is always enforced in this implementation; setting `VITE_LOCK_ENABLED=false` does not disable backend authentication. These frontend values are public build-time configuration. **Never put `STUDIO_PASSWORD`, R2 keys, or a frontend password hash in Vite or Cloudflare Pages variables.** Redeploy Pages whenever a Vite variable changes. `public/_headers` supplies basic security headers and `public/_redirects` supports the SPA. The only sharing format is `/?share=<id>`.
+This frontend value is public build-time configuration. **Never put `SHARE_CREATE_SECRET`, R2 keys, or any secret in Vite or Cloudflare Pages variables.** Redeploy Pages whenever a Vite variable changes. `public/_headers` supplies basic security headers and `public/_redirects` supports the SPA. The only sharing format is `/?share=<id>`.
 
 ## Backend — Render
 
@@ -68,7 +67,8 @@ The lock is always enforced in this implementation; setting `VITE_LOCK_ENABLED=f
 - Build: `npm ci --include=dev && npm run build`
 - Start: `npm start`
 - Health check: `/health`
-- `STUDIO_PASSWORD`: private password, at least 8 characters
+- `SHARE_CREATE_SECRET`: shared secret matching the sent4u order Worker; gates `POST /shares/:id/ensure`
+- `ORDERS_API_BASE`: the order Worker's origin, used to self-heal a share that isn't in storage yet
 - `CORS_ALLOWED_ORIGINS`: exact frontend origins separated by commas; no trailing slash
 - `PHOTO_TTL_MINUTES`: optional, defaults to 15, clamped to 1–60
 - `DATA_FILE`: optional local storage path
@@ -95,24 +95,22 @@ All four must be present, or none. The S3-compatible adapter stores each share a
 
 | Endpoint                    | Behavior                                                                                           |
 | --------------------------- | -------------------------------------------------------------------------------------------------- |
-| `POST /api/studio/unlock`   | `{password}` → temporary token, `wrong` with attempts remaining, or `locked_out`                   |
-| `POST /shares`              | Requires `Authorization: Bearer <token>`; body is the strict content object                        |
-| `GET /shares/:id`           | Returns public share content and edit metadata                                                     |
+| `POST /shares/:id/ensure`   | Requires header `x-date-create-secret: <SHARE_CREATE_SECRET>`; creates the share at that id if it doesn't already exist, never overwrites |
+| `GET /shares/:id`           | Returns public share content and edit metadata; self-heals against the order Worker on a miss      |
 | `PUT /shares/:id`           | Replaces validated content only during editing window                                              |
 | `POST /shares/:id/finalize` | Permanently finalizes only during editing window                                                   |
-| `GET /stats`                | Returns total, active, finalized and expired counts only                                           |
 | `POST /photos`              | `image/png`, maximum 5 MiB; validates signature, dimensions, chunks, CRC and bounded decompression |
 | `GET /photos/:id`           | Temporary PNG; expired/missing images return structured JSON                                       |
 
-All responses use string `status` discriminants. Invalid content/IDs return 400, missing shares 404, unauthorized studio calls 401, finalized edits 409, expired edits 410, excessive requests 429 and unexpected failures 500. The API uses async error wrappers and a JSON error handler. IDs are generated with six cryptographically secure random bytes encoded as base64url, with collision and reserved-ID retries. No sequential identifiers or demo records are created.
+All responses use string `status` discriminants. Invalid content/IDs return 400, forbidden `/ensure` calls 403, missing shares 404, finalized edits 409, expired edits 410, excessive requests 429 and unexpected failures 500. The API uses async error wrappers and a JSON error handler. There is no public, unauthenticated "create a share" endpoint: the id itself is chosen by the sent4u order Worker at checkout time, and `/ensure` only ever creates a share at that exact id.
 
 ## Security and operational limits
 
-- Studio passwords are compared only on the server, after SHA-256 digesting both inputs and using `timingSafeEqual`. Two wrong attempts lock that IP for 24 hours, including correct-password attempts. Success clears its failure state. Tokens contain 32 random bytes, last two hours and live only in backend memory.
-- `trust proxy` is exactly `1`, intended for Render's single trusted reverse-proxy hop. Configure the deployment so clients cannot bypass that hop. If the hosting topology changes, reassess IP trust before deployment.
-- The Studio lock protects private creation actions. It cannot hide delivered HTML, JavaScript, styles, assets or public shared content. Possession of a real share URL intentionally grants editing during the open window. The URL is a capability; do not post editable invitations publicly.
+- `SHARE_CREATE_SECRET` is compared only on the server via a direct header check, and gates `/ensure` alone. It is never sent to or checked by the browser; the frontend has no password or unlock flow at all.
+- `trust proxy` is exactly `1`, intended for Render's single trusted reverse-proxy hop (used by the photo-upload throttle). Configure the deployment so clients cannot bypass that hop. If the hosting topology changes, reassess IP trust before deployment.
+- Possession of a real share URL intentionally grants editing during the open window — the URL is a capability, not a secondary secret. Do not post editable invitations publicly.
 - Local JSON and R2 mutations are serialized within **one API process** so finalization and update requests cannot race. Run a single Render instance. Horizontal scaling requires distributed conditional writes/locking; the current storage contract does not provide those.
-- IP failures, tokens, upload throttling and temporary images are in memory. They reset on process restart. Durable lockouts and shared sessions would be needed for multiple instances.
+- Upload throttling and temporary images are in memory. They reset on process restart. Durable state would be needed for multiple instances.
 - Temporary images expire automatically, have a 64 MiB total memory limit, and are limited to six uploads per IP per minute. Photos and demo data never count as invitations. Generated image links can stop working early after server restarts.
 - Content has strict schemas, per-field limits, list limits and a 32 KB serialized limit. Unknown keys are rejected. React renders text without raw HTML. There are no import/export draft controls.
 - The system does not automatically send messages, make reservations, or persist recipient selections to the share backend. Reloading a recipient link restarts their invitation. Shared content persists through JSON/R2; recipient choices stay in memory.

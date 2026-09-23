@@ -107,7 +107,7 @@ export class R2Storage implements Storage {
         }),
       );
       for (const item of r.Contents ?? []) {
-        const match = item.Key?.match(/^shares\/([A-Za-z0-9_-]{8})\.json$/);
+        const match = item.Key?.match(/^shares\/([A-Za-z0-9_-]{6,40})\.json$/);
         if (match) {
           const s = await this.get(match[1]);
           if (s) shares.push(s);

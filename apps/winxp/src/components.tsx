@@ -467,7 +467,7 @@ export function Calendar({
             ‹
           </button>
           <strong>
-            {month.getFullYear()} он · {month.getMonth() + 1} сар
+            {month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </strong>
           <button
             aria-label="Next month"
@@ -479,7 +479,7 @@ export function Calendar({
           </button>
         </div>
         <div className="calendar-grid">
-          {["Да", "Мя", "Лх", "Пү", "Ба", "Бя", "Ня"].map((d) => (
+          {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
             <span className="weekday" key={d}>
               {d}
             </span>
@@ -517,12 +517,12 @@ export function Calendar({
         </div>
       </div>
       <label className="field time-field">
-        Цаг / Time
+        Time
         <select
           value={time}
           onChange={(e) => onChange({ time: e.target.value })}
         >
-          <option value="">Цагаа сонгох</option>
+          <option value="">Choose a time</option>
           {Array.from(
             { length: 48 },
             (_, i) =>
@@ -544,7 +544,7 @@ export function Calendar({
       </small>
       {date && time && !validDateTime(date, time, now) && (
         <p role="alert" className="error">
-          Энэ цаг өнгөрсөн байна. Шинэ цаг сонгоно уу.
+          That time has passed. Please choose a new time.
         </p>
       )}
     </>

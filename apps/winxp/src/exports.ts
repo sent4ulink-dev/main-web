@@ -47,7 +47,7 @@ export function calendar(p: Plan, now = new Date()) {
     [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Heart Desktop//Romantic Invitation//MN",
+      "PRODID:-//Heart Desktop//Romantic Invitation//EN",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
       "BEGIN:VEVENT",
@@ -186,7 +186,7 @@ export async function renderStory(
   )
     titleSize--;
   wrap(p.eventTitle, 142, 352, 780, titleSize, "#163f78", true);
-  text("✓  БАТЛАГДСАН", 142, 425, 23, "#39703b", true);
+  text("✓  CONFIRMED", 142, 425, 23, "#39703b", true);
   const rows: [string, string][] = [
     ["ACTIVITY", p.activity],
     ["DATE & TIME", `${displayDate(p.date)} · ${p.time}`],
@@ -224,7 +224,7 @@ export async function renderStory(
   }
   rect(142, y, 796, 2, "#d7d8cf");
   wrap(imageMessage, 142, y + 52 * scale, 796, 28 * scale, "#566175");
-  text("♡  Бидний дараагийн сайхан дурсамж", 142, 1740, 22, "#7b6576");
+  text("♡  Our next good memory", 142, 1740, 22, "#7b6576");
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("PNG could not be created"))),

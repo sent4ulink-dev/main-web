@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import request from "supertest";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,12 +8,12 @@ import { MemoryStorage, JsonStorage } from "../server/storage";
 import { freshContent } from "../shared/content";
 import { testPng } from "./png";
 const c = freshContent(),
-  password = "server-only-test-password";
+  createSecret = "server-only-test-fulfillment-secret";
 const apps: ReturnType<typeof createApp>[] = [];
 function fixture() {
   let time = 100000000;
   const storage = new MemoryStorage();
-  const app = createApp({ storage, password, now: () => time });
+  const app = createApp({ storage, createSecret, now: () => time });
   apps.push(app);
   return {
     app,
@@ -26,90 +26,55 @@ function fixture() {
 afterEach(() => {
   apps.splice(0).forEach((a) => a.locals.dispose());
 });
-async function token(app: ReturnType<typeof createApp>, ip = "1.2.3.4") {
-  return (
-    await request(app)
-      .post("/api/studio/unlock")
-      .set("X-Forwarded-For", ip)
-      .send({ password })
-  ).body.token as string;
+// Mints a share the same way the sent4u order Worker does: server-to-server,
+// against a specific id, gated by the shared fulfillment secret.
+function mint(app: ReturnType<typeof createApp>, id: string) {
+  return request(app)
+    .post(`/shares/${id}/ensure`)
+    .set("x-date-create-secret", createSecret);
 }
-describe("password and authorization", () => {
-  it("correct password returns only a temporary opaque token", async () => {
-    const { app, advance } = fixture();
-    const t = await token(app);
-    expect(t).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(t).not.toContain(password);
-    expect((await request(app).post("/shares").send(c)).status).toBe(401);
+describe("fulfillment secret", () => {
+  it("only the order Worker's shared secret can mint a share", async () => {
+    const { app } = fixture();
+    expect((await request(app).post("/shares/AbCd1234/ensure")).status).toBe(
+      403,
+    );
     expect(
       (
         await request(app)
-          .post("/shares")
-          .set("Authorization", `Bearer ${t}`)
-          .send(c)
+          .post("/shares/AbCd1234/ensure")
+          .set("x-date-create-secret", "wrong")
       ).status,
-    ).toBe(201);
-    advance(7200001);
-    expect(
-      (
-        await request(app)
-          .post("/shares")
-          .set("Authorization", `Bearer ${t}`)
-          .send(c)
-      ).status,
-    ).toBe(401);
+    ).toBe(403);
+    const created = await mint(app, "AbCd1234");
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ status: "ok", existed: false });
+    expect(created.body.share.content).toEqual(c);
   });
-  it("two failures lock only the real client IP, even with correct password", async () => {
-    const { app, advance } = fixture();
-    const unlock = (pw: string, ip = "10.1.2.3") =>
-      request(app)
-        .post("/api/studio/unlock")
-        .set("X-Forwarded-For", ip)
-        .send({ password: pw });
-    expect((await unlock("wrong")).body).toEqual({
-      status: "wrong",
-      attemptsRemaining: 1,
-    });
-    expect((await unlock("wrong")).body).toMatchObject({
-      status: "locked_out",
-      retryAfterMs: 86400000,
-    });
-    expect((await unlock(password)).body.status).toBe("locked_out");
-    expect((await unlock(password, "10.1.2.4")).body.status).toBe("ok");
-    advance(86400001);
-    expect((await unlock(password)).body.status).toBe("ok");
-  });
-  it("successful unlock resets failed attempt state", async () => {
+  it("is idempotent: a second ensure never overwrites existing content", async () => {
     const { app } = fixture();
-    const unlock = (pw: string) =>
-      request(app).post("/api/studio/unlock").send({ password: pw });
-    await unlock("wrong");
-    await unlock(password);
-    expect((await unlock("wrong")).body).toEqual({
-      status: "wrong",
-      attemptsRemaining: 1,
-    });
+    await mint(app, "AbCd1234");
+    await request(app)
+      .put("/shares/AbCd1234")
+      .send({ ...c, sender: "Changed sender" });
+    const second = await mint(app, "AbCd1234");
+    expect(second.status).toBe(200);
+    expect(second.body).toMatchObject({ status: "ok", existed: true });
+    expect(second.body.share.content.sender).toBe("Changed sender");
   });
-  it("rejects malformed bodies and never exposes a secret", async () => {
+  it("never exposes the secret and rejects malformed ids", async () => {
     const { app } = fixture();
-    const r = await request(app)
-      .post("/api/studio/unlock")
-      .send({ password: 3 });
-    expect(r.status).toBe(400);
-    expect(JSON.stringify(r.body)).not.toContain(password);
+    const r = await request(app).post("/shares/AbCd1234/ensure");
+    expect(JSON.stringify(r.body)).not.toContain(createSecret);
+    expect((await mint(app, "short")).status).toBe(400);
   });
 });
 describe("real shares", () => {
   it("creates, reads, updates and permanently finalizes a share", async () => {
     const { app } = fixture();
-    const t = await token(app);
-    const created = await request(app)
-      .post("/shares")
-      .set("Authorization", `Bearer ${t}`)
-      .send(c);
-    expect(created.status).toBe(201);
-    const id = created.body.id;
-    expect(id).toMatch(/^[A-Za-z0-9_-]{8}$/);
+    const created = await mint(app, "AbCd1234");
+    const id = created.body.share.id;
+    expect(id).toBe("AbCd1234");
     expect(
       (await request(app).get(`/shares/${id}`)).body.share.content,
     ).toEqual(c);
@@ -125,7 +90,8 @@ describe("real shares", () => {
         .finalEmoticon,
     ).toBe("cool");
     expect(
-      (await request(app).post(`/shares/${id}/finalize`)).body.share.finalized,
+      (await request(app).post(`/shares/${id}/finalize`)).body.share
+        .finalized,
     ).toBe(true);
     expect((await request(app).put(`/shares/${id}`).send(c)).body.status).toBe(
       "finalized",
@@ -136,13 +102,8 @@ describe("real shares", () => {
   });
   it("rejects updates and finalization after expiration", async () => {
     const { app, advance } = fixture();
-    const t = await token(app),
-      id = (
-        await request(app)
-          .post("/shares")
-          .set("Authorization", `Bearer ${t}`)
-          .send(c)
-      ).body.id;
+    const id = "AbCd1234";
+    await mint(app, id);
     advance(5 * 86400000);
     expect((await request(app).put(`/shares/${id}`).send(c)).status).toBe(410);
     expect(
@@ -150,76 +111,62 @@ describe("real shares", () => {
     ).toBe("expired");
     expect((await request(app).get(`/shares/${id}`)).status).toBe(200);
   });
-  it("retries reserved IDs and collisions", async () => {
+  it("self-heals a share the Worker confirms was really paid for, but rejects one it doesn't recognize", async () => {
     const storage = new MemoryStorage();
-    let count = 0;
-    const ids = ["test", "AbCd1234", "AbCd1234", "XyZ_3456"];
-    const app = createApp({ storage, password, randomId: () => ids[count++] });
-    apps.push(app);
-    const t = await token(app);
-    const a = await request(app)
-        .post("/shares")
-        .set("Authorization", `Bearer ${t}`)
-        .send(c),
-      b = await request(app)
-        .post("/shares")
-        .set("Authorization", `Bearer ${t}`)
-        .send(c);
-    expect(a.body.id).toBe("AbCd1234");
-    expect(b.body.id).toBe("XyZ_3456");
-  });
-  it("stats contain aggregate counts only and exclude demo/photos", async () => {
-    const { app, advance } = fixture();
-    const t = await token(app);
-    const create = async () =>
-      (
-        await request(app)
-          .post("/shares")
-          .set("Authorization", `Bearer ${t}`)
-          .send(c)
-      ).body.id;
-    const id = await create();
-    await request(app).post(`/shares/${id}/finalize`);
-    await create();
-    advance(5 * 86400000);
-    const t2 = await token(app);
-    await request(app)
-      .post("/shares")
-      .set("Authorization", `Bearer ${t2}`)
-      .send(c);
-    const result = await request(app).get("/stats");
-    expect(result.body).toEqual({
-      status: "ok",
-      total: 3,
-      active: 1,
-      finalized: 1,
-      expired: 1,
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith("/links/RealOrderId12345"))
+        return new Response(
+          JSON.stringify({ ok: true, product: "winxp" }),
+          { status: 200 },
+        );
+      if (url.endsWith("/links/OtherProductId1234"))
+        return new Response(
+          JSON.stringify({ ok: true, product: "pixel" }),
+          { status: 200 },
+        );
+      return new Response(JSON.stringify({ error: "Not found." }), {
+        status: 404,
+      });
     });
-    expect(JSON.stringify(result.body)).not.toContain(id);
-    expect((await request(app).get("/shares/test")).status).toBe(400);
+    vi.stubGlobal("fetch", fetchMock);
+    const app = createApp({
+      storage,
+      createSecret,
+      ordersApiBase: "https://orders.example.test",
+    });
+    apps.push(app);
+    try {
+      const healed = await request(app).get("/shares/RealOrderId12345");
+      expect(healed.status).toBe(200);
+      expect(healed.body.share.content).toEqual(c);
+      expect(await storage.get("RealOrderId12345")).not.toBeNull();
+      const wrongProduct = await request(app).get(
+        "/shares/OtherProductId1234",
+      );
+      expect(wrongProduct.status).toBe(404);
+      const unknown = await request(app).get("/shares/NeverIssuedId12345");
+      expect(unknown.status).toBe(404);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
   it("rejects malformed content, unknown shape, IDs and oversized payloads", async () => {
-    const { app } = fixture(),
-      t = await token(app);
+    const { app } = fixture();
+    await mint(app, "AbCd1234");
     for (const body of [
       { ...c, bad: true },
       { ...c, sender: "x".repeat(100) },
       {},
     ])
       expect(
-        (
-          await request(app)
-            .post("/shares")
-            .set("Authorization", `Bearer ${t}`)
-            .send(body)
-        ).status,
+        (await request(app).put("/shares/AbCd1234").send(body)).status,
       ).toBe(400);
     expect((await request(app).get("/shares/no")).status).toBe(400);
+    expect((await request(app).get("/shares/test")).status).toBe(400);
     expect(
       (
         await request(app)
-          .post("/shares")
-          .set("Authorization", `Bearer ${t}`)
+          .put("/shares/AbCd1234")
           .send({ ...c, messageTemplate: "x".repeat(50000) })
       ).status,
     ).toBe(413);
@@ -229,7 +176,7 @@ describe("real shares", () => {
     storage.get = async () => {
       throw new Error("private storage failure");
     };
-    const app = createApp({ storage, password });
+    const app = createApp({ storage, createSecret });
     apps.push(app);
     const r = await request(app).get("/shares/AbCd1234").timeout(2000);
     expect(r.status).toBe(500);
@@ -237,14 +184,9 @@ describe("real shares", () => {
     expect(JSON.stringify(r.body)).not.toContain("private storage");
   });
   it("serializes concurrent finalize and update operations", async () => {
-    const { app } = fixture(),
-      t = await token(app);
-    const id = (
-      await request(app)
-        .post("/shares")
-        .set("Authorization", `Bearer ${t}`)
-        .send(c)
-    ).body.id;
+    const { app } = fixture();
+    const id = "AbCd1234";
+    await mint(app, id);
     await Promise.all([
       request(app).post(`/shares/${id}/finalize`),
       request(app)
@@ -273,7 +215,7 @@ describe("real shares", () => {
   });
 });
 describe("temporary photos", () => {
-  it("accepts a real PNG, serves exact bytes, expires it and never counts it as a share", async () => {
+  it("accepts a real PNG, serves exact bytes and expires it", async () => {
     const { app, advance } = fixture();
     const png = testPng();
     const uploaded = await request(app)
@@ -285,7 +227,6 @@ describe("temporary photos", () => {
     const image = await request(app).get(uploaded.body.path);
     expect(image.headers["content-type"]).toContain("image/png");
     expect(image.body).toEqual(png);
-    expect((await request(app).get("/stats")).body.total).toBe(0);
     advance(15 * 60000);
     expect((await request(app).get(uploaded.body.path)).body.status).toBe(
       "expired",
@@ -336,19 +277,21 @@ describe("atomic JSON storage", () => {
     const dir = await mkdtemp(path.join(tmpdir(), "heart-restart-"));
     try {
       const file = path.join(dir, "shares.json");
-      const first = createApp({ storage: new JsonStorage(file), password });
+      const first = createApp({
+        storage: new JsonStorage(file),
+        createSecret,
+      });
       apps.push(first);
-      const t = await token(first);
-      const created = await request(first)
-        .post("/shares")
-        .set("Authorization", `Bearer ${t}`)
-        .send(c);
-      const id = created.body.id;
+      const id = "AbCd1234";
+      const created = await mint(first, id);
       await request(first)
         .put(`/shares/${id}`)
         .send({ ...c, sender: "Persisted sender" });
       await request(first).post(`/shares/${id}/finalize`);
-      const restarted = createApp({ storage: new JsonStorage(file), password });
+      const restarted = createApp({
+        storage: new JsonStorage(file),
+        createSecret,
+      });
       apps.push(restarted);
       const loaded = await request(restarted).get(`/shares/${id}`);
       expect(loaded.body.share).toMatchObject({
@@ -356,19 +299,15 @@ describe("atomic JSON storage", () => {
         content: { sender: "Persisted sender" },
         finalized: true,
         createdAt: created.body.share.createdAt,
-        editUntil: created.body.editUntil,
+        editUntil: created.body.share.editUntil,
       });
       expect(
         (await request(restarted).put(`/shares/${id}`).send(c)).status,
       ).toBe(409);
-      expect(
-        (
-          await request(restarted)
-            .post("/shares")
-            .set("Authorization", `Bearer ${t}`)
-            .send(c)
-        ).status,
-      ).toBe(401);
+      expect((await mint(restarted, id)).body).toMatchObject({
+        status: "ok",
+        existed: true,
+      });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

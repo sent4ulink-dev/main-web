@@ -3,13 +3,13 @@ import { sound } from "./sound";
 export type AppId =
   "invitation" | "music" | "notes" | "computer" | "documents" | "mail" | "plan";
 export const apps: Record<AppId, { title: string; icon: string }> = {
-  invitation: { title: "Чамд зориулсан урилга ♡", icon: "mail" },
+  invitation: { title: "An invitation for you ♡", icon: "mail" },
   music: { title: "Windows Media Player", icon: "music" },
   notes: { title: "Notes — Notepad", icon: "notes" },
   computer: { title: "My Computer", icon: "computer" },
   documents: { title: "My Documents", icon: "folder" },
   mail: { title: "Outlook Express — Message", icon: "mail" },
-  plan: { title: "Бидний болзоо — Notepad", icon: "notes" },
+  plan: { title: "Our date — Notepad", icon: "notes" },
 };
 export type WindowState = {
   visible: boolean;

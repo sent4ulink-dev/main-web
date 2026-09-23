@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 
-const invite = "Open Чамд зориулсан урилга ♡";
+const invite = "Open An invitation for you ♡";
 async function enterEditor(page: Page) {
   await page.getByRole("button", { name: "♥ start", exact: true }).click();
   await page
@@ -50,13 +50,13 @@ for (const size of [
     await expect(page.locator(".managed-app:visible")).toHaveCount(0);
     await page.getByRole("button", { name: invite, exact: true }).dblclick();
     const app = page.locator('[data-app="invitation"]');
-    await app.getByRole("button", { name: "Үгүй", exact: true }).click();
+    await app.getByRole("button", { name: "No", exact: true }).click();
     const response = await app.locator(".no-response").innerText();
     await app.getByRole("button", { name: "Minimize window" }).click();
     await expect(app).toBeHidden();
     await page
       .getByRole("button", {
-        name: "Restore Чамд зориулсан урилга ♡",
+        name: "Restore An invitation for you ♡",
         exact: true,
       })
       .click();
@@ -71,7 +71,7 @@ for (const size of [
     await expect(app).toBeHidden();
     await expect(
       page.getByRole("button", {
-        name: "Restore Чамд зориулсан урилга ♡",
+        name: "Restore An invitation for you ♡",
         exact: true,
       }),
     ).toBeVisible();

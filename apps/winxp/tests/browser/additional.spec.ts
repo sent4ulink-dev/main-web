@@ -1,23 +1,11 @@
 import { test, expect } from "@playwright/test";
-test("expired edit countdown disappears and locked-out studio removes the password field", async ({
+test("expired demo edit countdown disappears and the start menu still allows editing", async ({
   page,
 }) => {
   await page.clock.install();
-  await page.route("**/api/studio/unlock", (route) =>
-    route.fulfill({
-      status: 429,
-      contentType: "application/json",
-      body: JSON.stringify({ status: "locked_out", retryAfterMs: 86400000 }),
-    }),
-  );
-  await page.goto("/");
-  await page.getByLabel("Studio password").fill("wrong");
-  await page.getByRole("button", { name: "Unlock Studio →" }).click();
-  await expect(page.getByLabel("Studio password")).toHaveCount(0);
-  await expect(page.getByText(/Studio locked. Try again/)).toBeVisible();
   await page.goto("/?share=test");
   await page
-    .getByRole("button", { name: "Open Чамд зориулсан урилга ♡", exact: true })
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(page.locator(".scene-invitation")).toBeVisible();
   await page.clock.fastForward(5 * 86400000 + 1000);
@@ -38,7 +26,7 @@ test("touch editor remains inline and usable across all screens at 320px", async
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/?share=test");
   await page
-    .getByRole("button", { name: "Open Чамд зориулсан урилга ♡", exact: true })
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(page.locator(".scene-invitation")).toBeVisible();
   await page.getByRole("button", { name: "♥ start", exact: true }).click();

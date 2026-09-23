@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
+import { freshContent } from "../../shared/content";
+import { mintShare } from "./mint";
 async function noOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -33,10 +35,10 @@ async function enterEditor(page: Page) {
 async function play(page: Page, url = "/?share=test") {
   await page.goto(url);
   await page
-    .getByRole("button", { name: "Open Чамд зориулсан урилга ♡", exact: true })
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(
-    page.getByRole("button", { name: "Тийм ээ! ♡", exact: true }),
+    page.getByRole("button", { name: "Yes! ♡", exact: true }),
   ).toBeVisible();
   await fs.mkdir("artifacts/screenshots", { recursive: true });
   await page.screenshot({
@@ -44,12 +46,12 @@ async function play(page: Page, url = "/?share=test") {
     fullPage: true,
   });
   for (let i = 0; i < 9; i++)
-    await page.getByRole("button", { name: "Үгүй", exact: true }).click();
+    await page.getByRole("button", { name: "No", exact: true }).click();
   await expect(page.locator(".scene-invitation")).toBeVisible();
-  await page.getByRole("button", { name: "Тийм ээ! ♡", exact: true }).click();
+  await page.getByRole("button", { name: "Yes! ♡", exact: true }).click();
   await expect(page.locator(".scene-celebration")).toBeVisible();
   await page
-    .getByRole("button", { name: "Үргэлжлүүлэх →", exact: true })
+    .getByRole("button", { name: "Continue →", exact: true })
     .click();
   await expect(page.locator(".game-grid")).toBeVisible();
   await noOverflow(page);
@@ -58,7 +60,7 @@ async function play(page: Page, url = "/?share=test") {
     fullPage: true,
   });
   await expect(
-    page.getByRole("button", { name: "Үргэлжлүүлэх →", exact: true }),
+    page.getByRole("button", { name: "Continue →", exact: true }),
   ).toBeDisabled();
   for (let i = 1; i <= 36; i++) {
     if (
@@ -75,11 +77,11 @@ async function play(page: Page, url = "/?share=test") {
   );
   await noOverflow(page);
   await page
-    .getByRole("button", { name: "Үргэлжлүүлэх →", exact: true })
+    .getByRole("button", { name: "Continue →", exact: true })
     .click();
   await page.locator(".choice").first().click();
   await page
-    .getByRole("button", { name: "Батлах / Confirm →", exact: true })
+    .getByRole("button", { name: "Confirm →", exact: true })
     .click();
   await expect(page.locator(".calendar")).toBeVisible();
   await page.getByRole("button", { name: "Next month", exact: true }).click();
@@ -91,11 +93,11 @@ async function play(page: Page, url = "/?share=test") {
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Батлах / Confirm →", exact: true })
+    .getByRole("button", { name: "Confirm →", exact: true })
     .click();
   await page.locator(".choice").first().click();
   await page
-    .getByRole("button", { name: "Батлах / Confirm →", exact: true })
+    .getByRole("button", { name: "Confirm →", exact: true })
     .click();
   await expect(page.locator(".tray-message")).toBeVisible();
   await page.locator(".tray-message").click();
@@ -116,13 +118,13 @@ async function play(page: Page, url = "/?share=test") {
   await expect(page.locator('[data-app="mail"]')).toHaveCount(0);
   await page
     .getByRole("button", {
-      name: "Restore Чамд зориулсан урилга ♡",
+      name: "Restore An invitation for you ♡",
       exact: true,
     })
     .click();
   await expect(page.locator(".scene-notification")).toBeVisible();
   await page
-    .getByRole("button", { name: "Зурвас нээх ♡", exact: true })
+    .getByRole("button", { name: "Open message ♡", exact: true })
     .click();
   await expect(page.locator('[data-app="mail"]')).toBeVisible();
   await expect(page.locator('[data-app="invitation"]')).toBeHidden();
@@ -130,9 +132,9 @@ async function play(page: Page, url = "/?share=test") {
     path: `artifacts/screenshots/mail-${page.viewportSize()!.width}.png`,
   });
   await page
-    .getByRole("button", { name: "Бидний төлөвлөгөө ♡ →", exact: true })
+    .getByRole("button", { name: "Our plan ♡ →", exact: true })
     .click();
-  await expect(page.locator(".confirmed")).toHaveText("✓ БАТЛАГДСАН");
+  await expect(page.locator(".confirmed")).toHaveText("✓ CONFIRMED");
   await expect(page.locator(".scene-final .final-actions > *")).toHaveCount(4);
   await expect(page.locator(".scene-final .menu")).toHaveCount(0);
   await expect(page.locator(".memory-meter")).toContainText("Memory saved");
@@ -183,7 +185,7 @@ for (const [width, height] of sizes)
     const sms = await page
       .getByRole("link", { name: "✉ Send by Message" })
       .getAttribute("href");
-    expect(decodeURIComponent(sms!)).toContain("Кофе ууж, удаан ярилцах");
+    expect(decodeURIComponent(sms!)).toContain("Get coffee and talk for hours");
     expect(decodeURIComponent(sms!)).toContain("18:30");
     const downloadEvent = page.waitForEvent("download");
     await page
@@ -275,7 +277,7 @@ test("demo edits persist locally and reset restores defaults", async ({
   });
   await page.goto("/?share=test");
   await page
-    .getByRole("button", { name: "Open Чамд зориулсан урилга ♡", exact: true })
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(page.locator(".scene-invitation")).toBeVisible();
   const beforeEdit = await page
@@ -334,7 +336,7 @@ test("demo edits persist locally and reset restores defaults", async ({
   ).toHaveText("A date with you?");
   await page.reload();
   await page
-    .getByRole("button", { name: "Open Чамд зориулсан урилга ♡", exact: true })
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(page.locator("h1")).toHaveText("A date with you?");
   await page.getByRole("button", { name: "♥ start", exact: true }).click();
@@ -343,18 +345,25 @@ test("demo edits persist locally and reset restores defaults", async ({
     .click();
   await page.reload();
   await page
-    .getByRole("button", { name: "Open Чамд зориулсан урилга ♡", exact: true })
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
-  await expect(page.locator("h1")).toHaveText("Надтай болзоонд\nявах уу?");
+  await expect(page.locator("h1")).toHaveText(
+    "Will you\ngo on a date with me?",
+  );
   expect(requests).toEqual([]);
 });
-test("studio finalization stays on page, copy fallback, and reload lock", async ({
+test("finalizing a real invitation locks it for good; anyone with the link can still view it", async ({
   page,
   context,
+  request,
 }) => {
-  await page.goto("/");
-  await page.getByLabel("Studio password").fill("browser-test-password-only");
-  await page.getByRole("button", { name: "Unlock Studio →" }).click();
+  const id = await mintShare(request);
+  const link = `/?share=${id}`;
+  await page.goto(link);
+  await page.getByRole("button", { name: "♥ start", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit Invitation", exact: true })
+    .click();
   await expect(page.locator(".studio-bar button")).toHaveText([
     "Save",
     "‹ Previous screen",
@@ -373,44 +382,26 @@ test("studio finalization stays on page, copy fallback, and reload lock", async 
   await page
     .getByRole("button", { name: "Yes, Finish Permanently", exact: true })
     .click();
-  await expect(page.getByLabel("Share this link")).toBeVisible();
-  expect(new URL(page.url()).search).toBe("");
-  const link = await page.getByLabel("Share this link").inputValue();
-  expect(link).toMatch(/\?share=[A-Za-z0-9_-]{8}$/);
-  await page.evaluate(() =>
-    Object.defineProperty(navigator, "clipboard", {
-      value: {
-        writeText: async () => {
-          throw new Error("denied");
-        },
-      },
-      configurable: true,
-    }),
-  );
-  await page.getByRole("button", { name: "Copy Link", exact: true }).click();
-  expect(
-    await page
-      .getByLabel("Share this link")
-      .evaluate(
-        (el: HTMLInputElement) => el.selectionEnd! - el.selectionStart!,
-      ),
-  ).toBe(link.length);
-  const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("link", { name: "Open Link", exact: true }).click();
-  const popup = await popupPromise;
-  await expect(
-    popup.getByRole("button", { name: "✎ Edit invitation", exact: true }),
-  ).toHaveCount(0);
-  await popup.reload();
-  await expect(popup.locator(".studio-bar")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".studio-bar")).toHaveCount(0);
   await page.reload();
-  await expect(page.getByLabel("Studio password")).toBeVisible();
-  expect(await page.evaluate(() => Object.keys(localStorage))).not.toContain(
-    "token",
-  );
+  await page.getByRole("button", { name: "♥ start", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Edit Invitation", exact: true }),
+  ).toHaveCount(0);
   const third = await context.newPage();
   await third.goto(link);
-  await expect(third.getByLabel("Studio password")).toHaveCount(0);
+  await third.getByRole("button", { name: "♥ start", exact: true }).click();
+  await expect(
+    third.getByRole("button", { name: "Edit Invitation", exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (
+      await request.put(`http://127.0.0.1:3002/shares/${id}`, {
+        data: { ...freshContent(), sender: "should not persist" },
+      })
+    ).status(),
+  ).toBe(409);
 });
 test("date navigation crosses year boundaries, back preserves selections, changing activity clears place", async ({
   page,
@@ -497,8 +488,8 @@ test("canvas is deterministic, uses plan text, has PNG signature, and missing as
     height: 1920,
   });
   expect(result.drawn).toContain("Exact secret garden");
-  expect(result.drawn).toContain("Кофе ууж, удаан ярилцах");
-  expect(result.drawn.join(" ")).toContain("Бидний болзоо батлагдлаа!");
+  expect(result.drawn).toContain("Get coffee and talk for hours");
+  expect(result.drawn.join(" ")).toContain("Our date is set!");
   expect(result.drawn.join(" ")).not.toMatch(
     /Creating image|Generate Link|Permanently Finish Editing|Memory saved/,
   );
@@ -585,7 +576,7 @@ test("Start Again clears the plan and keeps closed apps in the taskbar", async (
   await expect(page.locator(".invitation-pulse")).toBeVisible();
   await page
     .getByRole("button", {
-      name: "Restore Бидний болзоо — Notepad",
+      name: "Restore Our date — Notepad",
       exact: true,
     })
     .click();
@@ -598,17 +589,17 @@ test("Start Again clears the plan and keeps closed apps in the taskbar", async (
     .click();
   await expect(
     page.getByRole("button", {
-      name: "Restore Бидний болзоо — Notepad",
+      name: "Restore Our date — Notepad",
       exact: true,
     }),
   ).toHaveCount(0);
   await page
     .getByRole("button", {
-      name: "Restore Чамд зориулсан урилга ♡",
+      name: "Restore An invitation for you ♡",
       exact: true,
     })
     .click();
   await expect(
-    page.getByRole("button", { name: "Тийм ээ! ♡", exact: true }),
+    page.getByRole("button", { name: "Yes! ♡", exact: true }),
   ).toBeVisible();
 });

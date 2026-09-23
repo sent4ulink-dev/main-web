@@ -18,7 +18,7 @@ const s = {
   activityId: "coffee",
   date: "2026-10-20",
   time: "18:30",
-  place: "Тухтай кафе, 2; давхар\\цонх",
+  place: "The cozy café, 2; upstairs\\left",
 };
 describe("story state machine", () => {
   it("refreshes saved plan copy without losing confirmed selections", () => {
@@ -142,8 +142,8 @@ describe("Heart Sweeper", () => {
   });
 });
 describe("modes and validation", () => {
-  it("resolves studio, demo, real and malformed real links", () => {
-    expect(resolveMode("")).toEqual({ mode: "studio", id: null });
+  it("resolves not-found, demo, real and malformed real links", () => {
+    expect(resolveMode("")).toEqual({ mode: "real", id: null });
     expect(resolveMode("?share=test").mode).toBe("demo");
     expect(resolveMode("?share=xyNn3_-Z").mode).toBe("real");
     expect(resolveMode("?share=").mode).toBe("real");
@@ -216,7 +216,9 @@ describe("calendar and SMS share one plan", () => {
     expect(ics).toContain("BEGIN:VEVENT");
     expect(ics.match(/BEGIN:VEVENT/g)?.length).toBe(1);
     const unfolded = ics.replace(/\r\n /g, "");
-    expect(unfolded).toContain("LOCATION:Тухтай кафе\\, 2\\; давхар\\\\цонх");
+    expect(unfolded).toContain(
+      "LOCATION:The cozy café\\, 2\\; upstairs\\\\left",
+    );
     const start = unfolded.match(/DTSTART:(.*)/)![1].trim(),
       end = unfolded.match(/DTEND:(.*)/)![1].trim();
     const toDate = (v: string) =>
@@ -234,8 +236,8 @@ describe("calendar and SMS share one plan", () => {
     for (const line of ics.split("\r\n"))
       expect(Buffer.byteLength(line)).toBeLessThanOrEqual(75);
   });
-  it("folds UTF-8 without splitting emoji or Mongolian characters", () => {
-    const value = "DESCRIPTION:" + "Өдөр ♡ 🥰".repeat(30);
+  it("folds UTF-8 without splitting emoji or accented characters", () => {
+    const value = "DESCRIPTION:" + "Café ♡ 🥰".repeat(30);
     const folded = foldLine(value);
     expect(folded.replaceAll("\r\n ", "")).toBe(value);
     for (const line of folded.split("\r\n"))

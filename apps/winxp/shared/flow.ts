@@ -80,9 +80,23 @@ export function validDateTime(date: string, time: string, now = new Date()) {
     +d > +now
   );
 }
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 export function displayDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
-  return `${year} оны ${month} сарын ${day}`;
+  return `${MONTH_NAMES[month - 1]} ${day}, ${year}`;
 }
 export function makePlan(
   c: Content,
@@ -182,14 +196,13 @@ export function transition(state: Flow, action: Action): Flow {
     scene: scenes[Math.min(scenes.indexOf(state.scene) + 1, scenes.length - 1)],
   };
 }
-export type Mode = "studio" | "demo" | "real";
+export type Mode = "demo" | "real";
+// There is no public studio any more: every real invitation is minted server-to-server
+// by the sent4u order Worker the moment it's paid for. A bare visit (no ?share=) has
+// nothing to show, represented here as a "real" mode with a null id.
 export function resolveMode(search: string): { mode: Mode; id: string | null } {
   const id = new URLSearchParams(search).get("share");
-  return id === null
-    ? { mode: "studio", id: null }
-    : id === "test"
-      ? { mode: "demo", id }
-      : { mode: "real", id };
+  return id === "test" ? { mode: "demo", id } : { mode: "real", id };
 }
 export function canEdit(
   mode: Mode,
@@ -197,9 +210,7 @@ export function canEdit(
   editUntil: number,
   now = Date.now(),
 ) {
-  return (
-    mode === "studio" || mode === "demo" || (!finalized && editUntil > now)
-  );
+  return mode === "demo" || (!finalized && editUntil > now);
 }
 export function buildShareUrl(origin: string, id: string) {
   const url = new URL(origin);

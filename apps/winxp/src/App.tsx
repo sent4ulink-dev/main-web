@@ -13,7 +13,6 @@ import {
   type Share,
 } from "../shared/content";
 import {
-  buildShareUrl,
   canEdit,
   displayDate,
   initialFlow,
@@ -23,7 +22,7 @@ import {
   validDateTime,
   type Scene,
 } from "../shared/flow";
-import { api, ApiError, copyLink } from "./api";
+import { api, ApiError } from "./api";
 import { Calendar, Dialog, Editable, Game, Icon, Window } from "./components";
 import { calendar, download, renderStory, smsUrl } from "./exports";
 import { sound, stopSounds } from "./sound";
@@ -60,21 +59,19 @@ export default function App({
   search?: string;
 }) {
   const context = resolveMode(search);
+  // There is no public studio any more: every real invitation is minted server-to-
+  // server the moment it's paid for. A bare visit (no ?share=) has nothing to show.
+  const notFound = context.mode === "real" && context.id === null;
   const [content, setContent] = useState<Content>(() => loadDraft(context)),
     [flow, dispatch] = useReducer(transition, undefined, initialFlow),
-    [token, setToken] = useState(""),
-    [password, setPassword] = useState(""),
-    [lockedUntil, setLockedUntil] = useState(0),
     [share, setShare] = useState<Share | null>(null),
-    [loading, setLoading] = useState(context.mode === "real"),
+    [loading, setLoading] = useState(context.mode === "real" && !notFound),
     [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState(false),
     [editScene, setEditScene] = useState(1),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
-    [link, setLink] = useState(""),
-    [copied, setCopied] = useState(false),
     [finish, setFinish] = useState(false),
     [now, setNow] = useState(Date.now()),
     [muted, setMuted] = useState(
@@ -88,8 +85,7 @@ export default function App({
     [readLength, setReadLength] = useState(0),
     [loveAssistant, setLoveAssistant] = useState(false),
     [loveMessage, setLoveMessage] = useState(0);
-  const linkInput = useRef<HTMLInputElement>(null),
-    operation = useRef(false),
+  const operation = useRef(false),
     imageOperation = useRef(false),
     demoUntil = useRef(Date.now() + 5 * 86400000),
     headingRef = useRef<HTMLDivElement>(null);
@@ -99,7 +95,6 @@ export default function App({
     share?.editUntil ?? 0,
     now,
   );
-  const unlocked = context.mode !== "studio" || !!token;
   const scene: Scene = editing ? scenes[editScene] : flow.scene;
   const wm = useDesktopWindows(muted);
   const startupPlayed = useRef(false);
@@ -151,7 +146,7 @@ export default function App({
       setEditing(false);
       setPlayRequest((v) => v + 1);
     });
-  usePlanTools(unlocked && !editing ? flow.plan : null);
+  usePlanTools(!notFound && !editing ? flow.plan : null);
   const update = useCallback(
     (key: TextKey, value: string | string[]) =>
       setContent((c) => ({ ...c, [key]: value })),
@@ -177,9 +172,9 @@ export default function App({
     dispatch({ type: "next", from, content });
   };
   useEffect(() => {
-    if (context.mode !== "real") return;
+    if (context.mode !== "real" || notFound) return;
     let alive = true;
-    if (!/^[A-Za-z0-9_-]{8}$/.test(context.id ?? "")) {
+    if (!/^[A-Za-z0-9_-]{6,40}$/.test(context.id ?? "")) {
       setLoadError("This invitation link is invalid.");
       setLoading(false);
       return;
@@ -212,15 +207,15 @@ export default function App({
       context.mode === "demo" ? demoUntil.current : (share?.editUntil ?? 0);
     const timer = setTimeout(
       () => setNow(Date.now()),
-      until - now < 3600000 || lockedUntil > now ? 1000 : 60000,
+      until - now < 3600000 ? 1000 : 60000,
     );
     return () => clearTimeout(timer);
-  }, [now, share, lockedUntil]);
+  }, [now, share]);
   useEffect(() => {
     if (!allowed) setEditing(false);
   }, [allowed]);
   useEffect(() => {
-    if (!unlocked || loading || editing || loadError) return;
+    if (notFound || loading || editing || loadError) return;
     if (flow.scene === "boot" || flow.scene === "connecting") {
       const from = flow.scene;
       const timer = setTimeout(
@@ -229,7 +224,7 @@ export default function App({
       );
       return () => clearTimeout(timer);
     }
-  }, [flow.scene, unlocked, loading, editing, loadError, content]);
+  }, [flow.scene, notFound, loading, editing, loadError, content]);
   useEffect(() => {
     if (flow.scene === "notification" && !editing) sound("notification", muted);
     if (flow.scene === "final" && !editing) sound("confirm", muted);
@@ -278,15 +273,6 @@ export default function App({
       );
       if (
         e instanceof ApiError &&
-        e.status === "unauthorized" &&
-        context.mode === "studio"
-      ) {
-        setToken("");
-        setEditing(false);
-        setLink("");
-      }
-      if (
-        e instanceof ApiError &&
         (e.status === "expired" || e.status === "finalized")
       ) {
         setEditing(false);
@@ -321,48 +307,10 @@ export default function App({
       );
       setShare(result.share);
       savedShare = result.share;
-    } else if (context.mode === "studio") {
-      const result =
-        share && !share.finalized && share.editUntil > Date.now()
-          ? await api<{ share: Share }>(`/shares/${share.id}`, "PUT", c)
-          : await api<{ share: Share }>("/shares", "POST", c, token);
-      savedShare = result.share;
-      setShare(savedShare);
-      setLink(buildShareUrl(location.origin, savedShare.id));
     }
     setContent(c);
     setNotice("Saved! ♡");
     return savedShare;
-  }
-  async function unlock() {
-    try {
-      const result = await api<{ status: "ok"; token: string }>(
-        "/api/studio/unlock",
-        "POST",
-        { password },
-      );
-      setToken(result.token);
-      setEditing(true);
-      setPassword("");
-    } catch (e) {
-      setPassword("");
-      if (e instanceof ApiError) {
-        if (e.status === "locked_out") {
-          setLockedUntil(Date.now() + Number(e.data.retryAfterMs));
-          setError(
-            "Studio is locked for this IP. Please try again after the lockout.",
-          );
-          return;
-        }
-        if (e.status === "wrong") {
-          setError(
-            `Incorrect password. ${e.data.attemptsRemaining} attempt remaining.`,
-          );
-          return;
-        }
-      }
-      throw e;
-    }
   }
   function toggleSound() {
     if (!muted) stopSounds();
@@ -428,8 +376,6 @@ export default function App({
     }
   }
   const editWindowLabel = (() => {
-    if (context.mode === "studio")
-      return "Shared links can be edited for 5 days";
     const until =
       context.mode === "demo" ? demoUntil.current : (share?.editUntil ?? 0);
     const remaining = Math.max(0, until - now);
@@ -439,7 +385,7 @@ export default function App({
     const minutes = Math.floor((remaining % 3600000) / 60000);
     return `Edit time: ${days}d ${hours}h ${minutes}m left`;
   })();
-  const toolbar = unlocked && !loadError && !loading && allowed && editing && (
+  const toolbar = !notFound && !loadError && !loading && allowed && editing && (
     <div className="studio-bar active">
       <div className="editor-row">
         <button
@@ -596,7 +542,7 @@ export default function App({
               if (!editing) next("celebration");
             }}
           >
-            Үргэлжлүүлэх →
+            Continue →
           </button>
         </div>
       );
@@ -616,7 +562,7 @@ export default function App({
               disabled={flow.hearts !== 5 || editing}
               onClick={() => next("game")}
             >
-              Үргэлжлүүлэх →
+              Continue →
             </button>
           </div>
         </div>
@@ -668,7 +614,7 @@ export default function App({
                 disabled={!currentActivity}
                 onClick={() => next("activity")}
               >
-                Батлах / Confirm →
+                Confirm →
               </button>
             </div>
           )}
@@ -687,7 +633,7 @@ export default function App({
             }}
           />
           <div className="actions spread">
-            <button onClick={() => dispatch({ type: "back" })}>← Буцах</button>
+            <button onClick={() => dispatch({ type: "back" })}>← Back</button>
             <button
               className="primary"
               disabled={
@@ -696,7 +642,7 @@ export default function App({
               }
               onClick={() => next("date")}
             >
-              Батлах / Confirm →
+              Confirm →
             </button>
           </div>
         </div>
@@ -742,7 +688,7 @@ export default function App({
             ))}
           </div>
           <label className="field custom-place">
-            Өөр газар / Custom place
+            Custom place
             <input
               maxLength={160}
               value={
@@ -750,7 +696,7 @@ export default function App({
                   ? ""
                   : flow.selection.place
               }
-              placeholder="Уулзах газрын нэр…"
+              placeholder="Name of the place…"
               onChange={(e) =>
                 selection({ type: "select", patch: { place: e.target.value } })
               }
@@ -760,13 +706,13 @@ export default function App({
             />
           </label>
           <div className="actions spread">
-            <button onClick={() => dispatch({ type: "back" })}>← Буцах</button>
+            <button onClick={() => dispatch({ type: "back" })}>← Back</button>
             <button
               className="primary"
               disabled={editing || !flow.selection.place.trim()}
               onClick={() => next("place")}
             >
-              Батлах / Confirm →
+              Confirm →
             </button>
           </div>
           {error && <p role="alert">{error}</p>}
@@ -798,7 +744,7 @@ export default function App({
               }
             }}
           >
-            Зурвас нээх ♡
+            Open message ♡
           </button>
         </div>
       );
@@ -852,7 +798,7 @@ export default function App({
                 )}
                 <div className="actions">
                   <button className="primary" onClick={() => next("message")}>
-                    Бидний төлөвлөгөө ♡ →
+                    Our plan ♡ →
                   </button>
                 </div>
               </>
@@ -903,19 +849,19 @@ export default function App({
               <>
                 <dl className="messenger-details">
                   <div>
-                    <dt>Үйл ажиллагаа</dt>
+                    <dt>Activity</dt>
                     <dd>{flow.plan?.activity ?? content.activities[0].name}</dd>
                   </div>
                   <div>
-                    <dt>Өдөр & цаг</dt>
+                    <dt>Date & time</dt>
                     <dd>
                       {flow.plan
                         ? `${displayDate(flow.plan.date)} · ${flow.plan.time}`
-                        : "Өдөр & цагаа сонгоно ♡"}
+                        : "Choose your date & time ♡"}
                     </dd>
                   </div>
                   <div>
-                    <dt>Уулзах газар</dt>
+                    <dt>Meeting place</dt>
                     <dd>
                       {flow.plan?.place ?? content.activities[0].places[0]}
                     </dd>
@@ -958,7 +904,7 @@ export default function App({
                   </div>
                 )}
                 <div className="messenger-receipt">
-                  <p className="confirmed">✓ БАТЛАГДСАН</p>
+                  <p className="confirmed">✓ CONFIRMED</p>
                   <span>See you soon! ;)</span>
                 </div>
                 <div className="memory-meter" aria-label="Memory saved 100%">
@@ -1009,7 +955,7 @@ export default function App({
       }}
     >
       {toolbar}
-      {scene === "boot" && !editing && unlocked && !loading && !loadError && (
+      {scene === "boot" && !editing && !notFound && !loading && !loadError && (
         <div
           className="xp-startup"
           role="status"
@@ -1054,7 +1000,7 @@ export default function App({
             </button>
           ))}
         </nav>
-        {unlocked &&
+        {!notFound &&
           !loading &&
           !loadError &&
           (["music", "notes", "computer", "documents"] as AppId[]).map((id) => {
@@ -1156,7 +1102,7 @@ export default function App({
                                 }}
                               >
                                 <Icon kind="notes" />
-                                Бидний болзоо.txt
+                                Our date.txt
                               </button>
                             )}
                           </>
@@ -1170,55 +1116,21 @@ export default function App({
           })}
         <main className="main-stage">
           <div ref={headingRef} tabIndex={-1} className="focus-anchor" />
-          {!unlocked ? (
+          {notFound ? (
             <Window
-              title="Private Studio — Sign in"
+              title="Invitation unavailable"
               icon="computer"
               className="lock-window"
             >
               <div className="scene-body">
                 <div className="lock-icon">♡</div>
-                <h1>Invitation Studio</h1>
-                <p>Your little corner for a very special invitation.</p>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void run(unlock);
-                  }}
-                >
-                  {lockedUntil > now ? (
-                    <p role="alert">
-                      Studio locked. Try again in{" "}
-                      {Math.ceil((lockedUntil - now) / 3600000)} hours.
-                    </p>
-                  ) : (
-                    <label className="field">
-                      Studio password
-                      <input
-                        autoFocus
-                        type="password"
-                        autoComplete="current-password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        maxLength={1024}
-                      />
-                    </label>
-                  )}
-                  <div className="actions">
-                    {lockedUntil <= now && (
-                      <button className="primary" disabled={busy}>
-                        {busy ? "Connecting…" : "Unlock Studio →"}
-                      </button>
-                    )}
-                    <a className="button" href="/?share=test">
-                      Try the public demo
-                    </a>
-                  </div>
-                </form>
-                <small className="subtle">
-                  Private studio · A new sign-in is required on every reload.
-                </small>
+                <h1>This link doesn&rsquo;t look right</h1>
+                <p>Double-check the URL you were sent.</p>
+                <div className="actions">
+                  <a className="button" href="/?share=test">
+                    Try the public demo
+                  </a>
+                </div>
               </div>
             </Window>
           ) : loading ? (
@@ -1313,7 +1225,7 @@ export default function App({
           </button>
         </div>
       )}
-      {scene === "notification" && !editing && unlocked && (
+      {scene === "notification" && !editing && !notFound && (
         <button className="tray-message" onClick={() => next("notification")}>
           <Icon kind="mail" />
           <span>
@@ -1384,7 +1296,7 @@ export default function App({
             <strong>♡ Invitation editor</strong>
             <small>{editWindowLabel}</small>
           </header>
-          {allowed && unlocked && (
+          {allowed && !notFound && (
             <>
               <button
                 onClick={() => {
@@ -1413,49 +1325,6 @@ export default function App({
             </button>
           )}
         </div>
-      )}
-      {link && (
-        <Dialog title="Your invitation is ready ♡" onClose={() => setLink("")}>
-          <label className="field">
-            Share this link
-            <input
-              ref={linkInput}
-              readOnly
-              value={link}
-              onFocus={(e) => e.target.select()}
-            />
-          </label>
-          <p>
-            {share?.finalized
-              ? "Editing is permanently finished. This invitation remains available to view."
-              : "Editable for five days, or until you finish editing permanently."}
-          </p>
-          <div className="actions">
-            <button
-              onClick={() =>
-                void copyLink(linkInput.current!).then((ok) => {
-                  setCopied(ok);
-                  if (ok) setTimeout(() => setCopied(false), 2500);
-                  else
-                    setNotice(
-                      "Link selected. Press Ctrl+C or touch and hold to copy.",
-                    );
-                })
-              }
-            >
-              {copied ? "Copied!" : "Copy Link"}
-            </button>
-            <a
-              className="button primary"
-              href={link}
-              target="_blank"
-              rel="opener"
-            >
-              Open Link
-            </a>
-            <button onClick={() => setLink("")}>Close</button>
-          </div>
-        </Dialog>
       )}
       {loveAssistant && (
         <Dialog
@@ -1495,11 +1364,10 @@ export default function App({
             Are you sure you want to finish editing permanently? You will not be
             able to edit this invitation again.
           </p>
-          {context.mode !== "real" && (
+          {context.mode === "demo" && (
             <p>
-              {context.mode === "demo"
-                ? "The demo is a browser-only sandbox. This saves your changes and exits the editor; you can reset or edit the demo again."
-                : "This will save your invitation and permanently finalize its link. Your in-memory studio draft stays available."}
+              The demo is a browser-only sandbox. This saves your changes and
+              exits the editor; you can reset or edit the demo again.
             </p>
           )}
           <div className="actions">
@@ -1508,20 +1376,13 @@ export default function App({
               disabled={busy}
               onClick={() =>
                 void run(async () => {
-                  const savedShare = await save();
+                  await save();
                   if (context.mode === "real") {
                     const r = await api<{ share: Share }>(
                       `/shares/${context.id}/finalize`,
                       "POST",
                     );
                     setShare(r.share);
-                  } else if (context.mode === "studio") {
-                    const r = await api<{ share: Share }>(
-                      `/shares/${savedShare!.id}/finalize`,
-                      "POST",
-                    );
-                    setShare(r.share);
-                    setLink(buildShareUrl(location.origin, r.share.id));
                   }
                   setFinish(false);
                   setEditing(false);

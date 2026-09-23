@@ -7,21 +7,26 @@ import cors from "cors";
 import { randomBytes } from "node:crypto";
 import { inflateSync } from "node:zlib";
 import { z } from "zod";
-import { contentSchema, type Share } from "../shared/content.js";
+import { contentSchema, freshContent, type Share } from "../shared/content.js";
 import type { Storage } from "./storage.js";
-import { StudioAuth } from "./auth.js";
-const ID = /^[A-Za-z0-9_-]{8}$/;
+// There is no public studio and no password any more: an invitation only ever comes
+// into existence because the sent4u order Worker calls POST /shares/:id/ensure
+// server-to-server, gated by a shared secret, the moment it's paid for. Whoever holds
+// the resulting share URL can edit or finalize it within its edit window — the link
+// itself is the credential, same trust model as Pinky and Pixel.
+const ID = /^[A-Za-z0-9_-]{6,40}$/;
 export function createApp(options: {
   storage: Storage;
-  password: string;
+  createSecret?: string;
+  ordersApiBase?: string;
   origins?: string[];
   now?: () => number;
   photoTtl?: number;
-  randomId?: () => string;
 }) {
   const app = express(),
     now = options.now ?? Date.now,
-    auth = new StudioAuth(options.password, now),
+    createSecret = options.createSecret,
+    ordersApiBase = (options.ordersApiBase ?? "").replace(/\/$/, ""),
     photos = new Map<string, { data: Buffer; until: number }>(),
     uploads = new Map<string, { count: number; until: number }>();
   let photoBytes = 0;
@@ -64,65 +69,77 @@ export function createApp(options: {
     }
     return true;
   };
-  const authorize = (req: Request, res: Response) => {
-    if (
-      !auth.authorized(req.headers.authorization?.replace(/^Bearer /, "") ?? "")
-    ) {
-      res
-        .status(401)
-        .json({ status: "unauthorized", message: "Unlock Studio again" });
+  // Gates POST /shares/:id/ensure — the endpoint the sent4u order Worker calls,
+  // server-to-server, the moment a paid order generates this id. Never called from a
+  // browser: there is no public studio, no password, no way to mint a share id from
+  // this app at all — a real invitation only ever exists because it was paid for.
+  const requireCreateSecret = (req: Request, res: Response) => {
+    if (!createSecret) return true; // not configured yet — dev convenience only
+    if (req.get("x-date-create-secret") !== createSecret) {
+      res.status(403).json({ status: "forbidden" });
       return false;
     }
     return true;
   };
+  // Self-heal: if a share isn't in storage yet, ask the sent4u order Worker whether
+  // this id was ever actually issued (paid for, and for this product) before creating
+  // it here. Covers the gap where the background /ensure call after a purchase is
+  // still mid-retry when the buyer clicks the link.
+  const selfHealShare = async (id: string): Promise<Share | null> => {
+    if (!ordersApiBase) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const r = await fetch(
+        `${ordersApiBase}/links/${encodeURIComponent(id)}`,
+        { signal: controller.signal },
+      );
+      clearTimeout(timer);
+      if (!r.ok) return null;
+      const body = (await r.json()) as { ok?: boolean; product?: string };
+      if (!body.ok || body.product !== "winxp") return null;
+    } catch (err) {
+      clearTimeout(timer);
+      console.warn(`Self-heal verify failed for ${id}:`, (err as Error).message);
+      return null;
+    }
+    const createdAt = now();
+    const share: Share = {
+      id,
+      content: freshContent(),
+      createdAt,
+      editUntil: createdAt + 5 * 86400000,
+      finalized: false,
+    };
+    await options.storage.put(share);
+    console.log(`Self-healed ${id} (verified with the order Worker, was never created here)`);
+    return share;
+  };
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
+  // POST /shares/:id/ensure — create a share at a SPECIFIC id if it doesn't already
+  // exist (no-op otherwise, never overwrites existing content). This is the *only* way
+  // a share ever comes into existence: there is no public, unauthenticated "create a
+  // share" endpoint any more.
   app.post(
-    "/api/studio/unlock",
+    "/shares/:id/ensure",
     route(async (req, res) => {
-      const b = z
-        .object({ password: z.string().max(1024) })
-        .strict()
-        .parse(req.body);
-      const result = auth.unlock(req.ip ?? "unknown", b.password);
-      res
-        .status(
-          result.status === "ok" ? 200 : result.status === "wrong" ? 401 : 429,
-        )
-        .json(result);
-    }),
-  );
-  app.post(
-    "/shares",
-    route(async (req, res) => {
-      if (!authorize(req, res)) return;
-      const content = contentSchema.parse(req.body);
+      if (!requireCreateSecret(req, res)) return;
+      if (!requireId(req, res)) return;
+      const id = String(req.params.id);
       await serial(async () => {
-        let id = "";
-        for (let i = 0; i < 32; i++) {
-          id = (
-            options.randomId ?? (() => randomBytes(6).toString("base64url"))
-          )();
-          if (id !== "test" && ID.test(id) && !(await options.storage.get(id)))
-            break;
-          id = "";
-        }
-        if (!id) throw new Error("Unable to allocate share ID");
+        const existing = await options.storage.get(id);
+        if (existing)
+          return res.json({ status: "ok", existed: true, share: existing });
         const createdAt = now();
         const share: Share = {
           id,
-          content,
+          content: freshContent(),
           createdAt,
           editUntil: createdAt + 5 * 86400000,
           finalized: false,
         };
         await options.storage.put(share);
-        res.status(201).json({
-          status: "ok",
-          id,
-          editUntil: share.editUntil,
-          finalized: false,
-          share,
-        });
+        res.status(201).json({ status: "ok", existed: false, share });
       });
     }),
   );
@@ -130,7 +147,8 @@ export function createApp(options: {
     "/shares/:id",
     route(async (req, res) => {
       if (!requireId(req, res)) return;
-      const share = await options.storage.get(String(req.params.id));
+      let share = await options.storage.get(String(req.params.id));
+      if (!share) share = await selfHealShare(String(req.params.id));
       if (!share)
         return res
           .status(404)
@@ -158,23 +176,7 @@ export function createApp(options: {
     });
   app.put("/shares/:id", mutate(false));
   app.post("/shares/:id/finalize", mutate(true));
-  app.get(
-    "/stats",
-    route(async (_req, res) => {
-      const shares = await options.storage.list();
-      res.json({
-        status: "ok",
-        total: shares.length,
-        active: shares.filter((s) => !s.finalized && s.editUntil > now())
-          .length,
-        finalized: shares.filter((s) => s.finalized).length,
-        expired: shares.filter((s) => !s.finalized && s.editUntil <= now())
-          .length,
-      });
-    }),
-  );
   const cleanup = () => {
-    auth.cleanup();
     for (const [id, p] of photos)
       if (p.until <= now()) {
         photoBytes -= p.data.length;

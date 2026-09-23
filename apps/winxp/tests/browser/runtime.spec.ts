@@ -11,7 +11,7 @@ test("the live desktop loads its styles and local artwork without a Vite error o
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/?share=test");
   await page
-    .getByRole("button", { name: "Open Чамд зориулсан урилга ♡", exact: true })
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(page.locator(".scene-invitation")).toBeVisible();
   await expect(page.locator("vite-error-overlay")).toHaveCount(0);
