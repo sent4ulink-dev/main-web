@@ -282,7 +282,9 @@ async function deleteClaim(request, env, cors, handle) {
    paid for: with 8 they can split them as they like, e.g. 3 Pixel + 2 Pinky + 3 WinXP, in one go or over several visits.
    See worker/README.md "Orders" for how to set the Paddle side of this up. */
 
-const PACKS = { single: { credits: 1, amount: 199 }, pack: { credits: 8, amount: 999 } };
+// no prototype: a plain {} would let pack="__proto__" (or "constructor", "toString", …) resolve PACKS[pack] to an inherited
+// object instead of failing the lookup below, silently turning credits/amount into undefined further down.
+const PACKS = Object.assign(Object.create(null), { single: { credits: 1, amount: 199 }, pack: { credits: 8, amount: 999 } });
 const PRODUCTS = ['pixel', 'pinky', 'winxp'];
 const JSON_OBJECT = { httpMetadata: { contentType: 'application/json' } };
 const WEBHOOK_TOLERANCE_S = 300;                                // reject a Paddle-Signature whose timestamp is older than this (clock skew + retry headroom)
@@ -320,7 +322,7 @@ async function createCheckout(request, env, cors) {
   const { body, fail } = await readBody(request, cors, 500);
   if (fail) return fail;
   const pack = String(body.pack || '');
-  if (!PACKS[pack]) return reply({ error: 'Choose 1 link or a pack of 8.' }, 422, cors);
+  if (!PACKS[pack] || !Number.isInteger(PACKS[pack].credits)) return reply({ error: 'Choose 1 link or a pack of 8.' }, 422, cors);   // belt and suspenders: credits must be a real number before anything is charged
   const priceId = pack === 'single' ? env.PADDLE_PRICE_SINGLE : env.PADDLE_PRICE_PACK;
   if (!env.PADDLE_API_KEY || !priceId) return reply({ error: 'Checkout isn’t switched on yet. Please check back soon.' }, 501, cors);
 

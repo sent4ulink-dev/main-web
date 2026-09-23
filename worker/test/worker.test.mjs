@@ -257,6 +257,19 @@ await test('checkout is refused until Paddle is configured, and only accepts the
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'pack' }, origin: 'https://evil.example' })).status, 403);
 });
 
+// regression: PACKS[pack] used to be a plain {} lookup, so pack="__proto__" (or "constructor", "toString", …) resolved to an
+// inherited Object.prototype value instead of failing — credits/amount silently became undefined, which turned the "never more
+// than you paid for" check in generateLinks into `want > NaN`, always false. A single real $9.99 payment would then generate
+// unlimited links forever. PACKS is now a null-prototype object so these names simply aren't there.
+await test('a pack name that shadows Object.prototype cannot buy unlimited links', async () => {
+  const e = shop();
+  globalThis.fetch = fakePaddle().fetchFn;
+  for (const pack of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf']) {
+    assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack } })).status, 422, pack);
+  }
+  assert.equal([...e.BUCKET.store.keys()].filter(k => k.startsWith('orders/')).length, 0);
+});
+
 await test('checkout asks Paddle for the right price and custom data, and hands back its checkout link', async () => {
   const e = shop(), paddle = fakePaddle();
   globalThis.fetch = paddle.fetchFn;
