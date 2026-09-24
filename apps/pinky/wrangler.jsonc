@@ -1,0 +1,13 @@
+{
+  // Pinky's frontend: a Worker serving static assets only (no fetch handler of its own —
+  // matches how Cloudflare now treats "Pages" projects as plain asset Workers). Deploy
+  // with an EXPLICIT --config flag: this directory has no other wrangler config, but the
+  // repo root does, and wrangler's upward config search will silently pick that one up
+  // (and its dist/) instead if you don't pin the config file explicitly. Learned this the
+  // hard way — always pass --config apps/pinky/wrangler.jsonc for anything here.
+  "name": "pinky-dom",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}

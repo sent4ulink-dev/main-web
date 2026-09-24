@@ -12,16 +12,17 @@ bucket_name = "winxp-shares"
 # — then put the id it prints below.
 [[kv_namespaces]]
 binding = "PHOTOS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "9eb7a6e616df497e8e52a715c2d1b21b"
 
 [vars]
-# The deployed frontend's exact origin(s), comma separated, no trailing slash. Empty
-# allows any origin, which is fine for local dev but should be set for production.
-CORS_ALLOWED_ORIGINS = ""
+# The deployed frontend's exact origin(s), comma separated, no trailing slash. sent4u.link
+# is what the browser sees when reached through the gateway's ?share= proxy (the normal
+# path); the .workers.dev origin covers visiting this app's own frontend URL directly.
+CORS_ALLOWED_ORIGINS = "https://sent4u.link,https://winxp-dom.sent4u-link.workers.dev"
 # The sent4u orders Worker (see /worker at the repo root), used to self-heal a share
 # that isn't in this bucket yet by confirming with it that the id was really paid for
 # and is really for WinXP. Leave empty to disable self-heal.
-ORDERS_API_BASE = ""
+ORDERS_API_BASE = "https://sent4u-reviews.sent4u-link.workers.dev"
 # How long an uploaded story photo stays downloadable before it expires. Clamped to 1-60.
 PHOTO_TTL_MINUTES = "15"
 

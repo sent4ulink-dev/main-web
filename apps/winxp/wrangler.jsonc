@@ -1,0 +1,11 @@
+{
+  // WinXP's frontend: a Worker serving static assets only. Deploy with an EXPLICIT
+  // --config flag — this directory has no other top-level wrangler config, but the repo
+  // root does, and wrangler's upward config search will silently pick that one up (and
+  // its dist/) instead if you don't pin the config file explicitly.
+  "name": "winxp-dom",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}

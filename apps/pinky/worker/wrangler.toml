@@ -8,13 +8,14 @@ binding = "BUCKET"
 bucket_name = "pinky-shares"
 
 [vars]
-# The deployed frontend's exact origin, no trailing slash. Empty allows any origin,
-# which is fine for local dev but should be set for production.
-CORS_ORIGIN = ""
+# The deployed frontend's exact origin(s), comma separated, no trailing slash. sent4u.link
+# is what the browser sees when reached through the gateway's ?share= proxy (the normal
+# path); the .workers.dev origin covers visiting this app's own frontend URL directly.
+CORS_ORIGIN = "https://sent4u.link,https://pinky-dom.sent4u-link.workers.dev"
 # The sent4u orders Worker (see /worker at the repo root), used to self-heal a share
 # that isn't in this bucket yet by confirming with it that the id was really paid for
 # and is really for Pinky. Leave empty to disable self-heal.
-ORDERS_API_BASE = ""
+ORDERS_API_BASE = "https://sent4u-reviews.sent4u-link.workers.dev"
 
 # Secrets (never put these in this file — set with `npx wrangler secret put NAME`):
 #   SHARE_CREATE_SECRET     gates POST /api/shares/:id/ensure. Nothing calls that endpoint

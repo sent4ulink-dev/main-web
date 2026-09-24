@@ -19,9 +19,9 @@
     // Each app's real deployed origin (Cloudflare Pages, or wherever it ends up). Until an
     // app's origin is set here, its share links just fall through to the marketing site
     // instead of erroring — safe to deploy this Worker before every app is live.
-    // "PIXEL_ORIGIN": "https://pixel-dom.pages.dev",
-    // "PINKY_ORIGIN": "https://<pinky-project>.pages.dev",
-    // "WINXP_ORIGIN": "https://<winxp-project>.pages.dev",
+    "PIXEL_ORIGIN": "https://pixel-dom-n49.pages.dev",
+    "PINKY_ORIGIN": "https://pinky-dom.sent4u-link.workers.dev",
+    "WINXP_ORIGIN": "https://winxp-dom.sent4u-link.workers.dev",
     // The orders Worker (see /worker), used to look up which product a REAL (paid) share id
     // belongs to. Demo ids (test-pixel / test-pinky / test-winxp) never need this.
     "ORDERS_API_BASE": "https://sent4u-reviews.sent4u-link.workers.dev",
