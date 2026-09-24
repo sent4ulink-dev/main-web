@@ -19,8 +19,19 @@
                                      this is what the gateway that picks which app to serve for sent4u.link/?share=<id> calls, and what each app's
                                      own backend calls to self-heal a link that's opened before /generate has fully landed)
 
+   Signing in — no passwords: a visitor gives their email, gets a one-time link, clicking it signs them in. This is what lets someone see every
+   order they've ever paid for (not just the one this browser remembers) — see "Sign-in" in the README for the Resend setup this needs.
+
+   POST   /auth/request-link    { email }  ->  { ok: true }  (always, whether or not the email is rate-limited or fails to send — never reveals
+                                which emails have signed in before)
+   GET    /auth/verify          ?token=<from the email>  ->  302 redirect to /, with the session cookie set. Meant to be opened directly (it's the
+                                link in the email), not fetched.
+   POST   /auth/logout          clears the session cookie
+   GET    /me                   the signed-in visitor's own orders  ->  { email, orders: [...] }, or 401 if not signed in
+
    R2 layout
-     orders/<token>.json  one object per order (pack, credits, status, the links made); the token is a random 128-bit secret and is the buyer's key
+     orders/<token>.json  one object per order (pack, credits, status, the links made, and which signed-in visitor made it, if any); the token is
+                          a random 128-bit secret and is the buyer's key regardless of whether they ever sign in
      tx/<paddleId>.json   Paddle's own transaction id -> our order token, so a webhook that lacks custom_data can still find the order
      links/<id>.json      one object per link that was made: which product it is and which order it came from (the page that serves ?share=<id> reads this)
      rlo/<hash>.json      per-visitor counters for starting orders
@@ -30,8 +41,15 @@
      claims/<name>.json   one object per reserved link name (the name, the optional email, a hashed IP). R2 refuses to overwrite it, which is
                           what makes a name unique even if two people ask at the same instant
      rlc/<hash>.json      the same kind of counters, for claims
+     users/<hash>.json    one object per signed-in visitor (the order tokens they've made while signed in), keyed by a hash of their email —
+                          never the email itself, so a bucket listing never exposes an address
 
-   The id starts with an inverted timestamp, so listing the bucket in key order gives newest first. */
+   The id starts with an inverted timestamp, so listing the bucket in key order gives newest first.
+
+   KV layout (see AUTH in wrangler.toml) — both auto-expire, nothing to clean up by hand
+     login:<token>    a pending sign-in link's destination email, 15-minute TTL, deleted the moment it's used (one-time)
+     session:<token>  a signed-in visitor's email, 30-day TTL
+     rla:<hash>       per-visitor counters for requesting sign-in links */
 
 const TOOLS = ['Send', 'Pixel', 'Pinky', 'WinXP', 'Marketplace'];
 const MAX_LIST = 100;             // how many reviews the public list holds
@@ -53,6 +71,10 @@ export default {
       if (claim && request.method === 'GET') return await checkClaim(env, cors, claim[1]);
       if (claim && request.method === 'DELETE') return await deleteClaim(request, env, cors, claim[1]);
       if (url.pathname === '/claims' && request.method === 'POST') return await createClaim(request, env, cors);
+      if (url.pathname === '/auth/request-link' && request.method === 'POST') return await requestLoginLink(request, env, cors);
+      if (url.pathname === '/auth/verify' && request.method === 'GET') return await verifyLogin(request, env, cors);
+      if (url.pathname === '/auth/logout' && request.method === 'POST') return await logout(request, env, cors);
+      if (url.pathname === '/me' && request.method === 'GET') return await getMe(request, env, cors);
       if (url.pathname === '/checkout' && request.method === 'POST') return await createCheckout(request, env, cors);
       const order = url.pathname.match(/^\/orders\/([A-Za-z0-9_-]{22})(?:\/(generate|confirm|refund))?$/);
       if (order && !order[2] && request.method === 'GET') return await getOrder(env, cors, order[1]);
@@ -280,6 +302,148 @@ async function deleteClaim(request, env, cors, handle) {
   return reply({ ok: true }, 200, cors);
 }
 
+/* ---------------- signing in: no passwords, just a one-time link to an email ----------------
+   Nothing is stored until someone actually clicks the link that proves they own that inbox — the same trust anyone already places in
+   "forgot password" email on every other site. There is no password to steal in a breach and nothing to reuse from a leak elsewhere. */
+
+const SESSION_COOKIE = 's4u_session';
+const SESSION_TTL_S = 30 * 24 * 60 * 60;       // 30 days
+const LOGIN_TOKEN_TTL_S = 15 * 60;             // the link in the email is only good for 15 minutes
+const userKey = hash => `users/${hash}.json`;
+
+function isEmail(value) {
+  return typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function readCookie(request, name) {
+  const header = request.headers.get('Cookie');
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
+// The session cookie carries no Domain attribute, so the browser scopes it to whichever host actually answered — sent4u.link, since the
+// gateway proxies /auth/* and /me there (see gateway/index.js): a first-party cookie, not one shared cross-site with this Worker's own
+// *.workers.dev address. Visiting that address directly still works for API calls, just without a saved session.
+function setSessionCookie(headers, token) {
+  headers['Set-Cookie'] = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${SESSION_TTL_S}; SameSite=Lax; HttpOnly; Secure`;
+}
+function clearSessionCookie(headers) {
+  headers['Set-Cookie'] = `${SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure`;
+}
+
+async function sessionEmail(request, env) {
+  const token = readCookie(request, SESSION_COOKIE);
+  if (!token) return null;
+  const stored = await env.AUTH.get(`session:${token}`);
+  return stored ? JSON.parse(stored).email : null;
+}
+
+async function readUser(env, email) {
+  const hash = await sha256(email);
+  const stored = await env.BUCKET.get(userKey(hash));
+  return { hash, user: stored ? await stored.json() : { email, orders: [], createdAt: Date.now() } };
+}
+
+// Called once at checkout, while the order is still just "pending" — not worth a compare-and-swap loop here (worst case, two orders
+// started in the same instant both append fine since each write reads its own fresh copy moments apart; a lost update would just mean
+// one order takes a moment longer to show up under "my links", not lose any money or access).
+async function addOrderToUser(env, email, token) {
+  const { hash, user } = await readUser(env, email);
+  if (user.orders.includes(token)) return;
+  user.orders.push(token);
+  await env.BUCKET.put(userKey(hash), JSON.stringify(user), JSON_OBJECT);
+}
+
+// A handful of sign-in links per visitor per hour is plenty, and keeps this from being a way to mail-bomb someone else's inbox.
+async function loginLimit(env, ipHash) {
+  const key = `rla/${ipHash}.json`;
+  const now = Date.now(), hour = Math.floor(now / 3_600_000);
+  const stored = await env.BUCKET.get(key);
+  let s = stored ? await stored.json().catch(() => ({})) : {};
+  if (s.hour !== hour) s = { hour, n: 0, last: 0 };
+  if (now - (s.last || 0) < 5000) return true;
+  if (s.n >= 5) return true;
+  s.n += 1; s.last = now;
+  await env.BUCKET.put(key, JSON.stringify(s));
+  return false;
+}
+
+async function sendLoginEmail(env, email, link) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: env.EMAIL_FROM || 'sent4u <onboarding@resend.dev>',
+      to: [email],
+      subject: 'Your sent4u sign-in link',
+      text: `Sign in to sent4u:\n\n${link}\n\nThis link works once and expires in 15 minutes. If you didn't ask for this, just ignore it — nothing happens without clicking the link.`,
+      html: `<p>Sign in to sent4u:</p><p><a href="${link}">${link}</a></p><p>This link works once and expires in 15 minutes. If you didn't ask for this, just ignore it — nothing happens without clicking the link.</p>`,
+    }),
+  });
+  if (!res.ok) throw new Error(`resend ${res.status}: ${(await res.text()).slice(0, 500)}`);
+}
+
+async function requestLoginLink(request, env, cors) {
+  if (!originOk(request, env)) return reply({ error: 'Sign-in can only be started from the sent4u site.' }, 403, cors);
+  const { body, fail } = await readBody(request, cors, 300);
+  if (fail) return fail;
+  const email = clean(body.email, 254).toLowerCase();
+  // Always the same reply whether the email is well-formed, rate-limited, or the send itself fails — never lets a visitor probe
+  // whether a given address has an account (every address gets one automatically on first sign-in, so there's nothing to probe
+  // anyway, but keeping the response uniform costs nothing and is one less thing to reason about).
+  if (!isEmail(email)) return reply({ ok: true }, 200, cors);
+  if (!env.RESEND_API_KEY) return reply({ error: 'Sign-in isn’t switched on yet. Please check back soon.' }, 501, cors);
+
+  const ipHash = await sha256(`${env.IP_SALT || ''}|${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
+  if (await loginLimit(env, ipHash)) return reply({ ok: true }, 200, cors);
+
+  const token = randomToken();
+  await env.AUTH.put(`login:${token}`, JSON.stringify({ email }), { expirationTtl: LOGIN_TOKEN_TTL_S });
+  const origin = String(env.LINK_ORIGIN || 'https://sent4u.link').replace(/[/]+$/, '');
+  try {
+    await sendLoginEmail(env, email, `${origin}/auth/verify?token=${token}`);
+  } catch (err) {
+    console.error('sign-in email failed to send:', err);
+  }
+  return reply({ ok: true }, 200, cors);
+}
+
+async function verifyLogin(request, env, cors) {
+  const token = new URL(request.url).searchParams.get('token') || '';
+  const origin = String(env.LINK_ORIGIN || 'https://sent4u.link').replace(/[/]+$/, '');
+  const stored = token && (await env.AUTH.get(`login:${token}`));
+  if (!stored) return reply({ error: 'That sign-in link has expired or was already used. Please ask for a new one.' }, 400, cors);
+  await env.AUTH.delete(`login:${token}`);          // one-time use, whether or not the rest below succeeds
+  const { email } = JSON.parse(stored);
+
+  const session = randomToken();
+  await env.AUTH.put(`session:${session}`, JSON.stringify({ email }), { expirationTtl: SESSION_TTL_S });
+  const headers = { ...cors, Location: `${origin}/?signedin=1` };
+  setSessionCookie(headers, session);
+  return new Response(null, { status: 302, headers });
+}
+
+async function logout(request, env, cors) {
+  const token = readCookie(request, SESSION_COOKIE);
+  if (token) await env.AUTH.delete(`session:${token}`);
+  const headers = {};
+  clearSessionCookie(headers);
+  return reply({ ok: true }, 200, cors, headers);
+}
+
+async function getMe(request, env, cors) {
+  const email = await sessionEmail(request, env);
+  if (!email) return reply({ error: 'Not signed in.' }, 401, cors);
+  const { user } = await readUser(env, email);
+  const orders = (await Promise.all(user.orders.map(t => readOrder(env, t)))).filter(Boolean).map(({ order }) => publicOrder(order));
+  orders.sort((a, b) => (b.links[0]?.at || 0) - (a.links[0]?.at || 0));
+  return reply({ email, orders }, 200, cors, { 'Cache-Control': 'no-store' });
+}
+
 /* ---------------- orders: packs of links ----------------
    1 link is $1.99 and a pack of 8 is $9.99, sold as two one-time Prices in Paddle — a Merchant of Record, so Paddle is the legal seller and
    collects and remits VAT/GST worldwide; this Worker never has to. Checkout is Paddle's own hosted page: this Worker only creates the
@@ -345,9 +509,13 @@ async function createCheckout(request, env, cors) {
     return reply({ error: 'Checkout isn’t reachable right now. Please try again in a moment.' }, 502, cors);
   }
 
-  const order = { token, pack, credits: PACKS[pack].credits, amount: PACKS[pack].amount, status: 'pending', createdAt: Date.now(), links: [], ipHash, paddleTransactionId: paddle.id };
+  // Signed-in visitors get this order added to "My links" automatically — everyone else can still open it later from the checkout
+  // redirect or /?order=<token>, same as before sign-in existed. Not required to buy at all.
+  const email = await sessionEmail(request, env);
+  const order = { token, pack, credits: PACKS[pack].credits, amount: PACKS[pack].amount, status: 'pending', createdAt: Date.now(), links: [], ipHash, paddleTransactionId: paddle.id, userEmail: email || undefined };
   await env.BUCKET.put(orderKey(token), JSON.stringify(order), JSON_OBJECT);
   await env.BUCKET.put(txKey(paddle.id), JSON.stringify({ token }), JSON_OBJECT);   // lets a webhook that only carries the transaction id still find this order
+  if (email) await addOrderToUser(env, email, token);
   return reply({ ok: true, token, checkoutUrl: paddle.checkoutUrl }, 201, cors);
 }
 

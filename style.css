@@ -1545,3 +1545,15 @@ button.btn.btn-outline{ border:1px solid var(--border); }
   .od-link{ flex-wrap:wrap; }
   .od-url{ flex-basis:100%; order:3; }
 }
+
+.auth-trigger{ padding:9px 16px; border-radius:99px; border:1px solid var(--border); background:transparent; color:inherit; font:600 .86rem/1 var(--ff-body); cursor:pointer; transition:background-color .15s, border-color .15s; }
+.auth-trigger:hover{ background:rgba(255,255,255,.08); }
+.au-view{ display:flex; flex-direction:column; align-items:flex-start; width:100%; }
+.au-view[hidden]{ display:none; }
+.au-view h3{ outline:none; }
+.au-orders{ display:grid; grid-template-columns:minmax(0,1fr); gap:14px; width:100%; max-height:min(360px,44vh); margin:0 0 20px; padding:0; list-style:none; overflow:auto; overscroll-behavior:contain; }
+.au-order{ padding:12px; border-radius:16px; background:#fff; border:1px solid #e1e1ee; }
+.au-order-head{ display:flex; align-items:center; gap:8px; margin:0 0 10px; font:600 .9rem/1 var(--ff-body); color:#0b0b12; }
+.au-status{ padding:3px 9px; border-radius:99px; background:#e6e6f2; color:#4b4b5e; font:700 .66rem/1 var(--ff-body); letter-spacing:.05em; text-transform:uppercase; }
+.au-status.is-paid{ background:#dff3e3; color:#1c6b34; }
+.au-empty{ margin:0 0 20px; color:#7a7a90; font-size:.9rem; }

@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict';
 import worker from '../src/index.js';
 import { fakeBucket } from './fake-bucket.mjs';
+import { fakeKV } from './fake-kv.mjs';
 
 const ORIGIN = 'https://sent4u.link';
-const env = () => ({ BUCKET: fakeBucket(), ALLOWED_ORIGINS: `${ORIGIN},http://localhost:4173`, ADMIN_TOKEN: 'secret-token' });
+const env = () => ({ BUCKET: fakeBucket(), AUTH: fakeKV(), ALLOWED_ORIGINS: `${ORIGIN},http://localhost:4173`, ADMIN_TOKEN: 'secret-token' });
 const call = (e, path, { method = 'GET', body, ip = '1.1.1.1', origin = ORIGIN, headers = {} } = {}) =>
   worker.fetch(new Request(`https://reviews.test${path}`, {
     method,
@@ -463,6 +464,151 @@ await test('orders are limited per visitor', async () => {
   globalThis.fetch = fakePaddle().fetchFn;
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '5.5.5.5' })).status, 201);
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '5.5.5.5' })).status, 429);   // too soon after the last one
+});
+
+/* ---------------- signing in (magic link) ---------------- */
+
+// a stand-in for Resend's API — captures every email it was asked to send, never sends anything for real
+function fakeEmail() {
+  const sent = [];
+  const fetchFn = async (url, opts) => {
+    assert.equal(url, 'https://api.resend.com/emails');
+    sent.push(JSON.parse(opts.body));
+    return { ok: true, status: 200, json: async () => ({ id: 'email_test' }) };
+  };
+  return { sent, fetchFn };
+}
+const withEmail = env => ({ ...env, RESEND_API_KEY: 'resend_test', EMAIL_FROM: 'sent4u <hello@sent4u.link>' });
+const requestLink = (e, email, extra = {}) => call(e, '/auth/request-link', { method: 'POST', body: { email }, ...extra });
+// the email's text body always contains the exact link this test then "clicks"
+const linkFromEmail = sent => sent.at(-1).text.match(/https:\S+/)[0].replace(/^https:\/\/sent4u\.link/, '');
+function sessionCookieFrom(res) {
+  const header = res.headers.get('Set-Cookie') || '';
+  const match = header.match(/s4u_session=([^;]*)/);
+  return match ? match[1] : '';
+}
+const asSession = token => ({ headers: { Cookie: `s4u_session=${token}` } });
+
+await test('sign-in is refused until Resend is configured', async () => {
+  const res = await requestLink(env(), 'lena@example.com');
+  assert.equal(res.status, 501);
+});
+
+await test('a well-formed email gets a one-time link that signs the visitor in', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const res = await requestLink(e, 'Lena@Example.com  ');   // stray case/whitespace, like a real input field
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true });
+  assert.equal(mail.sent.length, 1);
+  assert.equal(mail.sent[0].to[0], 'lena@example.com');     // trimmed and lower-cased before it's used anywhere
+
+  const verify = await call(e, linkFromEmail(mail.sent), { headers: {} });
+  assert.equal(verify.status, 302);
+  assert.equal(verify.headers.get('Location'), 'https://sent4u.link/?signedin=1');
+  const session = sessionCookieFrom(verify);
+  assert.ok(session);
+
+  const me = await call(e, '/me', asSession(session));
+  assert.equal(me.status, 200);
+  assert.deepEqual(await me.json(), { email: 'lena@example.com', orders: [] });
+});
+
+await test('a malformed email is accepted the same way, but nothing is ever sent', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const res = await requestLink(e, 'not-an-email');
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true });
+  assert.equal(mail.sent.length, 0);
+});
+
+await test('a sign-in link works once, then is refused; an unknown token is refused the same way', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  await requestLink(e, 'lena@example.com');
+  const path = linkFromEmail(mail.sent);
+  assert.equal((await call(e, path, { headers: {} })).status, 302);
+  const reused = await call(e, path, { headers: {} });
+  assert.equal(reused.status, 400);
+  assert.match((await reused.json()).error, /expired or was already used/);
+  assert.equal((await call(e, '/auth/verify?token=never-issued', { headers: {} })).status, 400);
+});
+
+await test('an expired sign-in link is refused', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  await requestLink(e, 'lena@example.com');
+  const path = linkFromEmail(mail.sent);
+  const key = [...e.AUTH.store.keys()].find(k => k.startsWith('login:'));
+  e.AUTH.store.get(key).expiresAt = Date.now() - 1000;   // pretend the 15 minutes passed
+  assert.equal((await call(e, path, { headers: {} })).status, 400);
+});
+
+await test('sign-in requests are rate limited per visitor, without revealing that in the response', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const past = (n) => { // pretend the last request was long enough ago to clear the "give it a moment" cooldown
+    const key = [...e.BUCKET.store.keys()].find(k => k.startsWith('rla/'));
+    if (!key) return;
+    const s = JSON.parse(e.BUCKET.store.get(key)); s.last -= n; e.BUCKET.store.set(key, JSON.stringify(s));
+  };
+  for (let i = 0; i < 5; i++) {
+    past(6000);
+    const res = await requestLink(e, 'lena@example.com', { ip: '6.6.6.6' });
+    assert.equal(res.status, 200);
+  }
+  past(6000);
+  const limited = await requestLink(e, 'lena@example.com', { ip: '6.6.6.6' });
+  assert.equal(limited.status, 200);            // looks identical to a normal success…
+  assert.equal(mail.sent.length, 5);             // …but nothing was actually sent the 6th time
+});
+
+await test('logging out clears the session; /me then requires signing in again', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  await requestLink(e, 'lena@example.com');
+  const verify = await call(e, linkFromEmail(mail.sent), { headers: {} });
+  const session = sessionCookieFrom(verify);
+  assert.equal((await call(e, '/me', asSession(session))).status, 200);
+
+  const out = await call(e, '/auth/logout', { method: 'POST', headers: { Cookie: `s4u_session=${session}` } });
+  assert.equal(out.status, 200);
+  assert.match(out.headers.get('Set-Cookie') || '', /Max-Age=0/);
+  assert.equal((await call(e, '/me', asSession(session))).status, 401);
+});
+
+await test('/me requires a session', async () => {
+  assert.equal((await call(env(), '/me')).status, 401);
+});
+
+await test('checking out while signed in adds the order to My links; signed out, it does not', async () => {
+  const e = withEmail(shop());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  await requestLink(e, 'lena@example.com');
+  const verify = await call(e, linkFromEmail(mail.sent), { headers: {} });
+  const session = sessionCookieFrom(verify);
+
+  globalThis.fetch = fakePaddle().fetchFn;
+  const signedIn = await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ...asSession(session) });
+  assert.equal(signedIn.status, 201);
+  const { token: myToken } = await signedIn.json();
+
+  const guest = await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '7.7.7.7' });
+  assert.equal(guest.status, 201);
+  const { token: guestToken } = await guest.json();
+
+  const me = await call(e, '/me', asSession(session));
+  const orders = (await me.json()).orders;
+  assert.deepEqual(orders.map(o => o.token), [myToken]);
+  assert.ok(!orders.some(o => o.token === guestToken));
 });
 
 globalThis.fetch = realFetch;

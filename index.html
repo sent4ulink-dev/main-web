@@ -56,6 +56,7 @@
       <a href="#pricing">Pricing</a>
     </nav>
     <div class="header-actions">
+      <button type="button" class="auth-trigger" id="authTrigger" data-auth-open>Sign in</button>
       <a href="#pricing" class="btn btn-primary btn-magnetic" data-magnetic>
         <span class="btn-label" data-text="Get your link">Get your link</span>
       </a>
@@ -698,6 +699,47 @@
     <section class="od-view" data-view="error" hidden>
       <h3 tabindex="-1" id="odErrTitle">Something went wrong</h3>
       <p class="rvm-sub" id="odErrText"></p>
+      <button type="button" class="pill-btn rvm-submit" data-close>Close<span class="pill-arrow" aria-hidden="true">→</span></button>
+    </section>
+  </div>
+</div>
+
+<!-- Sign in: no password — an email gets a one-time link (see worker/'s /auth/* routes). Lets a
+     buyer see every order they've ever paid for, from any device, not just the most recent one
+     this browser remembers (that still works too, unchanged, via "My links" in the footer). -->
+<div class="rv-modal au-modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="auTitle" hidden>
+  <div class="rvm-backdrop" data-close></div>
+  <div class="rvm-panel au-panel" tabindex="-1" data-lenis-prevent>
+    <button type="button" class="rvm-close" data-close aria-label="Close">×</button>
+
+    <section class="au-view" data-view="signin" hidden>
+      <h3 id="auTitle" tabindex="-1">Sign in</h3>
+      <p class="rvm-sub">No password — we'll email you a one-time link.</p>
+      <form id="auForm">
+        <label class="rvm-field"><span>Email</span><input type="email" id="auEmail" required autocomplete="email" placeholder="you@example.com"></label>
+        <p class="rvm-error" id="auError" role="alert" hidden></p>
+        <button type="submit" class="pill-btn rvm-submit" id="auSubmit">Send me a link<span class="pill-arrow" aria-hidden="true">→</span></button>
+      </form>
+    </section>
+
+    <section class="au-view" data-view="sent" hidden>
+      <span class="rvm-tick" aria-hidden="true">✓</span>
+      <h3 tabindex="-1">Check your email</h3>
+      <p class="rvm-sub">We've sent a sign-in link to <b id="auSentTo"></b>. It works once and expires in 15 minutes.</p>
+      <button type="button" class="pill-btn od-ghost" data-close>Close<span class="pill-arrow" aria-hidden="true">→</span></button>
+    </section>
+
+    <section class="au-view" data-view="account" hidden>
+      <h3 tabindex="-1">My account</h3>
+      <p class="rvm-sub">Signed in as <b id="auMeEmail"></b></p>
+      <ul class="au-orders" id="auOrders"></ul>
+      <p class="au-empty" id="auEmpty" hidden>Nothing here yet — links you buy while signed in will show up automatically.</p>
+      <button type="button" class="pill-btn od-ghost" id="auSignOut">Sign out</button>
+    </section>
+
+    <section class="au-view" data-view="error" hidden>
+      <h3 tabindex="-1" id="auErrTitle">Something went wrong</h3>
+      <p class="rvm-sub" id="auErrText"></p>
       <button type="button" class="pill-btn rvm-submit" data-close>Close<span class="pill-arrow" aria-hidden="true">→</span></button>
     </section>
   </div>

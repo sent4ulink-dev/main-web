@@ -21,7 +21,15 @@
    choice in a short-lived cookie and uses it to keep routing that browser's follow-up
    asset requests to the same app — falling back to this site's own assets if the app
    doesn't have the file, so a stale cookie can never break normal marketing-site
-   browsing. */
+   browsing.
+
+   The orders Worker's own browser-facing routes (checkout, orders, sign-in) are also
+   proxied straight through, unconditionally — not because of ?share=, but so the
+   sign-in session cookie those set is a first-party sent4u.link cookie rather than one
+   shared cross-site with the orders Worker's own *.workers.dev address (which browsers
+   increasingly restrict or block outright). Reviews and claims don't need this — they
+   never read a cookie — so they're left on the direct cross-origin data-api call they
+   already use. */
 
 const DEMO_PRODUCTS = {
   'test-pixel': 'pixel',
@@ -31,10 +39,16 @@ const DEMO_PRODUCTS = {
 const PRODUCTS = ['pixel', 'pinky', 'winxp'];
 const COOKIE_NAME = 's4u_app';
 const COOKIE_MAX_AGE = 6 * 60 * 60; // 6 hours — long enough for one browsing session
+const API_PATHS = [/^\/auth\//, /^\/me$/, /^\/checkout$/, /^\/orders\//];
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (API_PATHS.some(re => re.test(url.pathname))) {
+      const ordersApiBase = (env.ORDERS_API_BASE ?? '').replace(/\/$/, '');
+      if (!ordersApiBase) return new Response('Not configured.', { status: 501 });
+      return proxy(ordersApiBase, request);
+    }
     if (url.pathname === '/') {
       const shareId = url.searchParams.get('share');
       const product = shareId ? await resolveProduct(shareId, env) : null;

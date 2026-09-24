@@ -2020,6 +2020,144 @@ function initOrders(){
   }
 }
 
+/* ---------------- Sign in: no password, a one-time emailed link (see worker/'s /auth/* routes) ----------------
+   Calls go to relative paths (/auth/*, /me) rather than a data-api address: the gateway (see gateway/) proxies
+   those to the orders Worker so the session cookie it sets is a first-party sent4u.link cookie, not one shared
+   cross-site with the Worker's own *.workers.dev address, which browsers increasingly restrict or block. Clicking
+   the link in the email is a normal page load, not something this script drives — it lands back here at
+   /?signedin=1 with the cookie already set. */
+function initAuth(){
+  const modal = document.getElementById('authModal');
+  if (!modal) return;
+  const $ = id => document.getElementById(id);
+  const trigger = $('authTrigger');
+  const panel = modal.querySelector('.rvm-panel');
+  const views = Object.fromEntries([...modal.querySelectorAll('[data-view]')].map(v => [v.dataset.view, v]));
+  const lockables = [$('mainContent'), $('siteHeader')].filter(Boolean);
+  const NAMES = { pixel: 'Pixel', pinky: 'Pinky', winxp: 'WinXP' };
+  const COLORS = { pixel: '#6d9b3a', pinky: '#ff2e7e', winxp: '#2a63d8' };
+  const PACKS = { single: '1 link', pack: '8 links' };
+  let me = null, lastFocus = null, closeTimer = 0;
+
+  function show(name){
+    Object.entries(views).forEach(([k, el]) => { el.hidden = k !== name; });
+    requestAnimationFrame(() => { const h = views[name].querySelector('h3'); if (h) h.focus({ preventScroll: true }); });
+    panel.scrollTop = 0;
+  }
+  function open(){
+    clearTimeout(closeTimer);
+    if (modal.hidden){
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      lockables.forEach(el => { el.inert = true; });
+      if (lenis) lenis.stop(); else document.documentElement.style.overflow = 'hidden';
+      requestAnimationFrame(() => modal.classList.add('is-open'));
+    }
+  }
+  function close(){
+    if (modal.hidden) return;
+    modal.classList.remove('is-open');
+    lockables.forEach(el => { el.inert = false; });
+    if (lenis) lenis.start(); else document.documentElement.style.overflow = '';
+    if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+    closeTimer = setTimeout(() => { modal.hidden = true; }, 380);
+  }
+  modal.addEventListener('click', e => { if (e.target.closest('[data-close]')) close(); });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) close(); });
+  const fail = (text, title = 'Something went wrong') => { $('auErrTitle').textContent = title; $('auErrText').textContent = text; open(); show('error'); };
+
+  async function request(path, opts = {}){
+    const res = await fetch(path, { credentials: 'same-origin', ...opts });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok){ const err = new Error(data.error || 'That didn’t work. Please try again.'); err.status = res.status; throw err; }
+    return data;
+  }
+
+  async function copyText(text, btn){
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.append(ta); ta.select(); try { document.execCommand('copy'); } catch {} ta.remove();
+    }
+    const was = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = was; }, 1600);
+  }
+
+  function renderAccount(){
+    $('auMeEmail').textContent = me.email;
+    const list = $('auOrders'); list.replaceChildren();
+    $('auEmpty').hidden = me.orders.length > 0;
+    me.orders.forEach(order => {
+      const li = document.createElement('li'); li.className = 'au-order';
+      const head = document.createElement('div'); head.className = 'au-order-head';
+      const pack = document.createElement('span'); pack.textContent = PACKS[order.pack] || order.pack;
+      const status = document.createElement('span'); status.className = `au-status${order.status === 'paid' ? ' is-paid' : ''}`; status.textContent = order.status;
+      head.append(pack, status);
+      const links = document.createElement('ul'); links.className = 'od-links';
+      [...order.links].sort((a, b) => b.at - a.at).forEach(l => {
+        const item = document.createElement('li'); item.className = 'od-link'; item.style.setProperty('--c', COLORS[l.product] || '#7c5cff');
+        const tag = document.createElement('span'); tag.className = 'od-tag'; tag.textContent = NAMES[l.product] || l.product;
+        const url = document.createElement('span'); url.className = 'od-url'; url.textContent = l.url.replace(/^https?:[/][/]/, ''); url.title = l.url;
+        const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'od-copy'; copy.textContent = 'Copy';
+        copy.addEventListener('click', () => copyText(l.url, copy));
+        const openLink = document.createElement('a'); openLink.className = 'od-open'; openLink.textContent = 'Open'; openLink.href = l.url; openLink.target = '_blank'; openLink.rel = 'noopener';
+        item.append(tag, url, copy, openLink);
+        links.append(item);
+      });
+      li.append(head, links);
+      list.append(li);
+    });
+    show('account');
+  }
+
+  function signedIn(data){
+    me = data;
+    trigger.textContent = me.email;
+    trigger.title = `Signed in as ${me.email}`;
+  }
+
+  trigger.addEventListener('click', () => {
+    open();
+    if (me){ renderAccount(); return; }
+    show('signin');
+    requestAnimationFrame(() => $('auEmail').focus());
+  });
+
+  $('auForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = $('auEmail').value.trim();
+    $('auSubmit').disabled = true; $('auError').hidden = true;
+    try {
+      await request('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      $('auSentTo').textContent = email;
+      show('sent');
+    } catch (err){
+      $('auError').textContent = err.message || 'That didn’t work. Please try again.'; $('auError').hidden = false;
+    } finally {
+      $('auSubmit').disabled = false;
+    }
+  });
+
+  $('auSignOut').addEventListener('click', async () => {
+    try { await request('/auth/logout', { method: 'POST' }); } catch {}
+    me = null;
+    trigger.textContent = 'Sign in';
+    trigger.removeAttribute('title');
+    close();
+  });
+
+  // Already signed in from an earlier visit? Quietly check once on load — no modal, just updates the header button.
+  request('/me').then(signedIn).catch(() => {});
+
+  // Just came back from clicking the emailed link: the session cookie is already set, so this /me call succeeds —
+  // open straight to the account view instead of making them click "Sign in" again.
+  if (new URLSearchParams(location.search).has('signedin')){
+    history.replaceState(null, '', location.pathname + location.hash);
+    open();   // no view shown yet — renderAccount()/fail() below picks one the moment /me resolves, which is almost immediate
+    request('/me').then(data => { signedIn(data); renderAccount(); })
+      .catch(() => fail('That sign-in link didn’t work. Please ask for a new one.', 'Sign-in failed'));
+  }
+}
+
 /* ---------------- Boot ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
   initTilt();
@@ -2039,6 +2177,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBridge();
   initPricing();
   initOrders();
+  initAuth();
   initFinale({ reduceMotion });
   initOffscreenPause();
   initPerfGuard();

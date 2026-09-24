@@ -78,6 +78,47 @@ curl -X POST https://sent4u-reviews.<your-name>.workers.dev/orders/<token>/confi
 curl -X POST https://sent4u-reviews.<your-name>.workers.dev/orders/<token>/refund  -H "Authorization: Bearer <ORDER_SECRET>"
 ```
 
+## Signing in: no passwords
+
+A visitor can create an account with just an email — no password to choose, store, or reset. They enter their email, get a one-time link, and
+clicking it signs them in. This is what lets someone see every order they've ever paid for (not just the most recent one their browser
+remembers via "My links", which still works exactly as before — signing in is additive, never required to buy).
+
+```
+POST /auth/request-link   { email }  ->  { ok: true }  (always this, whether the email is well-formed, rate-limited, or the send fails —
+                          never reveals which emails have signed in before)
+GET  /auth/verify         ?token=<from the email>  ->  302 redirect to /, with the session cookie set. This is the link in the email —
+                          meant to be opened directly, not fetched from a script
+POST /auth/logout         clears the session cookie
+GET  /me                  the signed-in visitor's own orders  ->  { email, orders: [...] }, or 401 if not signed in
+```
+
+The site's own `/auth/*` and `/me` calls go through the gateway (`sent4u.link/auth/...`, see `gateway/` at the repo root) rather than straight
+to this Worker's address — that's what makes the session cookie a first-party `sent4u.link` cookie instead of one shared cross-site with this
+Worker's own `*.workers.dev` address, which browsers increasingly restrict.
+
+### Setting up Resend (sends the sign-in email)
+
+1. Sign up at [resend.com](https://resend.com) — the free tier (3,000 emails/month) is plenty for this.
+2. **Dashboard → API Keys → Create API Key.** Set it: `npx wrangler secret put RESEND_API_KEY`.
+3. For real production sending, **Dashboard → Domains → Add Domain**, add `sent4u.link` (or whichever domain you send from), and add the DNS
+   records Resend shows you (SPF/DKIM — this proves to email providers that you're really allowed to send as that domain, so the email doesn't
+   land in spam). Then set `EMAIL_FROM = "sent4u <hello@sent4u.link>"` in `wrangler.toml` (or any verified address at that domain).
+4. Without a verified domain, sign-in emails still work using Resend's own `onboarding@resend.dev` sender (the default when `EMAIL_FROM` is
+   unset) — fine for testing, not recommended for production: it's a shared address, and deliverability to arbitrary recipients isn't
+   guaranteed the way a verified domain's is.
+
+### The KV namespace
+
+One-time login links (15-minute TTL) and sessions (30-day TTL) live in KV, not R2 — R2 has no built-in expiry, and these need to disappear on
+their own. Create it once:
+
+```bash
+npx wrangler kv namespace create sent4u-auth
+```
+
+then paste the id it prints into `wrangler.toml`'s `[[kv_namespaces]]` block.
+
 ## Set it up (about 10 minutes)
 
 You need a free Cloudflare account. From this `worker/` folder:
