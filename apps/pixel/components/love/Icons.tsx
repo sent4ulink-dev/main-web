@@ -33,8 +33,8 @@ export function StatusBar({
         <i className={connected ? '' : 'empty'} />
         <span>{connected ? 'CONNECTED' : networkLabel}</span>
       </div>
-      <span className="brand-logo" aria-label="sent4u">
-        sent4u
+      <span className="brand-logo">
+        <img className="brand-wordmark" src="/brand/wordmark-ink.webp" width={582} height={128} alt="sent4u" />
       </span>
       <div className="status-right">
         <button

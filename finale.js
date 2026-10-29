@@ -54,41 +54,16 @@ function initGlobe(sec, reduceMotion) {
   const claimed = new Set();
   const light = (() => { const v = [-0.42, 0.52, 0.74], n = Math.hypot(...v); return v.map(c => c / n); })();
 
-  // ---- the land, as points on a sphere, from the same outlines as the hero globe
+  // ---- the land, as points on a sphere, from the same outlines as the hero globe, baked by scripts/build-land-dots.mjs
+  // (a coarser grid on a phone): Int16 pairs of latitude and longitude in hundredths of a degree
   async function buildLand() {
-    const geo = await (await fetch('assets/data/ne_110m_land.geojson')).json();
-    const MW = 1440, MH = 720;
-    const mask = document.createElement('canvas');
-    mask.width = MW; mask.height = MH;
-    const m = mask.getContext('2d', { willReadFrequently: true });
-    m.fillStyle = '#fff';
-    m.beginPath();
-    for (const f of geo.features) {
-      const g = f.geometry;
-      const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates];
-      for (const poly of polys) for (const ring of poly) {
-        ring.forEach(([lon, lat], i) => {
-          const x = (lon + 180) / 360 * MW, y = (90 - lat) / 180 * MH;
-          if (i) m.lineTo(x, y); else m.moveTo(x, y);
-        });
-        m.closePath();
-      }
+    const ll = new Int16Array(await (await fetch(phone ? 'assets/data/land-cta-phone.bin' : 'assets/data/land-cta.bin')).arrayBuffer());
+    const n = ll.length / 2;
+    PX = new Float32Array(n); PY = new Float32Array(n); PZ = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const lat = ll[2 * i] / 100 * DEG, lon = ll[2 * i + 1] / 100 * DEG, c = Math.cos(lat);
+      PX[i] = c * Math.sin(lon); PY[i] = Math.sin(lat); PZ[i] = c * Math.cos(lon);
     }
-    m.fill('evenodd');
-    const data = m.getImageData(0, 0, MW, MH).data;
-    const isLand = (lat, lon) => {
-      const x = clamp(Math.floor((lon + 180) / 360 * MW), 0, MW - 1), y = clamp(Math.floor((90 - lat) / 180 * MH), 0, MH - 1);
-      return data[(y * MW + x) * 4] > 128;
-    };
-    const xs = [], ys = [], zs = [], STEP = phone ? 2 : 1.25;
-    for (let lat = -84; lat <= 84; lat += STEP) {
-      const c = Math.cos(lat * DEG), lonStep = STEP / Math.max(c, 0.05);
-      for (let lon = -180; lon < 180; lon += lonStep) {
-        if (!isLand(lat, lon)) continue;
-        xs.push(c * Math.sin(lon * DEG)); ys.push(Math.sin(lat * DEG)); zs.push(c * Math.cos(lon * DEG));
-      }
-    }
-    PX = Float32Array.from(xs); PY = Float32Array.from(ys); PZ = Float32Array.from(zs);
     ready = true;
   }
 

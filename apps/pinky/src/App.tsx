@@ -258,9 +258,13 @@ export default function App() {
           controls flanking it (so it never competes with the Yes/No layout underneath). */}
       {!session.isEditing && (
         <div className="fixed top-3 inset-x-0 z-[90] flex justify-center pointer-events-none px-20 sm:px-24">
-          <span className="text-white/90 font-semibold tracking-tight text-lg sm:text-xl drop-shadow-[0_0_8px_rgba(255,255,255,0.35)]">
-            sent4u
-          </span>
+          <img
+            src="/brand/wordmark.webp"
+            width={582}
+            height={128}
+            alt="sent4u"
+            className="h-5 sm:h-6 w-auto drop-shadow-[0_0_8px_rgba(255,255,255,0.35)]"
+          />
         </div>
       )}
 

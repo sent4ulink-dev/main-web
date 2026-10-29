@@ -198,7 +198,7 @@ await test('claims: only the owner can free a name', async () => {
 
 /* ---------------- orders (Paddle) ---------------- */
 
-// a stand-in for Paddle's Transactions API (POST https://paddle.test/transactions), used in place of the real `fetch` for every test below
+// a stand-in for Paddle's Transactions and Adjustments APIs (POST https://paddle.test/transactions, /adjustments), used in place of the real `fetch` for every test below
 function fakePaddle() {
   const calls = [];
   let n = 0, broken = false;
@@ -206,6 +206,11 @@ function fakePaddle() {
     const body = JSON.parse(opts.body);
     calls.push({ url, body });
     if (broken) return { ok: false, status: 400, json: async () => ({ error: { detail: 'nope' } }) };
+    if (String(url).endsWith('/adjustments')) {                  // Paddle's Adjustments API: a refund, waiting for Paddle's approval
+      const id = `adj_${++n}`;
+      calls.at(-1).id = id;
+      return { ok: true, status: 201, json: async () => ({ data: { id, status: 'pending_approval', action: body.action, transaction_id: body.transaction_id } }) };
+    }
     const id = `txn_${++n}`;
     calls.at(-1).id = id;
     return { ok: true, status: 201, json: async () => ({ data: { id, checkout: { url: `https://pay.test/checkout?_ptxn=${id}` } } }) };
@@ -260,7 +265,7 @@ await test('checkout is refused until Paddle is configured, and only accepts the
 
 // regression: PACKS[pack] used to be a plain {} lookup, so pack="__proto__" (or "constructor", "toString", …) resolved to an
 // inherited Object.prototype value instead of failing — credits/amount silently became undefined, which turned the "never more
-// than you paid for" check in generateLinks into `want > NaN`, always false. A single real $9.99 payment would then generate
+// than you paid for" check in generateLinks into `want > NaN`, always false. A single real $14.99 payment would then generate
 // unlimited links forever. PACKS is now a null-prototype object so these names simply aren't there.
 await test('a pack name that shadows Object.prototype cannot buy unlimited links', async () => {
   const e = shop();
@@ -283,7 +288,7 @@ await test('checkout asks Paddle for the right price and custom data, and hands 
   assert.equal(paddle.calls[0].body.custom_data.orderToken, out.token);
   assert.equal(out.checkoutUrl, `https://pay.test/checkout?_ptxn=${paddle.calls[0].id}`);
   const order = await (await call(e, `/orders/${out.token}`)).json();
-  assert.deepEqual([order.status, order.credits, order.remaining, order.amount, order.links.length], ['pending', 1, 1, 199, 0]);
+  assert.deepEqual([order.status, order.credits, order.remaining, order.amount, order.links.length], ['pending', 1, 1, 399, 0]);
   assert.ok(!('ipHash' in order));
 });
 
@@ -403,6 +408,20 @@ await test('a pack of 8 can be split as the buyer likes: 3 Pixel, 2 Pinky, 3 Win
   assert.equal((await generate(e, token, { pixel: 1 })).status, 422);              // nothing left
 });
 
+await test('every style can be chosen: the birthday cards, Petal Isle and Halloween as well', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  const res = await generate(e, token, { halloween: 1, picnic: 2, salon: 2, mission: 1, spooky: 1, petal: 1 });
+  assert.equal(res.status, 200);
+  const order = await res.json();
+  assert.deepEqual(order.links.map(l => l.product), ['petal', 'picnic', 'picnic', 'salon', 'salon', 'mission', 'halloween', 'spooky']);
+  for (const l of order.links) {
+    const found = await call(e, `/links/${l.id}`);
+    assert.deepEqual(await found.json(), { ok: true, product: l.product });
+  }
+});
+
 await test('it can be spread over several visits, and never past what was paid for', async () => {
   const e = shop(), paddle = fakePaddle();
   globalThis.fetch = paddle.fetchFn;
@@ -466,7 +485,140 @@ await test('orders are limited per visitor', async () => {
   assert.equal((await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ip: '5.5.5.5' })).status, 429);   // too soon after the last one
 });
 
-/* ---------------- signing in (magic link) ---------------- */
+/* ---------------- refunds the buyer asks for (10 minutes), and Paddle's refund webhooks ---------------- */
+
+const adjustmentPayload = (type, data) => JSON.stringify({ event_type: type, data });
+const sendAdjustment = async (e, type, data) => {
+  const raw = adjustmentPayload(type, data);
+  const res = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
+  assert.equal(res.status, 200);
+};
+const askRefund = (e, token, extra = {}) => call(e, `/orders/${token}/refund-request`, { method: 'POST', ...extra });
+const stored = (e, token) => JSON.parse(e.BUCKET.store.get(`orders/${token}.json`));
+const linkRevoked = (e, id) => JSON.parse(e.BUCKET.store.get(`links/${id}.json`)).revoked === true;
+const age = (e, token, ms) => { const o = stored(e, token); o.paidAt -= ms; e.BUCKET.store.set(`orders/${token}.json`, JSON.stringify(o)); };
+
+await test('a paid order says until when it can be refunded', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  const order = await (await call(e, `/orders/${token}`)).json();
+  assert.equal(order.refundableUntil, order.paidAt + 10 * 60 * 1000);
+  const { token: pending } = await startOrder(e, 'single', '8.8.8.8');
+  assert.equal((await (await call(e, `/orders/${pending}`)).json()).refundableUntil, null);
+});
+
+await test('within 10 minutes and before any link is made: Paddle is asked for a full refund', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  age(e, token, 9 * 60 * 1000);                                // nine minutes after paying
+  const res = await askRefund(e, token);
+  assert.equal(res.status, 200);
+  const out = await res.json();
+  assert.equal(out.status, 'refunding');
+  assert.equal(out.refundableUntil, null);
+  const call0 = paddle.calls.at(-1);
+  assert.equal(call0.url, 'https://paddle.test/adjustments');
+  assert.deepEqual([call0.body.action, call0.body.type, call0.body.transaction_id], ['refund', 'full', stored(e, token).paddleTransactionId]);
+  assert.equal(stored(e, token).refundAdjustmentId, call0.id);
+  assert.equal((await generate(e, token, { pixel: 1 })).status, 402);   // nothing can be made from it any more
+  assert.equal((await askRefund(e, token)).status, 409);       // only once
+
+  // Paddle approves it: refunded for good
+  await sendAdjustment(e, 'adjustment.updated', { id: call0.id, action: 'refund', type: 'full', status: 'approved', transaction_id: call0.body.transaction_id });
+  assert.equal(stored(e, token).status, 'refunded');
+});
+
+await test('once a link has been made, the order can no longer be refunded (it could already have been sent and seen)', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  const { links, refundableUntil } = await (await generate(e, token, { pixel: 1 })).json();
+  assert.equal(refundableUntil, null);
+  const before = paddle.calls.length;
+  const res = await askRefund(e, token);
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /already been made/);
+  assert.equal(paddle.calls.length, before);                   // Paddle was never asked
+  assert.equal(stored(e, token).status, 'paid');
+  assert.ok(!linkRevoked(e, links[0].id));
+});
+
+await test('after 10 minutes the refund is refused and nothing changes', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  age(e, token, 10 * 60 * 1000 + 1000);
+  const before = paddle.calls.length;
+  const res = await askRefund(e, token);
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /10 minutes/);
+  assert.equal(paddle.calls.length, before);
+  assert.equal(stored(e, token).status, 'paid');
+});
+
+await test('an unpaid, unknown or foreign-site request is refused', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const { token } = await startOrder(e);
+  assert.equal((await askRefund(e, token)).status, 409);
+  assert.equal((await askRefund(e, 'AAAAAAAAAAAAAAAAAAAAAA')).status, 404);
+  const paid = await paidOrder(e, paddle.calls, 'pack', '8.8.4.4');
+  assert.equal((await askRefund(e, paid, { origin: 'https://evil.example' })).status, 403);
+  assert.equal(stored(e, paid).status, 'paid');
+});
+
+await test('if Paddle can’t take the refund, the buyer keeps the order and can still use it', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  paddle.break();
+  const res = await askRefund(e, token);
+  assert.equal(res.status, 502);
+  assert.equal(stored(e, token).status, 'paid');
+  assert.equal((await generate(e, token, { picnic: 1 })).status, 200);
+});
+
+await test('if Paddle rejects the refund, the order comes back', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  await askRefund(e, token);
+  const adj = paddle.calls.at(-1);
+  await sendAdjustment(e, 'adjustment.updated', { id: adj.id, action: 'refund', type: 'full', status: 'rejected', transaction_id: adj.body.transaction_id });
+  assert.equal(stored(e, token).status, 'paid');
+  assert.equal((await generate(e, token, { mission: 1 })).status, 200);
+});
+
+await test('a full refund or chargeback made in the Paddle dashboard stops the links too; a partial refund does not', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const token = await paidOrder(e, paddle.calls);
+  const { links } = await (await generate(e, token, { halloween: 1 })).json();
+  const txn = stored(e, token).paddleTransactionId;
+  await sendAdjustment(e, 'adjustment.created', { id: 'adj_p', action: 'refund', type: 'partial', status: 'approved', transaction_id: txn });
+  assert.equal(stored(e, token).status, 'paid');
+  await sendAdjustment(e, 'adjustment.created', { id: 'adj_x', action: 'refund', type: 'full', status: 'pending_approval', transaction_id: txn });
+  assert.equal(stored(e, token).status, 'paid');               // nothing until Paddle approves it
+  await sendAdjustment(e, 'adjustment.updated', { id: 'adj_x', action: 'refund', type: 'full', status: 'approved', transaction_id: txn });
+  assert.equal(stored(e, token).status, 'refunded');
+  assert.ok(linkRevoked(e, links[0].id));
+
+  const other = await paidOrder(e, paddle.calls, 'single', '8.8.8.1');
+  const { links: more } = await (await generate(e, other, { petal: 1 })).json();
+  await sendAdjustment(e, 'adjustment.created', { id: 'adj_cb', action: 'chargeback', type: 'full', status: 'approved', transaction_id: stored(e, other).paddleTransactionId });
+  assert.equal(stored(e, other).status, 'refunded');
+  assert.ok(linkRevoked(e, more[0].id));
+});
+
+await test('an adjustment for a transaction that isn’t ours is acknowledged and ignored', async () => {
+  const e = shop();
+  globalThis.fetch = fakePaddle().fetchFn;
+  await sendAdjustment(e, 'adjustment.created', { id: 'adj_z', action: 'refund', type: 'full', status: 'approved', transaction_id: 'txn_somebody_else' });
+});
+
+/* ---------------- signing in (an emailed link to confirm it's you) ---------------- */
 
 // a stand-in for Resend's API — captures every email it was asked to send, never sends anything for real
 function fakeEmail() {
@@ -482,71 +634,183 @@ const withEmail = env => ({ ...env, RESEND_API_KEY: 'resend_test', EMAIL_FROM: '
 const requestLink = (e, email, extra = {}) => call(e, '/auth/request-link', { method: 'POST', body: { email }, ...extra });
 // the email's text body always contains the exact link this test then "clicks"
 const linkFromEmail = sent => sent.at(-1).text.match(/https:\S+/)[0].replace(/^https:\/\/sent4u\.link/, '');
-function sessionCookieFrom(res) {
-  const header = res.headers.get('Set-Cookie') || '';
-  const match = header.match(/s4u_session=([^;]*)/);
-  return match ? match[1] : '';
-}
+const tokenFromEmail = sent => new URL(`https://x${linkFromEmail(sent)}`).searchParams.get('token');
+const cookieFrom = (res, name) => {
+  const all = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [res.headers.get('Set-Cookie') || ''];
+  for (const c of all) { const m = c.match(new RegExp(`${name}=([^;]*)`)); if (m) return m[1]; }
+  return '';
+};
+const sessionCookieFrom = res => cookieFrom(res, 's4u_session');
 const asSession = token => ({ headers: { Cookie: `s4u_session=${token}` } });
+// pressing a button on the confirmation page: a normal form post from sent4u.link
+const confirmForm = (e, token, { choice, cookie } = {}) => worker.fetch(new Request('https://reviews.test/auth/confirm', {
+  method: 'POST',
+  headers: { Origin: ORIGIN, 'Content-Type': 'application/x-www-form-urlencoded', ...(cookie ? { Cookie: cookie } : {}) },
+  body: new URLSearchParams({ token, ...(choice !== undefined ? { choice } : {}) }).toString(),
+}), e);
+// asking for a link the way the site does: the reply carries the number to show and the waiting cookie
+async function startSignIn(e, email = 'lena@example.com', extra = {}) {
+  const res = await requestLink(e, email, extra);
+  return { res, body: await res.json(), pending: cookieFrom(res, 's4u_signin') };
+}
+// the whole thing in the browser that asked: open the link, press "Yes, sign me in"
+async function signInHere(e, mail, email = 'lena@example.com') {
+  const { pending } = await startSignIn(e, email);
+  const res = await confirmForm(e, tokenFromEmail(mail.sent), { cookie: `s4u_signin=${pending}` });
+  assert.equal(res.status, 303);
+  return sessionCookieFrom(res);
+}
 
 await test('sign-in is refused until Resend is configured', async () => {
   const res = await requestLink(env(), 'lena@example.com');
   assert.equal(res.status, 501);
 });
 
-await test('a well-formed email gets a one-time link that signs the visitor in', async () => {
+await test('asking for a link emails a confirmation link and gives the browser a number and a waiting cookie', async () => {
   const e = withEmail(env());
   const mail = fakeEmail();
   globalThis.fetch = mail.fetchFn;
-  const res = await requestLink(e, 'Lena@Example.com  ');   // stray case/whitespace, like a real input field
+  const { res, body, pending } = await startSignIn(e, 'Lena@Example.com  ');   // stray case/whitespace, like a real input field
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true });
+  assert.equal(body.ok, true);
+  assert.match(body.code, /^\d{2}$/);
+  assert.ok(pending);
   assert.equal(mail.sent.length, 1);
   assert.equal(mail.sent[0].to[0], 'lena@example.com');     // trimmed and lower-cased before it's used anywhere
-
-  const verify = await call(e, linkFromEmail(mail.sent), { headers: {} });
-  assert.equal(verify.status, 302);
-  assert.equal(verify.headers.get('Location'), 'https://sent4u.link/?signedin=1');
-  const session = sessionCookieFrom(verify);
-  assert.ok(session);
-
-  const me = await call(e, '/me', asSession(session));
-  assert.equal(me.status, 200);
-  assert.deepEqual(await me.json(), { email: 'lena@example.com', orders: [] });
+  assert.match(linkFromEmail(mail.sent), /^\/auth\/confirm\?token=/);
 });
 
-await test('a malformed email is accepted the same way, but nothing is ever sent', async () => {
+await test('opening the link only shows a page: a mail scanner that opens it first cannot use it up', async () => {
   const e = withEmail(env());
   const mail = fakeEmail();
   globalThis.fetch = mail.fetchFn;
-  const res = await requestLink(e, 'not-an-email');
+  const { pending } = await startSignIn(e);
+  const path = linkFromEmail(mail.sent);
+  for (let i = 0; i < 3; i++) {                                // a scanner, a preview, the person themselves
+    const pageRes = await call(e, path, { headers: {} });
+    assert.equal(pageRes.status, 200);
+    assert.match(pageRes.headers.get('Content-Type'), /text\/html/);
+    assert.ok(!sessionCookieFrom(pageRes));
+  }
+  const html = await (await call(e, path, { headers: { Cookie: `s4u_signin=${pending}` } })).text();
+  assert.match(html, /Yes, sign me in/);
+  assert.match(html, /le\*+@example\.com/);                    // the address, masked
+  assert.ok(!html.includes('lena@example.com'));
+});
+
+await test('confirming in the browser that asked signs it in, and its waiting tab sees that', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const { pending } = await startSignIn(e);
+  const res = await confirmForm(e, tokenFromEmail(mail.sent), { cookie: `s4u_signin=${pending}` });
+  assert.equal(res.status, 303);
+  assert.equal(res.headers.get('Location'), 'https://sent4u.link/?signedin=1');
+  const session = sessionCookieFrom(res);
+  assert.ok(session);
+  const me = await call(e, '/me', asSession(session));
+  assert.deepEqual(await me.json(), { email: 'lena@example.com', orders: [] });
+  // the same browser's waiting tab: it now has the session cookie, so its next check says yes
+  const status = await call(e, '/auth/status', { headers: { Cookie: `s4u_session=${session}; s4u_signin=${pending}` } });
+  assert.equal((await status.json()).signedIn, true);
+});
+
+await test('confirming on another device: the right number signs the waiting browser in', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const { body, pending } = await startSignIn(e);
+  const waiting = { headers: { Cookie: `s4u_signin=${pending}` } };
+  assert.deepEqual(await (await call(e, '/auth/status', waiting)).json(), { signedIn: false, waiting: true });
+
+  const html = await (await call(e, linkFromEmail(mail.sent), { headers: {} })).text();   // the phone: no waiting cookie
+  const offered = [...html.matchAll(/name="choice" value="(\d{2})"/g)].map(m => m[1]);
+  assert.equal(offered.length, 3);
+  assert.ok(offered.includes(body.code));
+
+  const ok = await confirmForm(e, tokenFromEmail(mail.sent), { choice: body.code });
+  assert.equal(ok.status, 200);
+  assert.ok(!sessionCookieFrom(ok));                           // the phone itself isn't signed in by this
+  const status = await call(e, '/auth/status', waiting);
+  assert.equal((await status.json()).signedIn, true);
+  const session = sessionCookieFrom(status);
+  assert.equal((await call(e, '/me', asSession(session))).status, 200);
+  assert.equal((await (await call(e, '/auth/status', waiting)).json()).expired, true);   // used up
+});
+
+await test('a wrong number cancels the request, so tapping a link someone else asked for signs nobody in', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const { body, pending } = await startSignIn(e);
+  const wrong = body.code === '10' ? '11' : '10';
+  const res = await confirmForm(e, tokenFromEmail(mail.sent), { choice: wrong });
+  assert.match(await res.text(), /didn’t match/);
+  const status = await (await call(e, '/auth/status', { headers: { Cookie: `s4u_signin=${pending}` } })).json();
+  assert.deepEqual(status, { signedIn: false, expired: true });
+  assert.equal((await confirmForm(e, tokenFromEmail(mail.sent), { choice: body.code })).status, 410);   // the link is used up too
+});
+
+await test('"sign in on this device" from another device signs that device in, and nothing else', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const { pending } = await startSignIn(e);
+  const res = await confirmForm(e, tokenFromEmail(mail.sent));
+  assert.equal(res.status, 303);
+  assert.ok(sessionCookieFrom(res));
+  assert.equal((await (await call(e, '/auth/status', { headers: { Cookie: `s4u_signin=${pending}` } })).json()).signedIn, false);
+});
+
+await test('a malformed email gets the same reply, but nothing is ever sent', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const { res, body } = await startSignIn(e, 'not-an-email');
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true });
+  assert.equal(body.ok, true);
+  assert.match(body.code, /^\d{2}$/);
   assert.equal(mail.sent.length, 0);
 });
 
-await test('a sign-in link works once, then is refused; an unknown token is refused the same way', async () => {
+await test('a link signs in once, then is refused; an unknown or expired one is refused the same way', async () => {
   const e = withEmail(env());
   const mail = fakeEmail();
   globalThis.fetch = mail.fetchFn;
-  await requestLink(e, 'lena@example.com');
-  const path = linkFromEmail(mail.sent);
-  assert.equal((await call(e, path, { headers: {} })).status, 302);
-  const reused = await call(e, path, { headers: {} });
-  assert.equal(reused.status, 400);
-  assert.match((await reused.json()).error, /expired or was already used/);
-  assert.equal((await call(e, '/auth/verify?token=never-issued', { headers: {} })).status, 400);
+  await startSignIn(e);
+  const token = tokenFromEmail(mail.sent);
+  assert.equal((await confirmForm(e, token)).status, 303);
+  assert.equal((await confirmForm(e, token)).status, 410);
+  assert.equal((await call(e, linkFromEmail(mail.sent), { headers: {} })).status, 410);
+  assert.equal((await confirmForm(e, 'AAAAAAAAAAAAAAAAAAAAAA')).status, 410);
+
+  await startSignIn(e, 'lena@example.com', { ip: '4.4.4.4' });
+  const key = [...e.AUTH.store.keys()].find(k => k.startsWith('login:'));
+  e.AUTH.store.get(key).expiresAt = Date.now() - 1000;          // pretend the 15 minutes passed
+  assert.equal((await confirmForm(e, tokenFromEmail(mail.sent))).status, 410);
 });
 
-await test('an expired sign-in link is refused', async () => {
+await test('the confirmation must come from the sent4u site', async () => {
   const e = withEmail(env());
   const mail = fakeEmail();
   globalThis.fetch = mail.fetchFn;
-  await requestLink(e, 'lena@example.com');
-  const path = linkFromEmail(mail.sent);
-  const key = [...e.AUTH.store.keys()].find(k => k.startsWith('login:'));
-  e.AUTH.store.get(key).expiresAt = Date.now() - 1000;   // pretend the 15 minutes passed
-  assert.equal((await call(e, path, { headers: {} })).status, 400);
+  await startSignIn(e);
+  const res = await worker.fetch(new Request('https://reviews.test/auth/confirm', {
+    method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token: tokenFromEmail(mail.sent) }).toString(),
+  }), e);
+  assert.equal(res.status, 403);
+  assert.equal((await confirmForm(e, tokenFromEmail(mail.sent))).status, 303);   // still usable from the real page
+});
+
+await test('the old /auth/verify links show the confirmation page instead of signing straight in', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  await startSignIn(e);
+  const res = await call(e, `/auth/verify?token=${tokenFromEmail(mail.sent)}`, { headers: {} });
+  assert.equal(res.status, 200);
+  assert.ok(!sessionCookieFrom(res));
 });
 
 await test('sign-in requests are rate limited per visitor, without revealing that in the response', async () => {
@@ -566,16 +830,33 @@ await test('sign-in requests are rate limited per visitor, without revealing tha
   past(6000);
   const limited = await requestLink(e, 'lena@example.com', { ip: '6.6.6.6' });
   assert.equal(limited.status, 200);            // looks identical to a normal success…
+  assert.match((await limited.json()).code, /^\d{2}$/);
   assert.equal(mail.sent.length, 5);             // …but nothing was actually sent the 6th time
+});
+
+await test('a session lasts 90 days and is renewed while it is used, so a browser stays signed in', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  const session = await signInHere(e, mail);
+  const first = await call(e, '/me', asSession(session));
+  assert.equal(first.status, 200);
+  assert.ok(!sessionCookieFrom(first));                        // renewed at most once a week
+  const record = e.AUTH.store.get(`session:${session}`);
+  assert.ok(record.expiresAt - Date.now() > 89 * 24 * 3600 * 1000);
+  const stored = JSON.parse(record.value); stored.renewedAt -= 8 * 24 * 3600 * 1000;   // a visit eight days later
+  record.value = JSON.stringify(stored); record.expiresAt -= 8 * 24 * 3600 * 1000;
+  const later = await call(e, '/me', asSession(session));
+  assert.equal(later.status, 200);
+  assert.equal(sessionCookieFrom(later), session);
+  assert.ok(e.AUTH.store.get(`session:${session}`).expiresAt - Date.now() > 89 * 24 * 3600 * 1000);
 });
 
 await test('logging out clears the session; /me then requires signing in again', async () => {
   const e = withEmail(env());
   const mail = fakeEmail();
   globalThis.fetch = mail.fetchFn;
-  await requestLink(e, 'lena@example.com');
-  const verify = await call(e, linkFromEmail(mail.sent), { headers: {} });
-  const session = sessionCookieFrom(verify);
+  const session = await signInHere(e, mail);
   assert.equal((await call(e, '/me', asSession(session))).status, 200);
 
   const out = await call(e, '/auth/logout', { method: 'POST', headers: { Cookie: `s4u_session=${session}` } });
@@ -592,9 +873,7 @@ await test('checking out while signed in adds the order to My links; signed out,
   const e = withEmail(shop());
   const mail = fakeEmail();
   globalThis.fetch = mail.fetchFn;
-  await requestLink(e, 'lena@example.com');
-  const verify = await call(e, linkFromEmail(mail.sent), { headers: {} });
-  const session = sessionCookieFrom(verify);
+  const session = await signInHere(e, mail);
 
   globalThis.fetch = fakePaddle().fetchFn;
   const signedIn = await call(e, '/checkout', { method: 'POST', body: { pack: 'single' }, ...asSession(session) });

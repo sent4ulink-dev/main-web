@@ -16,13 +16,10 @@ import {
   Clock,
   X,
   Plus,
-  Wand2,
-  Loader2,
   Image as ImageIcon
 } from 'lucide-react';
 import { RestaurantOption } from '../../types';
 import { EditableText } from '../edit/EditableText';
-import { fetchPlaceDetails } from '../../utils/mapsFetch';
 
 interface RestaurantSectionProps {
   restaurants: RestaurantOption[];
@@ -34,11 +31,7 @@ interface RestaurantSectionProps {
    * own normally) get a small inline field each, cards can be removed, and the "custom
    * restaurant" box below becomes an "add restaurant" box. */
   editing?: boolean;
-  onAddRestaurant?: (
-    name: string,
-    mapsLink: string,
-    extra?: Partial<Pick<RestaurantOption, 'imageUrl' | 'rating' | 'reviewCount' | 'hours'>>
-  ) => void;
+  onAddRestaurant?: (name: string, mapsLink: string) => void;
   onUpdateRestaurant?: (id: string, patch: Partial<Omit<RestaurantOption, 'id'>>) => void;
   onRemoveRestaurant?: (id: string) => void;
 }
@@ -62,13 +55,10 @@ export function RestaurantSection({
   );
   const [isClosing, setIsClosing] = useState<boolean>(false);
 
-  // Owner edit mode only — mirrors RestaurantOptionsEditor's "fetch from Maps" (rating,
-  // review count, hours, photo) so that convenience isn't lost by inlining editing here.
-  const [fetchingId, setFetchingId] = useState<string | null>(null);
-  const [fetchError, setFetchError] = useState<{ id: string; message: string } | null>(null);
+  // Owner edit mode only: the "add restaurant" box. The owner types every detail (rating, reviews,
+  // hours, photo URL) into the card itself; nothing is looked up from Google.
   const [newName, setNewName] = useState('');
   const [newMapsLink, setNewMapsLink] = useState('');
-  const [newExtra, setNewExtra] = useState<Partial<RestaurantOption>>({});
 
   function looksLikeUrl(value: string): boolean {
     if (!value.trim()) return false;
@@ -80,33 +70,11 @@ export function RestaurantSection({
     }
   }
 
-  const runFetch = async (
-    id: string,
-    mapsLink: string,
-    apply: (details: Awaited<ReturnType<typeof fetchPlaceDetails>>) => void
-  ) => {
-    if (!looksLikeUrl(mapsLink)) {
-      setFetchError({ id, message: 'Paste a Maps link first' });
-      return;
-    }
-    setFetchError(null);
-    setFetchingId(id);
-    try {
-      const details = await fetchPlaceDetails(mapsLink);
-      apply(details);
-    } catch (err) {
-      setFetchError({ id, message: err instanceof Error ? err.message : 'Fetch failed' });
-    } finally {
-      setFetchingId(null);
-    }
-  };
-
   const handleConfirmAddRestaurant = () => {
     if (!newName.trim() || !looksLikeUrl(newMapsLink)) return;
-    onAddRestaurant?.(newName.trim(), newMapsLink.trim(), newExtra);
+    onAddRestaurant?.(newName.trim(), newMapsLink.trim());
     setNewName('');
     setNewMapsLink('');
-    setNewExtra({});
   };
 
   const handleSelect = (name: string) => {
@@ -327,28 +295,6 @@ export function RestaurantSection({
                       placeholder="Google Maps link"
                       className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-black/40 border border-white/15 text-white text-[11px] placeholder:text-white/40 focus:outline-none focus:border-[#FF2E7E]"
                     />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        runFetch(rest.id, rest.mapsLink, (details) =>
-                          onUpdateRestaurant?.(rest.id, {
-                            ...(details.rating && { rating: details.rating }),
-                            ...(details.reviewCount && { reviewCount: details.reviewCount }),
-                            ...(details.hours && { hours: details.hours }),
-                            ...(details.imageUrl && { imageUrl: details.imageUrl })
-                          })
-                        )
-                      }
-                      disabled={fetchingId === rest.id}
-                      title="Fetch rating, photo & hours from Google"
-                      className="shrink-0 p-1.5 rounded-lg text-[#FF80BF] hover:text-white hover:bg-white/10 disabled:opacity-50 transition-colors cursor-pointer"
-                    >
-                      {fetchingId === rest.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Wand2 className="w-3.5 h-3.5" />
-                      )}
-                    </button>
                   </div>
                 ) : (
                   rest.mapsLink && (
@@ -363,9 +309,6 @@ export function RestaurantSection({
                       <ExternalLink className="w-2.5 h-2.5 opacity-70" />
                     </button>
                   )
-                )}
-                {editing && fetchError?.id === rest.id && (
-                  <p className="text-[10px] text-red-400">{fetchError.message}</p>
                 )}
               </div>
             </div>
@@ -389,42 +332,15 @@ export function RestaurantSection({
                 placeholder="New restaurant name..."
                 className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-xs placeholder:text-white/40 focus:outline-none focus:border-[#FF2E7E]"
               />
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  id="input-new-restaurant-maps"
-                  value={newMapsLink}
-                  onChange={(e) => setNewMapsLink(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmAddRestaurant()}
-                  placeholder="Google Maps link"
-                  className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-[11px] placeholder:text-white/40 focus:outline-none focus:border-[#FF2E7E]"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    runFetch('new', newMapsLink, (details) => {
-                      setNewExtra((prev) => ({
-                        ...prev,
-                        ...(details.rating && { rating: details.rating }),
-                        ...(details.reviewCount && { reviewCount: details.reviewCount }),
-                        ...(details.hours && { hours: details.hours }),
-                        ...(details.imageUrl && { imageUrl: details.imageUrl })
-                      }));
-                      setNewName((prev) => prev.trim() || details.name || prev);
-                    })
-                  }
-                  disabled={fetchingId === 'new'}
-                  title="Fetch rating, photo & hours from Google"
-                  className="shrink-0 p-1.5 rounded-lg text-[#FF80BF] hover:text-white hover:bg-white/10 disabled:opacity-50 transition-colors cursor-pointer"
-                >
-                  {fetchingId === 'new' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Wand2 className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              </div>
-              {fetchError?.id === 'new' && <p className="text-[10px] text-red-400">{fetchError.message}</p>}
+              <input
+                type="text"
+                id="input-new-restaurant-maps"
+                value={newMapsLink}
+                onChange={(e) => setNewMapsLink(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleConfirmAddRestaurant()}
+                placeholder="Google Maps link"
+                className="w-full px-3 py-1.5 rounded-lg bg-black/40 border border-white/15 text-white text-[11px] placeholder:text-white/40 focus:outline-none focus:border-[#FF2E7E]"
+              />
               <div className="flex justify-end">
                 <button
                   type="button"

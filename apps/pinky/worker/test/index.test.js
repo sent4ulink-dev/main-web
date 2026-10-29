@@ -136,21 +136,3 @@ describe('share API', () => {
     expect(unknown.status).toBe(404);
   });
 });
-
-describe('maps proxy', () => {
-  it('resolve requires a url and a configured API key', async () => {
-    const e = env();
-    const missingUrl = await worker.fetch(new Request(`${base}/api/maps/resolve`), e);
-    expect(missingUrl.status).toBe(400);
-    const notConfigured = await worker.fetch(new Request(`${base}/api/maps/resolve?url=https://maps.google.com/x`), e);
-    expect(notConfigured.status).toBe(503);
-  });
-
-  it('photo requires a ref and a configured API key', async () => {
-    const e = env();
-    const missingRef = await worker.fetch(new Request(`${base}/api/maps/photo`), e);
-    expect(missingRef.status).toBe(400);
-    const notConfigured = await worker.fetch(new Request(`${base}/api/maps/photo?ref=abc`), e);
-    expect(notConfigured.status).toBe(503);
-  });
-});

@@ -10,7 +10,7 @@
 
    POST   /checkout                 start an order for a pack: { pack: "single" | "pack" }  -> { token, checkoutUrl }  (creates a Paddle transaction)
    GET    /orders/:token            the order: how many links were paid for, how many are left, the links made so far
-   POST   /orders/:token/generate   make links from a paid order: { items: { pixel: 3, pinky: 2, winxp: 3 } }  (never more than were paid for)
+   POST   /orders/:token/generate   make links from a paid order: { items: { pixel: 3, picnic: 2, salon: 3 } }  (never more than were paid for)
    POST   /orders/:token/confirm    mark it paid by hand (owner only: Authorization: Bearer <ORDER_SECRET>) — Paddle itself uses the webhook below
    POST   /orders/:token/refund     the payment was refunded: the order's links stop working (same secret)
    POST   /webhooks/paddle          Paddle calls this when a transaction completes (authenticated by its own signature, not a bearer token)
@@ -51,7 +51,7 @@
      session:<token>  a signed-in visitor's email, 30-day TTL
      rla:<hash>       per-visitor counters for requesting sign-in links */
 
-const TOOLS = ['Send', 'Pixel', 'Pinky', 'WinXP', 'Marketplace'];
+const TOOLS = ['Send', 'Pixel', 'Pinky', 'WinXP', 'Petal Isle', 'Picnic', 'Heritage', 'Salon', 'Mission', 'Halloween', 'Halloween Night', 'Marketplace'];   // Salon = Heritage's old name
 const MAX_LIST = 100;             // how many reviews the public list holds
 const MIN_GAP_MS = 60_000;        // one review per visitor per minute…
 const MAX_PER_DAY = 5;            // …and five a day
@@ -72,15 +72,19 @@ export default {
       if (claim && request.method === 'DELETE') return await deleteClaim(request, env, cors, claim[1]);
       if (url.pathname === '/claims' && request.method === 'POST') return await createClaim(request, env, cors);
       if (url.pathname === '/auth/request-link' && request.method === 'POST') return await requestLoginLink(request, env, cors);
-      if (url.pathname === '/auth/verify' && request.method === 'GET') return await verifyLogin(request, env, cors);
+      // /auth/verify is the address in emails sent before the confirmation page existed: it shows the same page
+      if ((url.pathname === '/auth/confirm' || url.pathname === '/auth/verify') && request.method === 'GET') return await confirmPage(request, env);
+      if (url.pathname === '/auth/confirm' && request.method === 'POST') return await confirmLogin(request, env);
+      if (url.pathname === '/auth/status' && request.method === 'GET') return await loginStatus(request, env, cors);
       if (url.pathname === '/auth/logout' && request.method === 'POST') return await logout(request, env, cors);
       if (url.pathname === '/me' && request.method === 'GET') return await getMe(request, env, cors);
       if (url.pathname === '/checkout' && request.method === 'POST') return await createCheckout(request, env, cors);
-      const order = url.pathname.match(/^\/orders\/([A-Za-z0-9_-]{22})(?:\/(generate|confirm|refund))?$/);
+      const order = url.pathname.match(/^\/orders\/([A-Za-z0-9_-]{22})(?:\/(generate|confirm|refund|refund-request))?$/);
       if (order && !order[2] && request.method === 'GET') return await getOrder(env, cors, order[1]);
       if (order && order[2] === 'generate' && request.method === 'POST') return await generateLinks(request, env, cors, order[1]);
       if (order && order[2] === 'confirm' && request.method === 'POST') return await confirmOrder(request, env, cors, order[1]);
       if (order && order[2] === 'refund' && request.method === 'POST') return await refundOrder(request, env, cors, order[1]);
+      if (order && order[2] === 'refund-request' && request.method === 'POST') return await requestRefund(request, env, cors, order[1]);
       if (url.pathname === '/webhooks/paddle' && request.method === 'POST') return await paddleWebhook(request, env, cors);
       const link = url.pathname.match(/^\/links\/([A-Za-z0-9_-]{22})$/);
       if (link && request.method === 'GET') return await getLink(env, cors, link[1]);
@@ -236,7 +240,7 @@ async function deleteReview(request, env, cors, id) {
 
 const RESERVED = new Set(['admin', 'administrator', 'support', 'help', 'sent4u', 'sent', 'www', 'api', 'app', 'root', 'mail', 'email', 'billing', 'security',
   'about', 'blog', 'careers', 'terms', 'privacy', 'login', 'logout', 'signup', 'register', 'account', 'settings', 'pricing', 'status', 'team', 'staff',
-  'official', 'contact', 'press', 'legal', 'escrow', 'marketplace', 'pixel', 'pinky', 'winxp', 'send', 'null', 'undefined']);
+  'official', 'contact', 'press', 'legal', 'escrow', 'marketplace', 'pixel', 'pinky', 'winxp', 'petal', 'picnic', 'salon', 'mission', 'halloween', 'spooky', 'send', 'null', 'undefined']);
 
 // 3–24 characters: lower-case letters and numbers, with - or _ allowed in the middle
 function handleProblem(h) {
@@ -302,12 +306,25 @@ async function deleteClaim(request, env, cors, handle) {
   return reply({ ok: true }, 200, cors);
 }
 
-/* ---------------- signing in: no passwords, just a one-time link to an email ----------------
-   Nothing is stored until someone actually clicks the link that proves they own that inbox — the same trust anyone already places in
-   "forgot password" email on every other site. There is no password to steal in a breach and nothing to reuse from a leak elsewhere. */
+/* ---------------- signing in: no passwords, a link in an email to confirm it's you ----------------
+   Nothing is stored until someone confirms from the inbox — the same trust anyone already places in "forgot password" email on every
+   other site. There is no password to steal in a breach and nothing to reuse from a leak elsewhere.
+
+   1. POST /auth/request-link {email}: emails a link, and gives the asking browser a waiting cookie (s4u_signin) and a two-digit
+      number to show while it waits.
+   2. The link opens a confirmation page (GET only shows it, so a mail scanner that opens links can't use it up). Opened in the browser
+      that asked, it is one button: "Sign me in". Opened somewhere else (the email on a phone, the site on a laptop), the page asks which
+      number the other screen shows: picking the right one signs that waiting browser in, picking a wrong one cancels the whole request.
+      That stops someone who asks for a link to another person's email from getting signed in when that person taps the link without
+      thinking. The same page can also just sign in the browser it's open in.
+   3. The waiting browser asks GET /auth/status every few seconds and gets its session the moment the request is confirmed.
+   A session lasts 90 days and is renewed while it's used, so a browser that has signed in once doesn't need another email: that keeps
+   the number of emails (and the monthly email allowance) down. */
 
 const SESSION_COOKIE = 's4u_session';
-const SESSION_TTL_S = 30 * 24 * 60 * 60;       // 30 days
+const PENDING_COOKIE = 's4u_signin';
+const SESSION_TTL_S = 90 * 24 * 60 * 60;       // 90 days…
+const SESSION_RENEW_MS = 7 * 24 * 60 * 60 * 1000;   // …counted again from the latest visit, at most once a week
 const LOGIN_TOKEN_TTL_S = 15 * 60;             // the link in the email is only good for 15 minutes
 const userKey = hash => `users/${hash}.json`;
 
@@ -325,21 +342,34 @@ function readCookie(request, name) {
   return null;
 }
 
-// The session cookie carries no Domain attribute, so the browser scopes it to whichever host actually answered — sent4u.link, since the
-// gateway proxies /auth/* and /me there (see gateway/index.js): a first-party cookie, not one shared cross-site with this Worker's own
+// The cookies carry no Domain attribute, so the browser scopes them to whichever host actually answered — sent4u.link, since the
+// gateway proxies /auth/* and /me there (see gateway/index.js): first-party cookies, not ones shared cross-site with this Worker's own
 // *.workers.dev address. Visiting that address directly still works for API calls, just without a saved session.
+const sessionCookie = token => `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${SESSION_TTL_S}; SameSite=Lax; HttpOnly; Secure`;
+const pendingCookie = (id, maxAge = LOGIN_TOKEN_TTL_S) => `${PENDING_COOKIE}=${id}; Path=/auth; Max-Age=${maxAge}; SameSite=Lax; HttpOnly; Secure`;
 function setSessionCookie(headers, token) {
-  headers['Set-Cookie'] = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${SESSION_TTL_S}; SameSite=Lax; HttpOnly; Secure`;
+  headers['Set-Cookie'] = sessionCookie(token);
 }
 function clearSessionCookie(headers) {
   headers['Set-Cookie'] = `${SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure`;
 }
 
-async function sessionEmail(request, env) {
+async function startSession(env, email) {
+  const token = randomToken();
+  await env.AUTH.put(`session:${token}`, JSON.stringify({ email, renewedAt: Date.now() }), { expirationTtl: SESSION_TTL_S });
+  return token;
+}
+
+async function readSession(request, env) {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return null;
   const stored = await env.AUTH.get(`session:${token}`);
-  return stored ? JSON.parse(stored).email : null;
+  return stored ? { token, ...JSON.parse(stored) } : null;
+}
+
+async function sessionEmail(request, env) {
+  const session = await readSession(request, env);
+  return session ? session.email : null;
 }
 
 async function readUser(env, email) {
@@ -358,7 +388,7 @@ async function addOrderToUser(env, email, token) {
   await env.BUCKET.put(userKey(hash), JSON.stringify(user), JSON_OBJECT);
 }
 
-// A handful of sign-in links per visitor per hour is plenty, and keeps this from being a way to mail-bomb someone else's inbox.
+// A handful of sign-in emails per visitor per hour is plenty, and keeps this from being a way to mail-bomb someone else's inbox.
 async function loginLimit(env, ipHash) {
   const key = `rla/${ipHash}.json`;
   const now = Date.now(), hour = Math.floor(now / 3_600_000);
@@ -379,52 +409,136 @@ async function sendLoginEmail(env, email, link) {
     body: JSON.stringify({
       from: env.EMAIL_FROM || 'sent4u <onboarding@resend.dev>',
       to: [email],
-      subject: 'Your sent4u sign-in link',
-      text: `Sign in to sent4u:\n\n${link}\n\nThis link works once and expires in 15 minutes. If you didn't ask for this, just ignore it — nothing happens without clicking the link.`,
-      html: `<p>Sign in to sent4u:</p><p><a href="${link}">${link}</a></p><p>This link works once and expires in 15 minutes. If you didn't ask for this, just ignore it — nothing happens without clicking the link.</p>`,
+      subject: 'Sign in to sent4u',
+      text: `Confirm it's you to sign in to sent4u:\n\n${link}\n\nOpen it on any device: if it isn't the one you're signing in on, it asks for the number that device is showing. The link expires in 15 minutes. If you didn't ask to sign in, just ignore this — nothing happens unless you confirm.`,
+      html: `<p>Confirm it's you to sign in to sent4u:</p><p><a href="${link}" style="display:inline-block;padding:12px 22px;border-radius:999px;background:#7c5cff;color:#fff;text-decoration:none;font-weight:600">Confirm sign-in</a></p><p style="color:#666">Open it on any device: if it isn't the one you're signing in on, it asks for the number that device is showing. The link expires in 15 minutes. If you didn't ask to sign in, just ignore this — nothing happens unless you confirm.</p><p style="color:#999;font-size:12px">${link}</p>`,
     }),
   });
   if (!res.ok) throw new Error(`resend ${res.status}: ${(await res.text()).slice(0, 500)}`);
 }
+
+const twoDigits = () => String(10 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90));
 
 async function requestLoginLink(request, env, cors) {
   if (!originOk(request, env)) return reply({ error: 'Sign-in can only be started from the sent4u site.' }, 403, cors);
   const { body, fail } = await readBody(request, cors, 300);
   if (fail) return fail;
   const email = clean(body.email, 254).toLowerCase();
-  // Always the same reply whether the email is well-formed, rate-limited, or the send itself fails — never lets a visitor probe
-  // whether a given address has an account (every address gets one automatically on first sign-in, so there's nothing to probe
-  // anyway, but keeping the response uniform costs nothing and is one less thing to reason about).
-  if (!isEmail(email)) return reply({ ok: true }, 200, cors);
   if (!env.RESEND_API_KEY) return reply({ error: 'Sign-in isn’t switched on yet. Please check back soon.' }, 501, cors);
+  // Always the same reply whether the email is well-formed, rate-limited, or the send itself fails — a number to show and a waiting
+  // cookie — never letting a visitor probe whether a given address has an account (every address gets one automatically on first
+  // sign-in, so there's nothing to probe anyway, but keeping the response uniform costs nothing).
+  const pending = randomToken(), code = twoDigits();
+  const headers = { 'Set-Cookie': pendingCookie(pending) };
+  if (!isEmail(email)) return reply({ ok: true, code }, 200, cors, headers);
 
   const ipHash = await sha256(`${env.IP_SALT || ''}|${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
-  if (await loginLimit(env, ipHash)) return reply({ ok: true }, 200, cors);
+  if (await loginLimit(env, ipHash)) return reply({ ok: true, code }, 200, cors, headers);
 
   const token = randomToken();
-  await env.AUTH.put(`login:${token}`, JSON.stringify({ email }), { expirationTtl: LOGIN_TOKEN_TTL_S });
+  await env.AUTH.put(`pending:${pending}`, JSON.stringify({ email, code, confirmed: false }), { expirationTtl: LOGIN_TOKEN_TTL_S });
+  await env.AUTH.put(`login:${token}`, JSON.stringify({ email, pending }), { expirationTtl: LOGIN_TOKEN_TTL_S });
   const origin = String(env.LINK_ORIGIN || 'https://sent4u.link').replace(/[/]+$/, '');
   try {
-    await sendLoginEmail(env, email, `${origin}/auth/verify?token=${token}`);
+    await sendLoginEmail(env, email, `${origin}/auth/confirm?token=${token}`);
   } catch (err) {
     console.error('sign-in email failed to send:', err);
   }
-  return reply({ ok: true }, 200, cors);
+  return reply({ ok: true, code }, 200, cors, headers);
 }
 
-async function verifyLogin(request, env, cors) {
-  const token = new URL(request.url).searchParams.get('token') || '';
-  const origin = String(env.LINK_ORIGIN || 'https://sent4u.link').replace(/[/]+$/, '');
-  const stored = token && (await env.AUTH.get(`login:${token}`));
-  if (!stored) return reply({ error: 'That sign-in link has expired or was already used. Please ask for a new one.' }, 400, cors);
-  await env.AUTH.delete(`login:${token}`);          // one-time use, whether or not the rest below succeeds
-  const { email } = JSON.parse(stored);
+// "le***@example.com": enough to recognise your own address on the confirmation page, not enough to read someone else's
+function maskEmail(email) {
+  const [name, domain] = email.split('@');
+  return `${name.slice(0, 2)}${'*'.repeat(Math.max(1, Math.min(6, name.length - 2)))}@${domain}`;
+}
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  const session = randomToken();
-  await env.AUTH.put(`session:${session}`, JSON.stringify({ email }), { expirationTtl: SESSION_TTL_S });
-  const headers = { ...cors, Location: `${origin}/?signedin=1` };
-  setSessionCookie(headers, session);
-  return new Response(null, { status: 302, headers });
+// The confirmation page and its answers: small, self-contained HTML in the site's colours (it is served at sent4u.link/auth/confirm).
+function page(title, body, status = 200, headers = {}) {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)} — sent4u</title>
+<link rel="icon" href="/assets/brand/favicon.ico" sizes="16x16 32x32 48x48">
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#08080c;color:#f3f2f7;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{width:100%;max-width:420px;padding:32px 28px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:#14141f;text-align:center}
+.logo{display:block;width:fit-content;margin:0 auto 22px}.logo img{display:block;height:34px;width:auto}h1{margin:0 0 8px;font-size:1.4rem}p{margin:0 0 20px;color:#a3a1b0}b{color:#f3f2f7}
+form{margin:0}button,.btn{display:inline-block;width:100%;padding:13px 20px;border:0;border-radius:999px;background:#fff;color:#0b0b12;font:600 1rem system-ui,sans-serif;cursor:pointer;text-decoration:none}
+.ghost{margin-top:12px;background:transparent;color:#a3a1b0;border:1px solid rgba(255,255,255,.14)}.codes{display:flex;gap:12px;justify-content:center;margin:0 0 18px}
+.codes button{width:76px;height:64px;padding:0;font-size:1.6rem;border-radius:16px;background:#191926;color:#f3f2f7;border:1px solid rgba(255,255,255,.14)}.codes button:hover{border-color:#7c5cff}
+.or{margin:22px 0 12px;font-size:.85rem}
+</style></head><body><main><a class="logo" href="/"><img src="/assets/brand/logo.webp" width="507" height="120" alt="sent4u"></a>${body}</main></body></html>`;
+  return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', ...headers } });
+}
+const expiredPage = () => page('Link expired', '<h1>This link has expired</h1><p>Sign-in links work for 15 minutes and only once. Go back to sent4u and ask for a new one.</p><a class="btn" href="/">Back to sent4u</a>', 410);
+
+async function confirmPage(request, env) {
+  const token = new URL(request.url).searchParams.get('token') || '';
+  const stored = /^[A-Za-z0-9_-]{22}$/.test(token) && (await env.AUTH.get(`login:${token}`));
+  if (!stored) return expiredPage();
+  const { email, pending } = JSON.parse(stored);
+  const here = `<form method="post" action="/auth/confirm"><input type="hidden" name="token" value="${token}"><button type="submit">Yes, sign me in</button></form>`;
+  const waiting = pending && (await env.AUTH.get(`pending:${pending}`));
+  // the browser that asked: one button
+  if (!waiting || readCookie(request, PENDING_COOKIE) === pending) {
+    return page('Confirm sign-in', `<h1>Sign in to sent4u?</h1><p>As <b>${escapeHtml(maskEmail(email))}</b></p>${here}`);
+  }
+  // somewhere else: which number is the other screen showing? (the right one, and two others, in a random order)
+  const { code } = JSON.parse(waiting);
+  const options = new Set([code]);
+  while (options.size < 3) options.add(twoDigits());
+  const shuffled = [...options].sort(() => crypto.getRandomValues(new Uint8Array(1))[0] - 128);
+  const buttons = shuffled.map(n => `<button type="submit" name="choice" value="${n}">${n}</button>`).join('');
+  return page('Confirm sign-in', `<h1>Signing in on another device?</h1><p>As <b>${escapeHtml(maskEmail(email))}</b>. Tap the number that the other screen is showing.</p>
+<form method="post" action="/auth/confirm"><input type="hidden" name="token" value="${token}"><div class="codes">${buttons}</div></form>
+<p class="or">Not signing in anywhere else? Then only sign in here:</p>${here.replace('Yes, sign me in', 'Sign in on this device')}`);
+}
+
+async function confirmLogin(request, env) {
+  if (!originOk(request, env)) return page('Not allowed', '<h1>That didn’t work</h1><p>Please open the link from your email again.</p>', 403);
+  const form = await request.formData().catch(() => null);
+  const token = String((form && form.get('token')) || '');
+  const choice = form && form.get('choice');
+  const stored = /^[A-Za-z0-9_-]{22}$/.test(token) && (await env.AUTH.get(`login:${token}`));
+  if (!stored) return expiredPage();
+  await env.AUTH.delete(`login:${token}`);          // one confirmation per link, whatever happens below
+  const { email, pending } = JSON.parse(stored);
+
+  if (choice !== null && choice !== undefined) {    // approving the other device
+    const waiting = pending && (await env.AUTH.get(`pending:${pending}`));
+    if (!waiting) return expiredPage();
+    const record = JSON.parse(waiting);
+    if (String(choice) !== record.code) {
+      await env.AUTH.delete(`pending:${pending}`);
+      return page('Sign-in cancelled', '<h1>That number didn’t match</h1><p>So nothing was signed in. If it was you, ask for a new link on the device you’re signing in on.</p><a class="btn" href="/">Back to sent4u</a>');
+    }
+    await env.AUTH.put(`pending:${pending}`, JSON.stringify({ ...record, confirmed: true }), { expirationTtl: LOGIN_TOKEN_TTL_S });
+    return page('Signed in', '<h1>You’re signed in</h1><p>Your other device is signing in now. You can close this page.</p>');
+  }
+
+  // signing in right here: the browser that asked also stops waiting
+  if (pending && readCookie(request, PENDING_COOKIE) === pending) await env.AUTH.delete(`pending:${pending}`);
+  const session = await startSession(env, email);
+  const origin = String(env.LINK_ORIGIN || 'https://sent4u.link').replace(/[/]+$/, '');
+  const headers = new Headers({ Location: `${origin}/?signedin=1`, 'Cache-Control': 'no-store' });
+  headers.append('Set-Cookie', sessionCookie(session));
+  headers.append('Set-Cookie', pendingCookie('', 0));
+  return new Response(null, { status: 303, headers });
+}
+
+// The waiting browser asks this every few seconds: has the request been confirmed (here or on another device)?
+async function loginStatus(request, env, cors) {
+  const headers = new Headers({ ...JSON_TYPE, ...cors, 'Cache-Control': 'no-store' });
+  const answer = body => new Response(JSON.stringify(body), { status: 200, headers });
+  if (await readSession(request, env)) { headers.append('Set-Cookie', pendingCookie('', 0)); return answer({ signedIn: true }); }
+  const pending = readCookie(request, PENDING_COOKIE);
+  const waiting = pending && (await env.AUTH.get(`pending:${pending}`));
+  if (!waiting) return answer({ signedIn: false, expired: true });
+  const record = JSON.parse(waiting);
+  if (!record.confirmed) return answer({ signedIn: false, waiting: true });
+  await env.AUTH.delete(`pending:${pending}`);
+  headers.append('Set-Cookie', sessionCookie(await startSession(env, record.email)));
+  headers.append('Set-Cookie', pendingCookie('', 0));
+  return answer({ signedIn: true });
 }
 
 async function logout(request, env, cors) {
@@ -436,16 +550,22 @@ async function logout(request, env, cors) {
 }
 
 async function getMe(request, env, cors) {
-  const email = await sessionEmail(request, env);
-  if (!email) return reply({ error: 'Not signed in.' }, 401, cors);
-  const { user } = await readUser(env, email);
+  const session = await readSession(request, env);
+  if (!session) return reply({ error: 'Not signed in.' }, 401, cors);
+  const extra = { 'Cache-Control': 'no-store' };
+  // still in use: count the 90 days again from today (at most once a week, so a busy visitor doesn't rewrite it every page)
+  if (Date.now() - (session.renewedAt || 0) > SESSION_RENEW_MS) {
+    await env.AUTH.put(`session:${session.token}`, JSON.stringify({ email: session.email, renewedAt: Date.now() }), { expirationTtl: SESSION_TTL_S });
+    setSessionCookie(extra, session.token);
+  }
+  const { user } = await readUser(env, session.email);
   const orders = (await Promise.all(user.orders.map(t => readOrder(env, t)))).filter(Boolean).map(({ order }) => publicOrder(order));
   orders.sort((a, b) => (b.links[0]?.at || 0) - (a.links[0]?.at || 0));
-  return reply({ email, orders }, 200, cors, { 'Cache-Control': 'no-store' });
+  return reply({ email: session.email, orders }, 200, cors, extra);
 }
 
 /* ---------------- orders: packs of links ----------------
-   1 link is $1.99 and a pack of 8 is $9.99, sold as two one-time Prices in Paddle — a Merchant of Record, so Paddle is the legal seller and
+   1 link is $3.99 and a pack of 8 is $14.99 (the same price everywhere, in USD), sold as two one-time Prices in Paddle — a Merchant of Record, so Paddle is the legal seller and
    collects and remits VAT/GST worldwide; this Worker never has to. Checkout is Paddle's own hosted page: this Worker only creates the
    transaction (POST /checkout) and hands back its checkout URL. When Paddle confirms the payment it POSTs to /webhooks/paddle, which this
    Worker verifies by that request's own signature and marks the order paid — only then can the buyer make links, and never more than they
@@ -454,14 +574,18 @@ async function getMe(request, env, cors) {
 
 // no prototype: a plain {} would let pack="__proto__" (or "constructor", "toString", …) resolve PACKS[pack] to an inherited
 // object instead of failing the lookup below, silently turning credits/amount into undefined further down.
-const PACKS = Object.assign(Object.create(null), { single: { credits: 1, amount: 199 }, pack: { credits: 8, amount: 999 } });
-const PRODUCTS = ['pixel', 'pinky', 'winxp'];
+const PACKS = Object.assign(Object.create(null), { single: { credits: 1, amount: 399 }, pack: { credits: 8, amount: 1499 } });
+// every style a buyer can make a link for; the ids are what the gateway and each style's own server know it by
+const PRODUCTS = ['pixel', 'pinky', 'winxp', 'petal', 'picnic', 'salon', 'mission', 'halloween', 'spooky'];
 const JSON_OBJECT = { httpMetadata: { contentType: 'application/json' } };
 const WEBHOOK_TOLERANCE_S = 300;                                // reject a Paddle-Signature whose timestamp is older than this (clock skew + retry headroom)
 
 const orderKey = token => `orders/${token}.json`;
 const txKey = id => `tx/${id}.json`;                            // Paddle's transaction id -> our order token
-const publicOrder = o => ({ token: o.token, pack: o.pack, credits: o.credits, remaining: o.credits - o.links.length, amount: o.amount, status: o.status, links: o.links });
+const REFUND_WINDOW_MS = 10 * 60 * 1000;                        // a buyer can undo a purchase themselves for 10 minutes after paying
+// …and only while no link has been made: a link that exists can be sent, opened and enjoyed, so a refund after that would be a free card
+const refundableUntil = o => (o.status === 'paid' && o.paidAt && o.paddleTransactionId && !o.links.length ? o.paidAt + REFUND_WINDOW_MS : null);
+const publicOrder = o => ({ token: o.token, pack: o.pack, credits: o.credits, remaining: o.credits - o.links.length, amount: o.amount, status: o.status, links: o.links, paidAt: o.paidAt || null, refundableUntil: refundableUntil(o) });
 
 function randomToken(bytes = 16) {
   const raw = String.fromCharCode(...crypto.getRandomValues(new Uint8Array(bytes)));
@@ -530,7 +654,8 @@ async function paddleCreateTransaction(env, priceId, token) {
       items: [{ price_id: priceId, quantity: 1 }],
       collection_mode: 'automatic',
       custom_data: { orderToken: token },
-      checkout: { url: null },   // Paddle's own hosted checkout page, redirecting afterwards to the default payment link set in the Paddle dashboard (see README)
+      // no checkout.url: Paddle uses the default payment link set in its dashboard (https://sent4u.link/pay, which runs Paddle.js), and
+      // the checkout link it returns is that address with ?_ptxn=<transaction id>, which makes Paddle.js open the payment window
     }),
   });
   const json = await res.json().catch(() => null);
@@ -568,7 +693,7 @@ async function markPaid(env, token) {
     const found = await readOrder(env, token);
     if (!found) return { error: 'not_found' };
     const { order, etag } = found;
-    if (order.status === 'refunded') return { error: 'refunded' };
+    if (order.status === 'refunded' || order.status === 'refunding') return { error: 'refunded' };
     if (order.status === 'paid') return { order };
     const next = { ...order, status: 'paid', paidAt: Date.now() };
     if (await env.BUCKET.put(orderKey(token), JSON.stringify(next), { ...JSON_OBJECT, onlyIf: { etagMatches: etag } })) return { order: next };
@@ -591,7 +716,7 @@ async function generateLinks(request, env, cors, token) {
   if (fail) return fail;
 
   const asked = body.items && typeof body.items === 'object' && !Array.isArray(body.items) ? body.items : null;
-  if (!asked || Object.keys(asked).some(k => !PRODUCTS.includes(k))) return reply({ error: 'Choose Pixel, Pinky or WinXP.' }, 422, cors);
+  if (!asked || Object.keys(asked).some(k => !PRODUCTS.includes(k))) return reply({ error: 'Choose one of the styles.' }, 422, cors);
   const items = {};
   let want = 0;
   for (const product of PRODUCTS) {
@@ -606,7 +731,7 @@ async function generateLinks(request, env, cors, token) {
     const found = await readOrder(env, token);
     if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
     const { order, etag } = found;
-    if (order.status !== 'paid') return reply({ error: order.status === 'refunded' ? 'This order was refunded.' : 'This order hasn’t been paid yet.' }, 402, cors);
+    if (order.status !== 'paid') return reply({ error: order.status === 'refunded' || order.status === 'refunding' ? 'This order was refunded.' : 'This order hasn’t been paid yet.' }, 402, cors);
     const remaining = order.credits - order.links.length;
     if (want > remaining) return reply({ error: remaining ? `You only have ${remaining} link${remaining === 1 ? '' : 's'} left.` : 'All the links in this pack have been made.' }, 422, cors);
 
@@ -630,8 +755,103 @@ async function refundOrder(request, env, cors, token) {
   if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
   const next = { ...found.order, status: 'refunded', refundedAt: Date.now() };
   await env.BUCKET.put(orderKey(token), JSON.stringify(next), JSON_OBJECT);
-  await Promise.all(next.links.map(l => env.BUCKET.put(`links/${l.id}.json`, JSON.stringify({ id: l.id, product: l.product, order: token, createdAt: l.at, revoked: true }), JSON_OBJECT)));
+  await setLinksRevoked(env, next, true);
   return reply(publicOrder(next), 200, cors);
+}
+
+// A link stops working the moment its order is refunded (or a refund is on its way), and works again if Paddle turns the refund down.
+async function setLinksRevoked(env, order, revoked) {
+  await Promise.all(order.links.map(l => env.BUCKET.put(`links/${l.id}.json`,
+    JSON.stringify({ id: l.id, product: l.product, order: order.token, createdAt: l.at, ...(revoked ? { revoked: true } : {}) }), JSON_OBJECT)));
+}
+
+// The same compare-and-set loop as markPaid, for any change to an order: change(order) returns the new order, or null for "leave it".
+async function updateOrder(env, token, change) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const found = await readOrder(env, token);
+    if (!found) return { error: 'not_found' };
+    const next = change(found.order);
+    if (!next) return { order: found.order, unchanged: true };
+    if (await env.BUCKET.put(orderKey(token), JSON.stringify(next), { ...JSON_OBJECT, onlyIf: { etagMatches: found.etag } })) return { order: next };
+  }
+  return { error: 'busy' };
+}
+
+/* ---------------- refunds the buyer asks for themselves ----------------
+   For 10 minutes after paying (from the moment Paddle confirmed the payment), and only until the first link is made, whoever holds the order — its token is the buyer's key,
+   the same one that makes the links — can undo the purchase: the links stop working at once and Paddle is asked for a full refund
+   (an "adjustment"). Paddle reviews most refunds before the money moves (status pending_approval) and tells /webhooks/paddle when it
+   decides: approved makes the order "refunded" for good, rejected gives the buyer their links back. After the 10 minutes this route
+   says no; anything else goes through support and the Paddle dashboard by hand. */
+async function requestRefund(request, env, cors, token) {
+  if (!originOk(request, env)) return reply({ error: 'Refunds can only be asked for from the sent4u site.' }, 403, cors);
+  if (!env.PADDLE_API_KEY) return reply({ error: 'Refunds aren’t switched on yet. Please contact us.' }, 501, cors);
+  const now = Date.now();
+  let refused = '';
+  const { order, error } = await updateOrder(env, token, o => {
+    if (o.status === 'refunding' || o.status === 'refunded') { refused = 'This order has already been refunded.'; return null; }
+    if (o.status !== 'paid') { refused = 'This order hasn’t been paid yet.'; return null; }
+    const until = refundableUntil(o);
+    if (o.links.length) { refused = 'Links have already been made from this order, so it can’t be refunded.'; return null; }
+    if (!until || now > until) { refused = 'The 10 minutes for an instant refund have passed, so this order can’t be refunded.'; return null; }
+    return { ...o, status: 'refunding', refundRequestedAt: now };
+  });
+  if (error === 'not_found') return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+  if (error === 'busy') return reply({ error: 'That order is busy. Please try again.' }, 409, cors);
+  if (refused) return reply({ error: refused }, 409, cors);
+  await setLinksRevoked(env, order, true);
+
+  try {
+    const adjustment = await paddleRefund(env, order.paddleTransactionId);
+    const saved = await updateOrder(env, token, o => (o.status === 'refunding' ? { ...o, refundAdjustmentId: adjustment.id, refundStatus: adjustment.status } : null));
+    return reply(publicOrder(saved.order || order), 200, cors);
+  } catch (err) {
+    console.error('paddle: could not create a refund', token, err);
+    // Paddle didn't take it: put the order back the way it was, so the buyer still has what they paid for and can try again
+    const back = await updateOrder(env, token, o => {
+      if (o.status !== 'refunding' || o.refundAdjustmentId) return null;
+      const { refundRequestedAt, ...rest } = o;
+      return { ...rest, status: 'paid' };
+    });
+    if (back.order && back.order.status === 'paid' && !back.unchanged) await setLinksRevoked(env, back.order, false);
+    return reply({ error: 'The refund couldn’t be started just now. Please try again in a moment.' }, 502, cors);
+  }
+}
+
+async function paddleRefund(env, transactionId) {
+  const base = String(env.PADDLE_API_BASE || 'https://api.paddle.com').replace(/\/+$/, '');
+  const res = await fetch(`${base}/adjustments`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.PADDLE_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'refund', type: 'full', transaction_id: transactionId, reason: 'Asked for by the buyer within 10 minutes of buying' }),
+  });
+  const json = await res.json().catch(() => null);
+  const data = json && json.data;
+  if (!res.ok || !data || !data.id) throw new Error(`paddle ${res.status}: ${JSON.stringify(json).slice(0, 500)}`);
+  return { id: data.id, status: data.status };
+}
+
+// Paddle's word on a refund or chargeback for one of our transactions (adjustment.created / adjustment.updated). Only a full refund
+// or a chargeback stops the links: a partial refund made by hand in the dashboard (a goodwill gesture) leaves them working.
+async function settleAdjustment(env, adjustment) {
+  if (adjustment.action !== 'refund' && adjustment.action !== 'chargeback') return;
+  const token = await tokenForTransaction(env, adjustment.transaction_id);
+  if (!token) return;
+  const full = adjustment.type === 'full' || adjustment.action === 'chargeback';
+  if (adjustment.status === 'approved' && full) {
+    const { order, unchanged } = await updateOrder(env, token, o => (o.status === 'refunded' ? null : { ...o, status: 'refunded', refundedAt: Date.now(), refundStatus: 'approved' }));
+    if (order && !unchanged) await setLinksRevoked(env, order, true);
+  } else if (adjustment.status === 'rejected' && adjustment.action === 'refund') {
+    // Paddle turned it down: whatever the buyer asked for, they keep what they paid for
+    const { order, unchanged } = await updateOrder(env, token, o => (o.status === 'refunding' ? { ...o, status: 'paid', refundStatus: 'rejected' } : null));
+    if (order && !unchanged) await setLinksRevoked(env, order, false);
+  }
+}
+
+async function tokenForTransaction(env, transactionId) {
+  if (!transactionId) return null;
+  const stored = await env.BUCKET.get(txKey(transactionId));
+  return stored ? (await stored.json()).token : null;
 }
 
 // Public and read-only, on purpose: this is called both by whatever picks which app to serve for a given share id, and by
@@ -648,8 +868,9 @@ async function getLink(env, cors, id) {
 /* ---------------- Paddle's webhook -----------------
    Paddle POSTs here when a transaction completes. There is no Origin to check (this is server to server, not a browser) and no
    Authorization header either — the Paddle-Signature header is the only thing that authenticates this request, so it is checked before
-   anything else touches the body. Refunds are not wired up yet: Paddle's refund payload shape needs confirming against a real refund
-   before this trusts it automatically, so for now use POST /orders/:token/refund by hand (with ORDER_SECRET) when one comes in. */
+   anything else touches the body. Refunds and chargebacks arrive as adjustment.created / adjustment.updated: an approved full refund or
+   a chargeback stops the order's links, and a refund Paddle rejects gives them back (see settleAdjustment). POST /orders/:token/refund
+   (with ORDER_SECRET) is still there for fixing an order by hand. */
 async function paddleWebhook(request, env, cors) {
   const raw = await request.text();                              // the signature covers these exact bytes: read before anything parses them
   if (!env.PADDLE_WEBHOOK_SECRET) return reply({ error: 'Not configured.' }, 501, cors);
@@ -673,6 +894,7 @@ async function paddleWebhook(request, env, cors) {
       console.error('paddle webhook: transaction.completed with no matching order', data.id);
     }
   }
+  if (event && (event.event_type === 'adjustment.created' || event.event_type === 'adjustment.updated')) await settleAdjustment(env, event.data || {});
   // other event types (transaction.payment_failed, transaction.canceled, …) need no action here: the order just stays pending
   // and the buyer's own "still waiting" retry loop (see script.js) picks it up whenever it does get paid.
   return reply({ ok: true }, 200, cors);

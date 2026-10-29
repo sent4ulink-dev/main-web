@@ -19,15 +19,14 @@ id = "312c951c20e243a4af1c426e75502bde"
 ALLOWED_ORIGINS = "https://sent4u.link,http://localhost:4173"
 
 # Selling links (see "Orders" in the README). The two one-time Prices created in your Paddle dashboard, one per pack.
-# PADDLE_PRICE_SINGLE = "pri_..."          # the $1.99 · 1 link price
-# PADDLE_PRICE_PACK   = "pri_..."          # the $9.99 · 8 links price
+PADDLE_PRICE_SINGLE = "pri_01m3964d9twgc370knhkc64cfn"   # the $1.99 · 1 link price
+PADDLE_PRICE_PACK   = "pri_01m3965bx3qsk98x12gmzchr4t"   # the $9.99 · 8 links price
 # PADDLE_API_BASE = "https://sandbox-api.paddle.com"   # only set this while testing against a Paddle sandbox account; omit it in production
 # LINK_ORIGIN = "https://sent4u.link"      # what the links start with (this is the default)
 
-# Sign-in emails (see "Sign-in" in the README). EMAIL_FROM must be an address at a domain you've
-# verified with Resend, e.g. "sent4u <hello@sent4u.link>" — Resend's own onboarding@resend.dev
-# works unverified but only for testing.
-# EMAIL_FROM = "sent4u <hello@sent4u.link>"
+# Sign-in emails (see "Sign-in" in the README). EMAIL_FROM must be an address at a domain verified
+# with Resend (Dashboard -> Domains).
+EMAIL_FROM = "sent4u <hello@mail.sent4u.link>"
 
 # Secrets (never put these in this file — set them with `npx wrangler secret put NAME`):
 #   ADMIN_TOKEN            lets you delete a review

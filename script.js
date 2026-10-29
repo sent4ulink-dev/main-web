@@ -1,6 +1,6 @@
 import {
   animate, createTimeline, createTimer, createAnimatable,
-  splitText, scrambleText, stagger, onScroll, utils, engine
+  splitText, stagger, onScroll, utils, engine
 } from './vendor/animejs.js';
 import Lenis from './vendor/lenis.js';
 import { initEarthScene } from './earth-scene.js';
@@ -29,13 +29,14 @@ function initCursor(){
   if (window.matchMedia('(hover: none)').matches) return;
   const dot = document.getElementById('cursorDot');
   const ring = document.getElementById('cursorRing');
-  const ringMove = createAnimatable(ring, { left: 0, top: 0, unit: 'px', ease: 'out(3)', duration: 550 });
+  // moved with transforms only (left/top would make the browser lay the page out again on every mouse move)
+  const ringMove = createAnimatable(ring, { x: 0, y: 0, unit: 'px', ease: 'out(3)', duration: 550 });
 
   window.addEventListener('mousemove', e => {
-    utils.set(dot, { left: e.clientX, top: e.clientY });
-    ringMove.left(e.clientX);
-    ringMove.top(e.clientY);
-  });
+    utils.set(dot, { x: e.clientX, y: e.clientY });
+    ringMove.x(e.clientX);
+    ringMove.y(e.clientY);
+  }, { passive: true });
 
   document.querySelectorAll('a, button, [data-magnetic]').forEach(el => {
     el.addEventListener('mouseenter', () => ring.classList.add('is-active'));
@@ -185,23 +186,6 @@ function initHeroTilt(){
   heroEl.addEventListener('mouseleave', () => setTilt(BASE_RX, 0, BASE_RZ));
 }
 
-// centripetal Catmull-Rom -> cubic bezier through pts (smooth, no kinks or loops for unevenly spaced points)
-function centripetalPathD(pts){
-  const ctrl = (pa, pb, pc) => {
-    const da = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) ** 0.5, db = Math.hypot(pc[0] - pb[0], pc[1] - pb[1]) ** 0.5;
-    if (da < 1e-3) return [pb[0] + (pc[0] - pb[0]) / 3, pb[1] + (pc[1] - pb[1]) / 3];
-    const k = 3 * da * (da + db), m = 2 * da * da + 3 * da * db + db * db;
-    return [(da * da * pc[0] - db * db * pa[0] + m * pb[0]) / k, (da * da * pc[1] - db * db * pa[1] + m * pb[1]) / k];
-  };
-  let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++){
-    const p0 = pts[Math.max(i - 1, 0)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(i + 2, pts.length - 1)];
-    const c1 = ctrl(p0, p1, p2), c2 = ctrl(p3, p2, p1);
-    d += ` C ${c1[0].toFixed(1)} ${c1[1].toFixed(1)}, ${c2[0].toFixed(1)} ${c2[1].toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
-  }
-  return d;
-}
-
 /* ---------------- How it works: a pinned page that slides right → left as you scroll ---------------- */
 function initHow(){
   const wrap = document.getElementById('how');
@@ -215,62 +199,19 @@ function initHow(){
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
   let vw = 0, vh = 0, endX = 0, range = 1;
 
-  // the flying line: while this page is pinned the plane crosses the screen right → left, in step with the slide
-  const line = document.getElementById('howLine'), lineBody = document.getElementById('howBody');
-  const lineGlow = document.getElementById('howGlow');
-  const lineHead = document.getElementById('howHead'), linePlane = document.getElementById('howPlane'), lineGrad = document.getElementById('howGrad');
-  const drawLine = !!(line && lineBody && lineHead && linePlane) && !reduceMotion;
-  if (line && !drawLine) line.style.display = 'none';
-  let lineLen = 1, lineTail = 0, ang = 0, bank = 0, dirSign = 1, prevP = 0, lastNow = 0, angReady = false;
-  const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-  const wrapAng = a => ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-
-  function buildLine(){
-    if (!drawLine) return;
-    const A = vh * 0.19, lam = Math.max(vw * 0.9, 640), cy = vh * 0.44; // a gentle wave through the middle of the page
-    const x0 = vw + 140, x1 = -140, n = 12, pts = [];
-    for (let i = 0; i <= n; i++){
-      const x = x0 + (x1 - x0) * i / n;
-      pts.push([x, cy + A * Math.sin(Math.PI * 2 * (x0 - x) / lam)]);
-    }
-    lineBody.setAttribute('d', centripetalPathD(pts));
-    if (lineGlow) lineGlow.setAttribute('d', lineBody.getAttribute('d'));
-    lineLen = lineBody.getTotalLength();
-    lineTail = Math.min(vw * 0.42, lineLen * 0.4);
-    lineGrad.setAttribute('x2', vw);
-  }
-  function renderLine(p, now){
-    if (!drawLine) return;
-    const dt = lastNow ? Math.min(now - lastNow, 100) : 16.7; lastNow = now;
-    const head = p * lineLen, hi = Math.min(head, lineLen), lo = Math.max(0, head - lineTail), vis = hi - lo;
-    line.style.opacity = 1 - smoothstep(0.9, 1, p); // the last of the trail drains away as the pinned page ends
-    if (vis < 0.5){ lineBody.style.opacity = 0; lineHead.style.opacity = 0; if (lineGlow) lineGlow.style.visibility = 'hidden'; return; }
-    lineBody.style.opacity = 1;
-    lineBody.style.strokeDasharray = `${vis.toFixed(1)} ${(lineLen + lineTail + 20).toFixed(1)}`;
-    lineBody.style.strokeDashoffset = (-lo).toFixed(1);
-    if (lineGlow){ lineGlow.style.visibility = 'visible'; lineGlow.style.strokeDasharray = lineBody.style.strokeDasharray; lineGlow.style.strokeDashoffset = lineBody.style.strokeDashoffset; }
-    const pt = lineBody.getPointAtLength(hi);
-    const a1 = lineBody.getPointAtLength(Math.max(0, hi - 40)), a2 = lineBody.getPointAtLength(Math.min(lineLen, hi + 40));
-    if (Math.abs(p - prevP) > 1e-5) dirSign = p > prevP ? 1 : -1; // face backwards while scrolling back up
-    prevP = p;
-    const want = Math.atan2(a2.y - a1.y, a2.x - a1.x) + (dirSign < 0 ? Math.PI : 0);
-    if (!angReady){ ang = want; angReady = true; }
-    const diff = wrapAng(want - ang), maxTurn = 3 * dt / 1000;
-    ang += clamp(diff * (1 - Math.exp(-dt / 220)), -maxTurn, maxTurn);
-    bank += (clamp(diff * 1.4, -0.7, 0.7) - bank) * (1 - Math.exp(-dt / 300));
-    lineHead.setAttribute('transform', `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`);
-    linePlane.setAttribute('transform', `rotate(${(ang * 180 / Math.PI).toFixed(2)}) scale(1 ${Math.cos(bank).toFixed(3)})`);
-    lineHead.style.opacity = head >= lineLen || p <= 0 ? 0 : 1;
-  }
+  // each card's contents pop in one after another as its step becomes active, in step with the scroll — not a timed
+  // animation, a direct function of scroll position, so it scrubs and reverses exactly like everything else on this page
+  const revealItems = cards.map(card => [...card.querySelectorAll('.hc-ui > *')]
+    .flatMap(el => el.classList.contains('hc-steps') ? [...el.children] : [el]));
+  const STAGGER = 0.1;
+  const easeOutBack = t => { const c1 = 1.70158, c3 = c1 + 1; t = clamp(t, 0, 1); return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2; };
 
   function measure(){
     vw = window.innerWidth; vh = pinnedHeight();
     endX = -N * vw;                                     // every slide is one screen wide: the intro plus N panels
     range = Math.max(wrap.offsetHeight - 120 - vh, 1);  // the wrapper keeps 120px below the pinned part
-    buildLine();
   }
   function render(p, now = 0){
-    renderLine(p, now);
     track.style.transform = `translate3d(${(endX * p).toFixed(1)}px,0,0)`;
     const s = p * N; // slide position: 0 = the intro is centred, k = panel k is centred
     panels.forEach((_, k) => {
@@ -281,6 +222,10 @@ function initHow(){
       bars[k].style.setProperty('--f', f.toFixed(3));
       segs[k].classList.toggle('is-done', f >= 0.999);
       segs[k].classList.toggle('is-active', f > 0 && (f < 0.999 || k === N - 1));
+      revealItems[k].forEach((item, i) => {
+        const r = reduceMotion ? 1 : easeOutBack((f - i * STAGGER) / (1 - i * STAGGER));
+        item.style.setProperty('--r', r.toFixed(3));
+      });
     });
   }
 
@@ -295,7 +240,7 @@ function initHow(){
   }
   new IntersectionObserver(([e]) => {
     active = e.isIntersecting;
-    if (active && !raf){ pS = -1; last = 0; lastNow = 0; raf = requestAnimationFrame(frame); }
+    if (active && !raf){ pS = -1; last = 0; raf = requestAnimationFrame(frame); }
   }, { rootMargin: '150px' }).observe(wrap);
   onRealResize(measure);
   measure();
@@ -460,7 +405,7 @@ function initMenu(){
 const REVIEWS_URL = 'assets/data/reviews.json';
 const PENDING_KEY = 'sent4u.reviews.pending';   // reviews this visitor sent, kept in their own browser until they appear in reviews.json
 const LAST_SENT_KEY = 'sent4u.reviews.lastSent';
-const REVIEW_TOOLS = { Send: '#7c5cff', Pixel: '#8fb84a', Pinky: '#ff2e7e', WinXP: '#3d8bff', Marketplace: '#5ce1ff' };
+const REVIEW_TOOLS = { Send: '#7c5cff', Pixel: '#8fb84a', Pinky: '#ff2e7e', WinXP: '#3d8bff', 'Petal Isle': '#f08fb0', Picnic: '#e8843c', Heritage: '#b0314f', Salon: '#b0314f', Mission: '#d9a441', Halloween: '#8a5cff', 'Halloween Night': '#ff7a1a', Marketplace: '#5ce1ff' };   // Salon: Heritage's old name, for reviews written before the rename
 
 const pendingStore = {
   read(){ try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; } },
@@ -959,7 +904,7 @@ function initBridge(){
     const r = sec.getBoundingClientRect(), vh = window.innerHeight;
     return clamp((vh - r.top) / (vh + r.height), 0, 1);
   };
-  let minGap = 0;
+  let minGap = 15;                                          // 60 fps at most, even on a 120-165 Hz screen
   window.addEventListener('sent4u:lite', () => { minGap = 33; resize(); });
   function frame(now){
     if (!active){ raf = 0; return; }
@@ -1035,22 +980,23 @@ function initPricing(){
 
   // Each price is a row of odometer wheels (a strip of 0–9 twice over, so a roll can spin a whole turn before it lands); the point stays put.
   const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-  prices.forEach(el => {
+  const buildOdo = (el, text, symbol = '$', after = false) => {
     const odo = mk('span', 'odo'); odo.setAttribute('aria-hidden', 'true');
     let k = 0;
-    for (const ch of el.dataset.price){
+    for (const ch of text){
       if (!/[0-9]/.test(ch)){ odo.append(mk('span', 'odo-dot', ch)); continue; }
       const strip = mk('span', 'odo-strip'); strip.style.setProperty('--k', k++);
       for (let i = 0; i < 20; i++) strip.append(mk('i', null, String(i % 10)));
       const col = mk('span', 'odo-col'); col.append(strip); odo.append(col);
     }
-    const cur = mk('span', 'pc-cur', '$'); cur.setAttribute('aria-hidden', 'true');
-    el.replaceChildren(cur, odo);
-  });
+    const cur = mk('span', after ? 'pc-cur is-after' : 'pc-cur', symbol); cur.setAttribute('aria-hidden', 'true');
+    el.replaceChildren(...(after ? [odo, cur] : [cur, odo]));
+  };
+  prices.forEach(el => buildOdo(el, el.dataset.price));
   const setPrice = (el, value) => {
     const digits = String(value).replace(/[^0-9]/g, '');
     [...el.querySelectorAll('.odo-strip')].forEach((strip, k) => strip.style.setProperty('--d', String(Number(digits[k] || 0) + 10))); // the second turn of the strip, so a change rolls the short way
-    el.setAttribute('aria-label', `$${value}`);
+    el.setAttribute('aria-label', el.dataset.label || `$${value}`);
   };
   const snapToZero = el => {                                // jump every wheel back to 0 without animating
     const strips = [...el.querySelectorAll('.odo-strip')];
@@ -1215,7 +1161,26 @@ function initPerfGuard(){
   if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700){   // phones and tablets: lighter from the start
     document.body.classList.add('lite'); window.dispatchEvent(new CustomEvent('sent4u:lite')); return;
   }
-  if (reduceMotion) return;                                 // the timing test below is for computers that haven't asked for less motion
+  if (reduceMotion) return;                                 // the timing tests below are for computers that haven't asked for less motion
+  const goLite = () => { if (document.body.classList.contains('lite')) return; document.body.classList.add('lite'); window.dispatchEvent(new CustomEvent('sent4u:lite')); };
+
+  // A laptop with built-in graphics can be smooth while the page sits still and stutter as soon as it scrolls, which the
+  // still-page test below never sees: count the frames that miss a 60 Hz beat (over 30 ms) while the page is moving, and
+  // eight of them within three seconds switch lite mode on — early, before the stutter is felt for long.
+  let movedAt = 0, slow = [];
+  window.addEventListener('scroll', () => { movedAt = performance.now(); }, { passive: true });
+  (function watch(prev){
+    requestAnimationFrame(now => {
+      if (document.body.classList.contains('lite')) return;
+      if (!document.hidden && now > 4000 && now - movedAt < 250 && now - prev > 30){   // (the first seconds are the loading screen)
+        slow.push(now);
+        slow = slow.filter(t => now - t < 3000);
+        if (slow.length >= 8){ goLite(); return; }
+      }
+      watch(now);
+    });
+  })(performance.now());
+
   let attempts = 0;
   function sample(){
     const gaps = []; let last = 0;
@@ -1225,10 +1190,8 @@ function initPerfGuard(){
       last = now;
       if (gaps.length < 90) return requestAnimationFrame(tick);
       gaps.sort((a, b) => a - b);
-      if (gaps[gaps.length >> 1] > 28){                     // the middle frame took over 28 ms: under ~35 fps
-        document.body.classList.add('lite');
-        window.dispatchEvent(new CustomEvent('sent4u:lite'));
-      } else if (++attempts < 3) setTimeout(sample, 9000);
+      if (gaps[gaps.length >> 1] > 28) goLite();            // the middle frame took over 28 ms: under ~35 fps
+      else if (++attempts < 3) setTimeout(sample, 9000);
     })(performance.now());
   }
   setTimeout(sample, 5000);                                 // after the preloader and the first paint
@@ -1247,7 +1210,7 @@ function initPreloader(){
     return;
   }
 
-  animate(word, { innerHTML: scrambleText({ chars: 'uppercase', revealRate: 50, settleRate: 28 }) });
+  animate(word, { opacity: [0, 1], scale: [.94, 1], duration: 700, ease: 'outCubic' });
 
   createTimer({
     duration: 2000,
@@ -1478,7 +1441,9 @@ function initSnake(){
    One tall track with a sticky stage; scroll progress p (0..1) drives everything.
      0   → .28   the phone rises between a split headline · tool pills burst out on dashed "signal" lines
      .28 → 1     the pills dock along the bottom as the nav · the phone sways, its screen slides to the next
-                 tool, the backdrop colour and the giant word behind it change with each tool          */
+                 tool, the backdrop colour and the giant word behind it change with each tool
+   A slide's length is its data-span (in units of a normal slide): the spotlight, Halloween Night, plays its five chapters on the
+   phone while the haunted hill behind it acts each one out (the gate opens, the letter flies in, the pumpkins light, the stones rise). */
 function initPhoneSection(){
   const track = document.getElementById('phoneTrack');
   if (!track) return;
@@ -1491,6 +1456,8 @@ function initPhoneSection(){
   const pills = $$('.tool-pill'), feats = $$('.pfeature'), screens = $$('.pscreen:not(.idle)'), words = $$('.phone-word');
   const inner = feats.map(f => f.querySelector('.pf-inner'));
   const N = feats.length;
+  const slideOf = t => feats.findIndex(f => f.classList.contains(t));
+  const iSpooky = slideOf('t-spooky'), iPixel = slideOf('t-pixel'), iPinky = slideOf('t-pinky');
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
   const lerp = (a, b, t) => a + (b - a) * t;
   const smooth = t => t * t * (3 - 2 * t);
@@ -1503,8 +1470,8 @@ function initPhoneSection(){
   const wordsBox = $('.phone-words');
 
   // backdrop: one saturated tint per tool, blended as the phone swings between them
-  const TINTS = ['#3d2bd6', '#9bb477', '#0b0508', '#2a7bde'].map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))); // send · Pixel · Pinky · WinXP
-  const STATUS_INK = ['#fff', '#20351b', '#fff', '#fff']; // phone status-bar colour per screen
+  const TINTS = ['#3d2bd6', '#1a0d30', '#9bb477', '#0b0508', '#2a7bde'].map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))); // send · Halloween Night · Pixel · Pinky · WinXP
+  const STATUS_INK = ['#fff', '#fff', '#20351b', '#fff', '#fff']; // phone status-bar colour per screen
   const BASE = [13, 10, 36], DARK = [8, 8, 12];
   const mix = (a, b, t) => a.map((v, i) => Math.round(lerp(v, b[i], t)));
 
@@ -1601,9 +1568,97 @@ function initPhoneSection(){
   const pxScene = $('.px-scene');
   if (pxScene) buildPixelScene(pxScene);
 
+  // ---- Halloween Night: the haunted hill behind the phone, drawn from the card's own things ----
+  const spooky = document.getElementById('phoneSpooky');
+  const spBats = [], spSparks = [];
+  function buildSpookyScene(root){
+    let seed = 31; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+    // stars: two twinkling layers of box-shadow dots in the upper sky
+    const starsA = root.querySelector('.sp-stars'), starsB = starsA.cloneNode(); starsB.classList.add('b'); starsA.after(starsB);
+    for (const layer of [starsA, starsB]){
+      layer.style.boxShadow = Array.from({ length: 34 }, () =>
+        `${(rnd() * 100).toFixed(1)}vw ${(rnd() * 58).toFixed(1)}vh 0 ${rnd() < 0.2 ? 1 : 0}px rgba(255,248,230,${(0.35 + rnd() * 0.6).toFixed(2)})`).join(',');
+    }
+    // a jack-o'-lantern; k = which --k<k> lights its face
+    const face = 'M-17 -30l6-9 6 9zM5 -30l6-9 6 9zM-3 -24l3-5 3 5zM-19 -15q19 12 38 0l-4 7-5-4-5 5-5-5-5 4-5-4z';
+    const pumpkin = (x, y, s, k, gid) => `<g transform="translate(${x} ${y}) scale(${s})">
+      <g style="opacity:calc(var(--k${k},0) * .95)"><circle class="sp-pk-glow" cx="0" cy="-24" r="66" fill="url(#${gid})"/></g>
+      <ellipse class="sp-pk-rib" cx="-17" cy="-24" rx="22" ry="24"/><ellipse class="sp-pk-rib" cx="17" cy="-24" rx="22" ry="24"/>
+      <ellipse class="sp-pk-body" cx="0" cy="-24" rx="21" ry="25"/><path class="sp-pk-stem" d="M-3 -47q2-9 9-12l2 3q-5 3-6 9z"/>
+      <path class="sp-pk-face" d="${face}"/><path class="sp-pk-lit" d="${face}" style="opacity:var(--k${k},0)"/></g>`;
+    const glowDef = gid => `<defs><radialGradient id="${gid}"><stop offset="0" stop-color="#ffb347" stop-opacity=".75"/><stop offset=".45" stop-color="#ff7a1a" stop-opacity=".28"/><stop offset="1" stop-color="#ff7a1a" stop-opacity="0"/></radialGradient></defs>`;
+
+    // left: the haunted house on its hill, a dead tree, the iron fence and the gate, two pumpkins
+    let bars = '';
+    for (let x = 300; x <= 700; x += 22){
+      if (x > 304 && x < 500) continue;   // the gate's gap
+      bars += `M${x} 384V306M${x - 5} 312l5-12 5 12`;
+    }
+    const leaf = (x0, x1) => { let d = `M${x0} 384V318M${x1} 384V318M${x0} 346H${x1}`; for (let x = x0 + 13; x < x1 - 4; x += 13) d += `M${x} 384V${306 + Math.abs(x - 410) * 0.18}`; return d; };
+    root.querySelector('.sp-left').innerHTML = glowDef('spPkL') + `
+      <path class="far" d="M0 232C110 190 240 178 360 214S580 250 700 292V420H0Z"/>
+      <g class="ink"><rect x="122" y="62" width="14" height="44"/><path d="M96 224V130l-12 2 88-64 88 64-12-2v94z"/><path d="M214 134V80h-8l26-46 26 46h-8v54z"/><path d="M62 222h236v8H62z"/></g>
+      <rect class="sp-win" x="116" y="150" width="18" height="24"/><rect class="sp-win g" x="148" y="150" width="18" height="24"/><rect class="sp-win" x="196" y="150" width="18" height="24"/>
+      <rect class="sp-win g" x="226" y="94" width="12" height="18"/><rect class="sp-win" x="116" y="186" width="18" height="20"/><path class="sp-win" d="M160 224v-26a11 11 0 0 1 22 0v26z"/>
+      <path class="ink" d="M24 236c5-40 4-76-4-110-12-6-26-8-40-4 14-4 28-4 38 0-4-20-12-34-24-46 14 10 24 24 28 40 2-22 10-38 24-50-10 16-16 34-15 54 10 30 12 70 6 116z"/>
+      <path class="sp-bars" d="${bars}M296 322H314M506 322H700M296 368H314M506 368H700"/>
+      <g class="ink"><rect x="313" y="282" width="18" height="104"/><rect x="489" y="282" width="18" height="104"/><circle cx="322" cy="276" r="11"/><circle cx="498" cy="276" r="11"/></g>
+      <g class="sp-gl"><path class="sp-bars" d="${leaf(333, 410)}M333 318Q371 296 410 306"/></g>
+      <g class="sp-gr"><path class="sp-bars" d="${leaf(410, 487)}M410 306Q449 296 487 318"/></g>
+      <path class="near" d="M0 376Q340 346 700 382V420H0Z"/>
+      ${pumpkin(84, 412, 1.15, 0, 'spPkL')}${pumpkin(196, 414, 0.78, 1, 'spPkL')}`;
+
+    // right: the crypt with its "31", a dead tree, the four gravestones of the date plan (they rise from the ground), two pumpkins
+    const PLAN = [['19:00', 'Pumpkin carving'], ['20:30', 'Horror movie'], ['22:00', 'Haunted walk'], ['23:30', 'Hot chocolate']];
+    const stones = PLAN.map(([time, what], i) => {
+      const x = 118 + i * 96;
+      return `<g style="transform:translateY(calc((1 - var(--r${i},0)) * 122px))">
+        <path class="sp-stone" d="M${x - 40} 366V296Q${x - 40} 258 ${x} 258Q${x + 40} 258 ${x + 40} 296V366Z"/>
+        <g style="opacity:calc(.25 + var(--r${i},0) * .75)"><text class="sp-time" x="${x}" y="300">${time}</text><text class="sp-what" x="${x}" y="320">${what}</text></g></g>`;
+    }).join('');
+    root.querySelector('.sp-right').innerHTML = glowDef('spPkR') + `
+      <defs><clipPath id="spGround"><rect x="0" y="0" width="700" height="366"/></clipPath></defs>
+      <path class="far" d="M0 300C150 258 320 246 470 270S640 236 700 226V420H0Z"/>
+      <g class="ink"><path d="M476 270V206h108v64z"/><path d="M466 210l64-36 64 36z"/></g><path class="sp-win g" d="M518 270v-26a12 12 0 0 1 24 0v26z"/>
+      <text class="sp-time" x="530" y="200" style="font-size:15px">31</text>
+      <path class="ink" d="M676 300c-6-60-4-120 6-170-16-14-40-20-64-18 22-6 44-4 62 4-10-24-26-40-46-52 24 10 42 28 52 50 6-26 20-46 40-58v40c-12 14-20 32-22 52 8 50 6 100-2 152z"/>
+      <path class="sp-bars" style="stroke-width:2" d="M612 118v26M640 96v20"/><rect class="sp-win" x="603" y="144" width="18" height="14"/><rect class="sp-win" x="632" y="116" width="16" height="12"/>
+      <g clip-path="url(#spGround)">${stones}</g>
+      <path class="near" d="M0 364Q360 348 700 368V420H0Z"/>
+      ${pumpkin(500, 414, 1.05, 2, 'spPkR')}${pumpkin(612, 416, 0.72, 3, 'spPkR')}`;
+
+    // bats: they cross the sky as the slide plays, and scatter at the finale
+    const BAT = '<path class="wl" d="M22 9c-4-6-10-8-21-6 4 2 6 5 6 8 3-2 6-1 8 2 1-3 4-4 7-4z"/><path class="wr" d="M22 9c4-6 10-8 21-6-4 2-6 5-6 8-3-2-6-1-8 2-1-3-4-4-7-4z"/><ellipse cx="22" cy="11" rx="3.2" ry="4.6"/><path d="M19.4 8l.9-3.4 1.3 2.4zM24.6 8l-.9-3.4-1.3 2.4z"/>';
+    for (let i = 0; i < 7; i++){
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 44 22'); svg.setAttribute('class', 'sp-bat'); svg.innerHTML = BAT;
+      svg.style.animationDelay = svg.querySelector('.wl').style.animationDelay = svg.querySelector('.wr').style.animationDelay = `${-rnd()}s`;
+      root.querySelector('.sp-bats').append(svg);
+      spBats.push({ el: svg, x0: 1.1 + rnd() * 0.5, y0: 0.08 + rnd() * 0.42, vx: 1.2 + rnd() * 0.9, amp: 8 + rnd() * 18, ph: rnd() * 6, s: 0.6 + rnd() * 0.75 });
+    }
+    // the finale's burst of sparks around the moon
+    const COLORS = ['#ffb347', '#ff7a1a', '#9dff6e', '#fff1c4'];
+    for (let i = 0; i < 18; i++){
+      const el = document.createElement('i');
+      el.style.background = COLORS[i % 4]; el.style.boxShadow = `0 0 10px ${COLORS[i % 4]}`;
+      root.querySelector('.sp-sparks').append(el);
+      const a = (i / 18) * Math.PI * 2 + rnd() * 0.3;
+      spSparks.push({ el, dx: Math.cos(a), dy: Math.sin(a), r: 70 + rnd() * 90 });
+    }
+  }
+  if (spooky) buildSpookyScene(spooky);
+
   // ---- layout-dependent values (rebuilt on resize) ----
-  const F0 = 0.28, LEN = (1 - F0) / N; // tool k owns p ∈ [F0 + k·LEN, F0 + (k+1)·LEN]
+  // one unit U is a normal slide's share of p; slide k owns p ∈ [S0[k], END(k)], SPAN[k] units long (its data-span)
+  const F0 = 0.28, SPAN = feats.map(f => +(f.dataset.span || 1)), U = (1 - F0) / SPAN.reduce((a, b) => a + b, 0);
+  const S0 = SPAN.map((_, k) => F0 + SPAN.slice(0, k).reduce((a, b) => a + b, 0) * U), END = k => S0[k] + SPAN[k] * U;
+  const slideAt = p => { let k = -1; for (let i = 0; i < N; i++) if (p >= S0[i] + 0.025 * U) k = i; return k; };
+  // the intro keeps its own length of scroll however long the slides are: the track's first INTRO of scroll plays p 0 → F0
+  const INTRO = 0.22;
+  const toP = r => r < INTRO ? r * F0 / INTRO : F0 + (r - INTRO) * (1 - F0) / (1 - INTRO);
+  const toR = p => p < F0 ? p * INTRO / F0 : INTRO + (p - F0) * (1 - INTRO) / (1 - F0);
   let W = 0, H = 0, S = 1, mobile = false, keys = [], scatter = [], dockPos = [], dockY = 0, dockScale = 1;
+  let moonAt = { x: 0, y: 0 }, gateAt = { x: 0, y: 0 };
   const pose = (x, y, s, rx, ry, rz) => ({ x, y, s, rx, ry, rz });
   function measure(){
     W = window.innerWidth; H = (document.getElementById('phoneSticky') || {}).clientHeight || window.innerHeight; mobile = W <= 900;
@@ -1618,16 +1673,16 @@ function initPhoneSection(){
       [0.27, pose(0, 0, S, 3, -8, 3)],
     ];
     for (let k = 0; k < N; k++){
-      const a = F0 + (k + 0.3) * LEN;
-      const b = k === N - 1 ? 1 : F0 + (k + 0.75) * LEN;
+      const a = S0[k] + 0.3 * U;
+      const b = k === N - 1 ? 1 : END(k) - 0.25 * U;
       keys.push([a, F(k)], [b, F(k)]);
       // between two tools the phone faces front for a beat while the screen slides over
-      if (k < N - 1) keys.push([F0 + (k + 1.025) * LEN, pose(0, py, S * 0.94, 5, 0, 0)]);
+      if (k < N - 1) keys.push([S0[k + 1] + 0.025 * U, pose(0, py, S * 0.94, 5, 0, 0)]);
     }
 
     // where the pills scatter to (loose, sticker-like) and where they dock (a row along the bottom)
     const ux = clamp(Math.min(W * 0.34, H * 0.5), 110, 340), uy = clamp(H * 0.28, 120, 260);
-    scatter = [[-0.95, -0.8, -6], [0.9, -0.5, 5], [-0.9, 0.35, -4], [0.95, 0.62, 7]]
+    scatter = [[-0.95, -0.7, -6], [0.92, -0.85, 5], [-0.9, 0.5, -4], [0.98, -0.05, -3], [0.9, 0.72, 7]]
       .map(([a, b, r]) => ({ x: a * ux, y: b * uy, r }));
     const gap = 8, ws = pills.map(p => p.offsetWidth);
     const total = ws.reduce((a, b) => a + b, 0) + gap * (N - 1);
@@ -1635,6 +1690,12 @@ function initPhoneSection(){
     let x = -total * dockScale / 2;
     dockPos = ws.map(w => { const cx = x + w * dockScale / 2; x += (w + gap) * dockScale; return cx; });
     dockY = H / 2 - (mobile ? 40 : 52);
+    // where the finale's sparks burst (the moon) and where the letter rises from (behind the gate), in stage pixels
+    if (spooky){
+      const o = spooky.getBoundingClientRect(), m = spooky.querySelector('.sp-moon').getBoundingClientRect(), g = spooky.querySelector('.sp-left').getBoundingClientRect();
+      moonAt = { x: m.left - o.left + m.width / 2, y: m.top - o.top + m.height / 2 };
+      gateAt = { x: g.left - o.left + g.width * 410 / 700, y: g.top - o.top + g.height * 330 / 420 };
+    }
   }
   function poseAt(p){
     if (p <= keys[0][0]) return keys[0][1];
@@ -1651,10 +1712,9 @@ function initPhoneSection(){
   // how much each slide owns the stage right now (0..1 each); the last 30% of a slide blends into the next
   function weightsAt(p){
     const w = new Array(N).fill(0);
-    const u = (p - F0 - 0.025 * LEN) / LEN;
-    if (u < 0){ w[0] = smooth(seg(p, 0.2, F0)); return w; } // still the intro colour, easing toward slide 1
-    const k = Math.min(N - 1, Math.floor(u)), f = u - k;
-    if (k < N - 1){ const t = smooth(seg(f, 0.7, 1)); w[k] = 1 - t; w[k + 1] = t; } else w[k] = 1;
+    const k = slideAt(p);
+    if (k < 0){ w[0] = smooth(seg(p, 0.2, F0)); return w; } // still the intro colour, easing toward slide 1
+    if (k < N - 1){ const e = S0[k + 1] + 0.025 * U, t = smooth(seg(p, e - 0.3 * U, e)); w[k] = 1 - t; w[k + 1] = t; } else w[k] = 1;
     return w;
   }
   function tintAt(w, p){
@@ -1664,17 +1724,75 @@ function initPhoneSection(){
     return `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
   }
 
+  // ---- Halloween Night's hill: everything on it is a function of the slide's own progress t, so it plays forward and back with the
+  // scroll in step with the chapter on the phone (t 0–.2 the gate · .2–.4 the letter · .4–.6 the pumpkin · .6–.8 the date plan · .8–1 the finale)
+  const spVars = {}, spImgs = $$('.s-spooky img'), spSteps = $$('.sp-steps li'), planesBox = $('#phonePlanes');
+  const spLetter = spooky && spooky.querySelector('.sp-letter'), spMoon = spooky && spooky.querySelector('.sp-moon');
+  const spClouds = spooky ? [...spooky.querySelectorAll('.sp-clouds i')] : [], spFog = spooky && spooky.querySelector('.sp-fog');
+  let spLive = false, spCh = -1, spOp = '';
+  const setVar = (k, v) => { const s = v.toFixed(3); if (spVars[k] !== s){ spVars[k] = s; spooky.style.setProperty(k, s); } };
+  function renderSpooky(p, ws, q, bob){
+    const live = ws > 0.005;
+    if (live !== spLive){ spLive = live; spooky.classList.toggle('is-live', live); }
+    const op = ws.toFixed(3);
+    if (op !== spOp){ spOp = op; spooky.style.opacity = op; if (planesBox) planesBox.style.opacity = (1 - ws).toFixed(3); }   // the paper planes give the sky to the bats
+    const t = seg(p, S0[iSpooky] + 0.025 * U, END(iSpooky) - 0.275 * U);
+    const ch = Math.min(4, Math.floor(t * 5));
+    if (ch !== spCh){
+      spCh = ch;
+      spImgs.forEach((im, i) => im.classList.toggle('is-on', i === ch));
+      spSteps.forEach((li, i) => { li.classList.toggle('is-on', i === ch); li.classList.toggle('is-done', i < ch); });
+    }
+    if (!live) return;
+
+    const f = smooth(seg(t, 0.8, 0.88));
+    setVar('--g', smooth(seg(t, 0.05, 0.12)));                          // 1 · "Open the gate": the iron gate swings open
+    setVar('--w', Math.max(smooth(seg(t, 0.2, 0.36)), f));              // 2 · the house wakes up while the letter is read
+    for (let i = 0; i < 4; i++){
+      setVar(`--k${i}`, smooth(seg(t, 0.4 + i * 0.025, 0.45 + i * 0.025)));   // 3 · the jack-o'-lanterns light, one by one
+      setVar(`--r${i}`, smooth(seg(t, 0.6 + i * 0.03, 0.67 + i * 0.03)));     // 4 · the gravestones of the date plan rise
+    }
+    setVar('--f', f);                                                    // 5 · the finale: the moon flares, sparks burst, the bats scatter
+
+    // the letter rises beyond the gate and flies into the phone just as the phone opens it
+    // (on a narrow screen the copy sits between the gate and the phone, so the letter comes in from the side)
+    const e = seg(t, 0.1, 0.2);
+    if (e <= 0 || e >= 1){ if (spLetter.style.opacity !== '0') spLetter.style.opacity = '0'; }
+    else {
+      const rise = smooth(Math.min(1, e / 0.35)), fly = smooth(seg(e, 0.35, 1)), from = mobile ? { x: -10, y: H / 2 + q.y } : gateAt;
+      const sx = from.x, sy = from.y - 80 * rise, tx = W / 2 + q.x, ty = H / 2 + q.y + bob;
+      const x = lerp(sx, tx, fly), y = lerp(sy, ty, fly) - Math.sin(fly * Math.PI) * 90, sc = lerp(0.55 + 0.45 * rise, 0.35, fly);
+      spLetter.style.opacity = (seg(e, 0, 0.12) * (1 - seg(e, 0.86, 1))).toFixed(3);
+      spLetter.style.transform = `translate3d(${(x - 32).toFixed(1)}px,${(y - 23).toFixed(1)}px,0) rotate(${(-8 + 16 * fly).toFixed(1)}deg) scale(${sc.toFixed(3)})`;
+    }
+
+    spMoon.style.transform = `translate3d(0,${((1 - t) * 26).toFixed(1)}px,0) scale(${(1 + f * 0.06).toFixed(3)})`;
+    spClouds.forEach((c, i) => { c.style.transform = `translate3d(${(-t * (4 + i * 3)).toFixed(2)}vw,0,0)`; });
+    spFog.style.transform = `translate3d(${(-t * 6).toFixed(2)}vw,0,0)`;
+    spBats.forEach(b => {   // right to left across the sky; the finale sends them off faster
+      const x = (b.x0 - t * b.vx - f * 0.5) * W, y = b.y0 * H + Math.sin(t * 9 + b.ph) * b.amp - f * 60 * b.s;
+      b.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) scale(${b.s.toFixed(2)})`;
+    });
+    const fb = seg(t, 0.8, 0.92), so = (smooth(seg(t, 0.8, 0.83)) * (1 - seg(t, 0.9, 0.99))).toFixed(3);
+    spSparks.forEach(s => {
+      const d = s.r * (1 - Math.pow(1 - fb, 3));
+      s.el.style.opacity = so;
+      s.el.style.transform = `translate3d(${(moonAt.x + s.dx * d).toFixed(1)}px,${(moonAt.y + s.dy * d + fb * fb * 26).toFixed(1)}px,0)`;
+    });
+  }
+
   // ---- one frame ----
   let idx = -2, mx = 0, my = 0, tmx = 0, tmy = 0, lastTint = '';
   function render(p, now){
     const w = weightsAt(p);
     const tint = tintAt(w, p);
     if (tint !== lastTint){ lastTint = tint; sticky.style.backgroundColor = tint; }
-    glowWhite.style.opacity = 1 - w[2] * 0.9;
-    glowPink.style.opacity = w[2];
-    gridEl.style.opacity = w[1] * 0.3;
+    glowWhite.style.opacity = 1 - (w[iPinky] || 0) * 0.9 - (w[iSpooky] || 0) * 0.6;
+    glowPink.style.opacity = w[iPinky] || 0;
+    gridEl.style.opacity = (w[iPixel] || 0) * 0.3;
     const q = poseAt(p);
     const bob = reduceMotion ? 0 : Math.sin(now * 0.0012) * 6;
+    if (spooky) renderSpooky(p, w[iSpooky] || 0, q, bob);
     if (flat){
       phone.style.transform =
         `perspective(1200px) translate3d(${q.x}px,${q.y + bob}px,0) rotateX(${(-my * 14).toFixed(2)}deg) rotateY(${(mx * 18).toFixed(2)}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
@@ -1692,7 +1810,7 @@ function initPhoneSection(){
     idleLogo.style.opacity = 1 - seg(p, 0.05, 0.11);
 
     // pills: burst out of the phone → scatter → dock along the bottom as the nav
-    const appear = seg(p, 0.08, 0.15), fly = smooth(seg(p, 0.15, 0.25)), dock = smooth(seg(p, 0.28, 0.35));
+    const appear = seg(p, 0.08, 0.15), fly = smooth(seg(p, 0.15, 0.25)), dock = smooth(seg(p, F0, F0 + 0.39 * U));
     const cy = H / 2 + q.y, cx = W / 2;
     const linkOp = fly * (1 - smooth(seg(p, 0.25, 0.31)));
     linksEl.style.opacity = linkOp;
@@ -1715,22 +1833,21 @@ function initPhoneSection(){
 
     // copy + giant word for each tool
     feats.forEach((f, k) => {
-      const t = (p - (F0 + k * LEN)) / LEN;
-      const inn = seg(t, 0.12, 0.34);
-      const out = k === N - 1 ? 0 : seg(t, 0.74, 0.94);
+      const a0 = S0[k], e0 = END(k);
+      const inn = seg(p, a0 + 0.12 * U, a0 + 0.34 * U);
+      const out = k === N - 1 ? 0 : seg(p, e0 - 0.26 * U, e0 - 0.06 * U);
       const a = inn * (1 - out);
       f.style.visibility = a > 0.01 ? 'visible' : 'hidden';
       inner[k].style.opacity = a;
       inner[k].style.transform = `translate3d(0,${(1 - inn) * 34 - out * 34}px,0)`;
 
-      const wi = seg(t, -0.1, 0.3), wo = k === N - 1 ? 0 : seg(t, 0.7, 1.05);
+      const wi = seg(p, a0 - 0.1 * U, a0 + 0.3 * U), wo = k === N - 1 ? 0 : seg(p, e0 - 0.3 * U, e0 + 0.05 * U);
       words[k].style.opacity = wi * (1 - wo);
       words[k].style.transform = `translate3d(${(1 - wi) * W * 0.35 - wo * W * 0.35}px,-50%,0)`;
     });
 
     // which screen the phone shows
-    const u = (p - F0 - 0.025 * LEN) / LEN;
-    const ni = u < 0 ? -1 : Math.min(N - 1, Math.floor(u));
+    const ni = slideAt(p);
     if (ni !== idx){
       idx = ni;
       idle.dataset.s = ni < 0 ? 'on' : 'before';
@@ -1744,7 +1861,7 @@ function initPhoneSection(){
   function frame(now){
     if (!active){ raf = 0; return; }
     const r = track.getBoundingClientRect();
-    const p = clamp(-r.top / Math.max(r.height - H, 1), 0, 1);
+    const p = toP(clamp(-r.top / Math.max(r.height - H, 1), 0, 1));
     // exponential smoothing that doesn't depend on the frame rate (≈ .14 per frame at 60fps)
     const dt = last ? now - last : 16.7; last = now;
     pS = pS < 0 || reduceMotion ? p : pS + (p - pS) * (1 - Math.exp(-dt / 110));
@@ -1770,27 +1887,84 @@ function initPhoneSection(){
   // pills jump straight to a tool
   function goTo(k){
     const r = track.getBoundingClientRect();
-    const y = window.scrollY + r.top + (F0 + (k + 0.52) * LEN) * (r.height - H);
+    const y = window.scrollY + r.top + toR(S0[k] + (SPAN[k] > 1 ? 0.36 : 0.52) * U) * (r.height - H);   // the spotlight opens on its first chapter
     if (lenis) lenis.scrollTo(y, { duration: 1.6 });
     else window.scrollTo({ top: y, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
   pills.forEach(b => b.addEventListener('click', () => goTo(+b.dataset.k)));
 }
 
+/* ---------------- The styles: one list drives the order dialog, the account view and the gallery ----------------
+   id = what the orders server and the gateway call it (see worker/ and gateway/); the demo link is /?share=test-<id>.
+   live: false = not deployed yet: shown as "coming soon" and left out of the order dialog. */
+const STYLES = [
+  { id: 'spooky',    name: 'Halloween Night', blurb: 'A haunted hill with your date plan', color: '#ff7a1a', glyph: '☠',  group: 'holiday', live: true },
+  { id: 'halloween', name: 'Halloween',  blurb: 'A spooky quest for two',                  color: '#8a5cff', glyph: '☾',  group: 'holiday', live: true },
+  { id: 'pixel',     name: 'Pixel',      blurb: 'A Game Boy love letter',                  color: '#6d9b3a', glyph: 'px', group: 'date', live: true },
+  { id: 'pinky',     name: 'Pinky',      blurb: 'Neon, after dark',                        color: '#ff2e7e', glyph: '♥',  group: 'date', live: true },
+  { id: 'winxp',     name: 'WinXP',      blurb: 'A retro desktop',                         color: '#2a63d8', glyph: 'xp', group: 'date', live: true },
+  { id: 'petal',     name: 'Petal Isle', blurb: 'A floating island to explore together',  color: '#f08fb0', glyph: '✿',  group: 'date', live: true },
+  { id: 'picnic',    name: 'Picnic',     blurb: 'A birthday picnic under the stars',       color: '#e8843c', glyph: '☆',  group: 'birthday', live: true },
+  { id: 'salon',     name: 'Heritage',   blurb: 'A candle-lit birthday from another century', color: '#b0314f', glyph: '♪',  group: 'birthday', live: true },
+  { id: 'mission',   name: 'Mission',    blurb: 'A birthday mission at a desert base',     color: '#d9a441', glyph: '★',  group: 'birthday', live: true },
+];
+const STYLE_NAMES = Object.fromEntries(STYLES.map(s => [s.id, s.name]));
+const STYLE_COLORS = Object.fromEntries(STYLES.map(s => [s.id, s.color]));
+
 /* ---------------- Orders: buy a pack, then choose which links to make ----------------
-   1 link costs $1.99 and a pack of 8 costs $9.99. After paying, the buyer chooses how many of each style (Pixel, Pinky, WinXP) to create,
-   up to the number of links they paid for: with 8 they could make 3 Pixel, 2 Pinky and 3 WinXP, in one go or over several visits.
+   1 link costs $3.99 and a pack of 8 costs $14.99, the same price everywhere (USD). After paying, the buyer chooses how many of each style (see STYLES above) to create,
+   up to the number of links they paid for: with 8 they could make 3 Pixel, 2 Picnic and 3 Heritage, in one go or over several visits.
 
    With a Worker address in the pricing section's data-api (see worker/): "Buy" asks the Worker for a checkout, sends the buyer to it, and the
    Worker marks the order paid when the payment provider confirms. The buyer comes back to /?order=<token>, the dialog waits for the
    confirmation, and links are created by the Worker. With no address this all runs as a demo in the visitor's own browser: nothing is
    charged, and the links it makes are placeholders that open nothing. */
+/* ---------------- Undoing a purchase: for 10 minutes after paying, the buyer can get their money back themselves ----------------
+   A countdown and a button that asks twice ("tap again"), since it switches every link in the order off. ask(order) makes the
+   request and resolves with the updated order; done(order) is called once the refund has been asked for. Returns null when the
+   order can't be refunded (any more). */
+function refundControl(order, { ask, done, compact = false }){
+  if (!order || order.status !== 'paid' || !order.refundableUntil || order.refundableUntil <= Date.now()) return null;
+  const box = document.createElement('div'); box.className = compact ? 'od-refund is-compact' : 'od-refund';
+  const text = document.createElement('p');
+  const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'od-refund-btn';
+  const err = document.createElement('p'); err.className = 'od-refund-err'; err.setAttribute('role', 'alert'); err.hidden = true;
+  if (!compact) box.append(text);
+  box.append(btn, err);
+  let armed = false, armTimer = 0, busy = false;
+  const clock = ms => { const sec = Math.ceil(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+  function paint(){
+    const left = order.refundableUntil - Date.now();
+    if (left <= 0){ box.remove(); clearInterval(tick); return; }
+    if (busy) return;
+    text.innerHTML = `Changed your mind? Until you make your first link, you can get a full refund for <b>${clock(left)}</b> more.`;
+    btn.textContent = armed ? (compact ? 'Tap again to refund' : 'Tap again: refund and switch the links off') : (compact ? `Refund · ${clock(left)}` : 'Refund this order');
+    btn.classList.toggle('is-armed', armed);
+  }
+  const tick = setInterval(paint, 1000);
+  btn.addEventListener('click', async () => {
+    if (busy) return;
+    if (!armed){ armed = true; paint(); clearTimeout(armTimer); armTimer = setTimeout(() => { armed = false; paint(); }, 5000); return; }
+    clearTimeout(armTimer); busy = true; btn.disabled = true; btn.textContent = 'Refunding…'; err.hidden = true;
+    try {
+      const next = await ask(order);
+      clearInterval(tick);
+      done(next);
+    } catch (e){
+      busy = false; armed = false; btn.disabled = false;
+      err.textContent = e.message || 'That didn’t work. Please try again.'; err.hidden = false;
+      paint();
+    }
+  });
+  paint();
+  return box;
+}
+
 function initOrders(){
   const modal = document.getElementById('orderModal');
   if (!modal) return;
-  const PACKS = { single: { credits: 1, cents: 199, label: '1 link' }, pack: { credits: 8, cents: 999, label: '8 links' } };
-  const NAMES = { pixel: 'Pixel', pinky: 'Pinky', winxp: 'WinXP' };
-  const COLORS = { pixel: '#6d9b3a', pinky: '#ff2e7e', winxp: '#2a63d8' };
+  const PACKS = { single: { credits: 1, cents: 399, label: '1 link' }, pack: { credits: 8, cents: 1499, label: '8 links' } };
+  const NAMES = STYLE_NAMES, COLORS = STYLE_COLORS;
   const KEY = 'sent4u.order', HOST = 'https://sent4u.link';
   const money = cents => `$${(cents / 100).toFixed(2)}`;
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -1801,17 +1975,25 @@ function initOrders(){
 
   const panel = modal.querySelector('.rvm-panel');
   const views = Object.fromEntries([...modal.querySelectorAll('[data-view]')].map(v => [v.dataset.view, v]));
+  // the style rows, built from STYLES (name, one line, colour, a + and − each)
+  $('odProducts').innerHTML = STYLES.filter(s => s.live).map(s => `
+        <li class="od-prod" data-product="${s.id}" style="--c:${s.color}">
+          <span class="od-swatch" aria-hidden="true">${s.glyph}</span>
+          <div class="od-name"><b>${s.name}</b><small>${s.blurb}</small></div>
+          <div class="od-step"><button type="button" data-dec aria-label="One less ${s.name}">−</button><output aria-live="polite">0</output><button type="button" data-inc aria-label="One more ${s.name}">+</button></div>
+        </li>`).join('');
   const rows = [...modal.querySelectorAll('.od-prod')];
   const createBtn = $('odCreate'), errBox = views.choose.querySelector('.rvm-error');
   const lockables = [$('mainContent'), $('siteHeader')].filter(Boolean);
-  const counts = { pixel: 0, pinky: 0, winxp: 0 };
+  const counts = Object.fromEntries(STYLES.filter(s => s.live).map(s => [s.id, 0]));
+  const clearCounts = () => { for (const id in counts) counts[id] = 0; };
   let order = null, pendingPack = '', busy = false, run = 0, lastFocus = null, closeTimer = 0, made = 0;
 
   const store = {
     read(){ try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; } },
     write(v){ try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} },
   };
-  const total = () => counts.pixel + counts.pinky + counts.winxp;
+  const total = () => Object.values(counts).reduce((a, b) => a + b, 0);
 
   /* ---- the dialog ---- */
   function show(name){
@@ -1842,13 +2024,32 @@ function initOrders(){
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) close(); });
   const fail = (text, title = 'Something went wrong') => { $('odErrTitle').textContent = title; $('odErrText').textContent = text; open(); show('error'); };
 
+  /* ---- undoing the purchase (10 minutes) ---- */
+  let refundBox = null;
+  function mountRefund(where){
+    if (refundBox) refundBox.remove();
+    refundBox = order.demo ? null : refundControl(order, {
+      ask: o => request(`/orders/${encodeURIComponent(o.token)}/refund-request`, {}),
+      done: next => { order = next; showRefunded(); },
+    });
+    if (refundBox) where.after(refundBox);
+  }
+  function showRefunded(){
+    const asked = order.status === 'refunding';
+    $('odRefundedTitle').textContent = asked ? 'Refund on its way' : 'This order was refunded';
+    $('odRefundedText').textContent = asked
+      ? `We've asked Paddle to refund your ${PACKS[order.pack] ? PACKS[order.pack].label : 'order'} (${money(order.amount)}). The money goes back to the card or account you paid with: Paddle checks it first, then it usually shows within a few business days. The links from this order no longer work.`
+      : 'The money for this order has been returned, so its links no longer work.';
+    open(); show('refunded');
+  }
+
   /* ---- choosing ---- */
   function renderChoose(){
     const left = order.remaining - total();
     const spent = order.credits - order.remaining;
     $('odPaid').textContent = spent
-      ? `You paid ${money(order.amount)} for ${plural(order.credits, 'link')}. ${plural(spent, 'link')} already made. Choose the rest.`
-      : `You paid ${money(order.amount)} for ${plural(order.credits, 'link')}. Choose which ones to create.`;
+      ? `Payment received for ${plural(order.credits, 'link')}. ${plural(spent, 'link')} already made. Choose the rest.`
+      : `Payment received for ${plural(order.credits, 'link')}. Choose which ones to create.`;
     $('odLeft').textContent = left;
     $('odLeftLabel').textContent = left === 1 ? 'link left to choose' : 'links left to choose';
     rows.forEach(row => {
@@ -1865,14 +2066,14 @@ function initOrders(){
     const p = row.dataset.product;
     row.querySelector('[data-inc]').addEventListener('click', () => {
       errBox.hidden = true;
-      if (order.remaining === 1){ counts.pixel = counts.pinky = counts.winxp = 0; counts[p] = 1; }
+      if (order.remaining === 1){ clearCounts(); counts[p] = 1; }
       else if (total() < order.remaining) counts[p]++;
       renderChoose();
     });
     row.querySelector('[data-dec]').addEventListener('click', () => { errBox.hidden = true; if (counts[p] > 0) counts[p]--; renderChoose(); });
   });
 
-  function showChoose(){ counts.pixel = counts.pinky = counts.winxp = 0; busy = false; errBox.hidden = true; show('choose'); renderChoose(); }
+  function showChoose(){ clearCounts(); busy = false; errBox.hidden = true; show('choose'); renderChoose(); mountRefund(createBtn); }
 
   createBtn.addEventListener('click', async () => {
     if (busy || !total()) return;
@@ -1911,6 +2112,7 @@ function initOrders(){
       list.append(li);
     });
     show('done');
+    mountRefund(views.done.querySelector('.od-actions'));
   }
   $('odMore').addEventListener('click', showChoose);
   async function copyText(text, btn){
@@ -1992,6 +2194,7 @@ function initOrders(){
       try {
         order = await request(`/orders/${encodeURIComponent(token)}`);
         if (order.status === 'paid'){ if (my === run){ made = 0; toNext(); } return; }
+        if (order.status === 'refunding' || order.status === 'refunded'){ if (my === run) showRefunded(); return; }
       } catch (err){
         if (err.status === 404){ if (my === run) fail('We couldn’t find that order. Check the link you were sent, or get in touch and we’ll sort it out.', 'Order not found'); return; }
       }
@@ -2020,7 +2223,7 @@ function initOrders(){
   }
 }
 
-/* ---------------- Sign in: no password, a one-time emailed link (see worker/'s /auth/* routes) ----------------
+/* ---------------- Sign in: no password, an emailed link to confirm it's you (see worker/'s /auth/* routes) ----------------
    Calls go to relative paths (/auth/*, /me) rather than a data-api address: the gateway (see gateway/) proxies
    those to the orders Worker so the session cookie it sets is a first-party sent4u.link cookie, not one shared
    cross-site with the Worker's own *.workers.dev address, which browsers increasingly restrict or block. Clicking
@@ -2034,8 +2237,7 @@ function initAuth(){
   const panel = modal.querySelector('.rvm-panel');
   const views = Object.fromEntries([...modal.querySelectorAll('[data-view]')].map(v => [v.dataset.view, v]));
   const lockables = [$('mainContent'), $('siteHeader')].filter(Boolean);
-  const NAMES = { pixel: 'Pixel', pinky: 'Pinky', winxp: 'WinXP' };
-  const COLORS = { pixel: '#6d9b3a', pinky: '#ff2e7e', winxp: '#2a63d8' };
+  const NAMES = STYLE_NAMES, COLORS = STYLE_COLORS;
   const PACKS = { single: '1 link', pack: '8 links' };
   let me = null, lastFocus = null, closeTimer = 0;
 
@@ -2090,8 +2292,15 @@ function initAuth(){
       const li = document.createElement('li'); li.className = 'au-order';
       const head = document.createElement('div'); head.className = 'au-order-head';
       const pack = document.createElement('span'); pack.textContent = PACKS[order.pack] || order.pack;
-      const status = document.createElement('span'); status.className = `au-status${order.status === 'paid' ? ' is-paid' : ''}`; status.textContent = order.status;
+      const status = document.createElement('span'); status.className = `au-status${order.status === 'paid' ? ' is-paid' : ''}`;
+      status.textContent = { paid: 'paid', pending: 'waiting for payment', refunding: 'refund requested', refunded: 'refunded' }[order.status] || order.status;
       head.append(pack, status);
+      const refund = refundControl(order, {
+        compact: true,
+        ask: o => request(`/orders/${encodeURIComponent(o.token)}/refund-request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }),
+        done: next => { me.orders = me.orders.map(o => (o.token === next.token ? next : o)); renderAccount(); },
+      });
+      if (refund) head.append(refund);
       const links = document.createElement('ul'); links.className = 'od-links';
       [...order.links].sort((a, b) => b.at - a.at).forEach(l => {
         const item = document.createElement('li'); item.className = 'od-link'; item.style.setProperty('--c', COLORS[l.product] || '#7c5cff');
@@ -2115,9 +2324,34 @@ function initAuth(){
     trigger.title = `Signed in as ${me.email}`;
   }
 
+  // The email can be opened anywhere: this browser asks every few seconds whether it has been confirmed yet (on this device, or on
+  // another one by picking the number shown here), and signs in by itself. The link lasts 15 minutes; so does the waiting.
+  let waitRun = 0;
+  async function waitForConfirmation(){
+    const my = ++waitRun, until = Date.now() + 15 * 60 * 1000;
+    $('auWait').textContent = 'Waiting for you to confirm…'; $('auRetry').hidden = true;
+    while (my === waitRun && Date.now() < until){
+      await new Promise(resolve => setTimeout(resolve, document.hidden ? 6000 : 3000));
+      if (my !== waitRun) return;
+      let status;
+      try { status = await request('/auth/status'); } catch { continue; }
+      if (status.signedIn){
+        waitRun++;
+        try { signedIn(await request('/me')); if (!modal.hidden) renderAccount(); } catch {}
+        return;
+      }
+      if (status.expired) break;
+    }
+    if (my !== waitRun) return;
+    $('auWait').textContent = 'This sign-in link has expired or was cancelled.'; $('auRetry').hidden = false;
+  }
+  $('auRetry').addEventListener('click', () => { show('signin'); requestAnimationFrame(() => $('auEmail').focus()); });
+
+  const EMAIL_KEY = 'sent4u.email';   // the address last used here, so it's already filled in next time
   trigger.addEventListener('click', () => {
     open();
     if (me){ renderAccount(); return; }
+    try { if (!$('auEmail').value) $('auEmail').value = localStorage.getItem(EMAIL_KEY) || ''; } catch {}
     show('signin');
     requestAnimationFrame(() => $('auEmail').focus());
   });
@@ -2127,9 +2361,12 @@ function initAuth(){
     const email = $('auEmail').value.trim();
     $('auSubmit').disabled = true; $('auError').hidden = true;
     try {
-      await request('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const sent = await request('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      try { localStorage.setItem(EMAIL_KEY, email); } catch {}
       $('auSentTo').textContent = email;
+      $('auCode').textContent = sent.code || '··';
       show('sent');
+      waitForConfirmation();
     } catch (err){
       $('auError').textContent = err.message || 'That didn’t work. Please try again.'; $('auError').hidden = false;
     } finally {
@@ -2139,7 +2376,7 @@ function initAuth(){
 
   $('auSignOut').addEventListener('click', async () => {
     try { await request('/auth/logout', { method: 'POST' }); } catch {}
-    me = null;
+    me = null; waitRun++;
     trigger.textContent = 'Sign in';
     trigger.removeAttribute('title');
     close();
@@ -2158,8 +2395,43 @@ function initAuth(){
   }
 }
 
+/* ---------------- The styles gallery: a card per style (from STYLES), filtered by the tabs above it ---------------- */
+function initStyles(){
+  const grid = document.getElementById('sgGrid');
+  if (!grid) return;
+  grid.innerHTML = STYLES.map(s => {
+    const shot = s.live
+      ? `<img src="assets/styles/${s.id}.webp" alt="A preview of the ${s.name} style" width="520" height="853" loading="lazy" decoding="async">`
+      : `<span class="sg-soon" aria-hidden="true">${s.glyph}</span>`;
+    const inner = `<span class="sg-shot">${shot}</span><span class="sg-name">${s.name}</span><span class="sg-blurb">${s.blurb}</span><span class="sg-demo">${s.live ? 'Open live demo' : 'Coming soon'}</span>`;
+    return `<li class="sg-item" data-group="${s.group}" style="--c:${s.color}">${s.live
+      ? `<a class="sg-card" href="/?share=test-${s.id}" target="_blank" rel="noopener">${inner}</a>`
+      : `<div class="sg-card is-soon">${inner}</div>`}</li>`;
+  }).join('');
+  const tabs = [...document.querySelectorAll('.sg-tabs [data-filter]')];
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    const f = tab.dataset.filter;
+    tabs.forEach(b => b.setAttribute('aria-selected', String(b === tab)));
+    grid.querySelectorAll('.sg-item').forEach(li => { li.hidden = f !== 'all' && li.dataset.group !== f; });
+  }));
+}
+
 /* ---------------- Boot ---------------- */
+/* ---------------- Support band: a tip jar on Ko-fi (not Paddle: Paddle doesn't allow donations) ---------------- */
+// The Ko-fi page's address. While it is empty the band and its footer link stay hidden, so nobody is sent to a page that
+// isn't ours.
+const KOFI_URL = '';
+function initSupport(){
+  if (!/^https:\/\/ko-fi\.com\/[A-Za-z0-9_]+\/?$/.test(KOFI_URL)) return;
+  const band = document.getElementById('support');
+  if (!band) return;
+  document.getElementById('supportLink').href = KOFI_URL;
+  band.hidden = false;
+  document.querySelectorAll('[data-support-link]').forEach(a => { a.hidden = false; });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initSupport();
   initTilt();
   prepareHero();
   initSmoothScroll();
@@ -2169,7 +2441,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeader();
   initHeroParallax();
   initHeroTilt();
-  initEarthScene({ canvas: document.getElementById('earthCanvas'), reduceMotion });
+  setTimeout(() => initEarthScene({ canvas: document.getElementById('earthCanvas'), reduceMotion }), 60);   // after the loading screen's first paint: creating the 3D renderer stalls the page for a moment
   initHow();
   initLetterRoll();
   initMenu();
@@ -2178,6 +2450,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPricing();
   initOrders();
   initAuth();
+  initStyles();
   initFinale({ reduceMotion });
   initOffscreenPause();
   initPerfGuard();

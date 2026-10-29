@@ -17,3 +17,8 @@ parallax-techniques.md
 # 3D models that are downloaded but not used by the site
 assets/models/earth.glb
 assets/models/moon.glb
+
+# local secrets and dev state
+.dev.vars
+.env*.local
+.sites-runtime/

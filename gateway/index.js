@@ -1,16 +1,17 @@
 /* sent4u gateway — the Worker behind sent4u.link itself.
 
-   Every invitation link is the same shape, no matter which of the three apps it's for:
+   Every invitation link is the same shape, no matter which of the apps (styles) it's for:
    sent4u.link/?share=<id>. This Worker decides which app that id belongs to and reverse-
    proxies the request there, so the app's real domain (wherever it's actually hosted)
    never shows up in the address bar. Everything else — the marketing site, reviews,
    pricing — is served straight from this Worker's own static assets, unchanged.
 
    How an id resolves to a product:
-     - test-pixel / test-pinky / test-winxp   the three "Open live demo" links on the
-                                               marketing site — always resolve locally,
-                                               no network call, no such thing exists in
-                                               the orders Worker (demo ids are never real).
+     - test-<style>                           the "Open live demo" links on the marketing
+                                               site (test-pixel, test-picnic, ...) — always
+                                               resolve locally, no network call, no such
+                                               thing exists in the orders Worker (demo ids
+                                               are never real).
      - anything else                          asked of the orders Worker's GET /links/:id
                                                (see /worker). A real id only resolves once
                                                it's actually been paid for.
@@ -21,7 +22,10 @@
    choice in a short-lived cookie and uses it to keep routing that browser's follow-up
    asset requests to the same app — falling back to this site's own assets if the app
    doesn't have the file, so a stale cookie can never break normal marketing-site
-   browsing.
+   browsing. (This site's own /assets/, /vendor/ and page scripts never reach this Worker
+   at all: Cloudflare serves them straight from storage, see run_worker_first in
+   wrangler.jsonc. An app's own files have names this site doesn't use, so they miss
+   storage and still arrive here.)
 
    The orders Worker's own browser-facing routes (checkout, orders, sign-in) are also
    proxied straight through, unconditionally — not because of ?share=, but so the
@@ -31,15 +35,25 @@
    never read a cookie — so they're left on the direct cross-origin data-api call they
    already use. */
 
-const DEMO_PRODUCTS = {
-  'test-pixel': 'pixel',
-  'test-pinky': 'pinky',
-  'test-winxp': 'winxp',
+// Every style and the env var holding where it's deployed. A style whose origin isn't set yet just falls
+// through to the marketing site, so a new one can be added here before it's live.
+const ORIGIN_VARS = {
+  pixel: 'PIXEL_ORIGIN',
+  pinky: 'PINKY_ORIGIN',
+  winxp: 'WINXP_ORIGIN',
+  petal: 'PETAL_ORIGIN',
+  picnic: 'PICNIC_ORIGIN',
+  salon: 'SALON_ORIGIN',
+  mission: 'MISSION_ORIGIN',
+  halloween: 'HALLOWEEN_ORIGIN',
+  spooky: 'SPOOKY_ORIGIN',
 };
-const PRODUCTS = ['pixel', 'pinky', 'winxp'];
+const PRODUCTS = Object.keys(ORIGIN_VARS);
+const DEMO_PRODUCTS = Object.fromEntries(PRODUCTS.map(p => [`test-${p}`, p]));
 const COOKIE_NAME = 's4u_app';
 const COOKIE_MAX_AGE = 6 * 60 * 60; // 6 hours — long enough for one browsing session
 const API_PATHS = [/^\/auth\//, /^\/me$/, /^\/checkout$/, /^\/orders\//];
+const SITE_PAGES = /^\/(pay|terms|privacy|refunds)(\.html)?\/?$/;
 
 export default {
   async fetch(request, env) {
@@ -49,6 +63,10 @@ export default {
       if (!ordersApiBase) return new Response('Not configured.', { status: 501 });
       return proxy(ordersApiBase, request);
     }
+    // The site's own pages (checkout, legal) are never an app's: an app answers any unknown path with its own page, so a
+    // buyer who looked at a card a moment ago would otherwise get that card instead of the payment window. These pages also
+    // drop the cookie, like the home page, so the style sheet and scripts they load come from this site too.
+    if (SITE_PAGES.test(url.pathname)) return withClearedAppCookie(await env.ASSETS.fetch(request));
     if (url.pathname === '/') {
       const shareId = url.searchParams.get('share');
       const product = shareId ? await resolveProduct(shareId, env) : null;
@@ -59,18 +77,55 @@ export default {
       // asset requests this same page is about to make.
       return withClearedAppCookie(await env.ASSETS.fetch(request));
     }
-    const cookieProduct = readCookie(request, COOKIE_NAME);
-    const origin = cookieProduct && originFor(cookieProduct, env);
+    const appProduct = await productOfPage(request, url, env) || readCookie(request, COOKIE_NAME);
+    const origin = appProduct && originFor(appProduct, env);
     if (origin) {
       const proxied = await proxy(origin, request);
-      if (proxied.status !== 404) return proxied;
+      // an app's own API answers 404 with a JSON body its page understands: pass that through as it is
+      if (url.pathname.startsWith('/api/')) return proxied;
+      // a Pages app answers a file it doesn't have with its own index.html (status 200): that's a miss too
+      const pageForAFile = /\.[a-z0-9]{2,5}$/i.test(url.pathname) && !url.pathname.endsWith('.html')
+        && (proxied.headers.get('Content-Type') || '').startsWith('text/html');
+      if (proxied.status !== 404 && !pageForAFile) return proxied;
     }
     return env.ASSETS.fetch(request);
   },
 };
 
-async function resolveProduct(id, env) {
+// Which app the page asking for this file is showing, from its Referer (sent4u.link/?share=<id>). A buyer with several
+// links open in tabs has one cookie but many pages: without this, the tab opened first would load its sounds and pictures
+// from whichever card was opened last. Files asked for by a style sheet or script carry that file as the Referer
+// instead, and fall back to the cookie.
+async function productOfPage(request, url, env) {
+  const referer = request.headers.get('Referer');
+  if (!referer) return null;
+  try {
+    const page = new URL(referer);
+    const id = page.origin === url.origin && page.pathname === '/' ? page.searchParams.get('share') : null;
+    return id ? await resolveProduct(id, env, { cached: true }) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Real ids already looked up, so a page's dozens of file requests don't each ask the orders Worker again. Only the
+// files use this: the page itself is always checked fresh, so a refunded link stops working at once.
+const knownLinks = new Map();
+const KNOWN_FOR_MS = 10 * 60 * 1000;
+
+async function resolveProduct(id, env, { cached = false } = {}) {
   if (id in DEMO_PRODUCTS) return DEMO_PRODUCTS[id];
+  const known = knownLinks.get(id);
+  if (cached && known && known.until > Date.now()) return known.product;
+  const product = await lookUpLink(id, env);
+  if (product) {
+    if (knownLinks.size > 5000) knownLinks.clear();
+    knownLinks.set(id, { product, until: Date.now() + KNOWN_FOR_MS });
+  }
+  return product;
+}
+
+async function lookUpLink(id, env) {
   const ordersApiBase = (env.ORDERS_API_BASE ?? '').replace(/\/$/, '');
   if (!ordersApiBase) return null;
   const controller = new AbortController();
@@ -91,7 +146,7 @@ async function resolveProduct(id, env) {
 }
 
 function originFor(product, env) {
-  const value = { pixel: env.PIXEL_ORIGIN, pinky: env.PINKY_ORIGIN, winxp: env.WINXP_ORIGIN }[product];
+  const value = env[ORIGIN_VARS[product]];
   return value ? value.replace(/\/$/, '') : null;
 }
 

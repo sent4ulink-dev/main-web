@@ -38,6 +38,8 @@ export interface Env {
   CORS_ALLOWED_ORIGINS?: string;
   SHARE_CREATE_SECRET?: string;
   ORDERS_API_BASE?: string;
+  // the orders Worker, bound directly (a workers.dev Worker cannot fetch another one on the same account)
+  ORDERS?: { fetch(input: string, init?: RequestInit): Promise<Response> };
   PHOTO_TTL_MINUTES?: string;
   // Test-only clock override — never set in production, where this is just Date.now.
   now?: () => number;
@@ -113,11 +115,11 @@ async function mutateShare(
 // ids that exist in a real, unrevoked order.
 async function selfHealShare(id: string, storage: ReturnType<typeof createStorage>, env: Env): Promise<Share | null> {
   const ordersApiBase = String(env.ORDERS_API_BASE || "").replace(/\/$/, "");
-  if (!ordersApiBase) return null;
+  if (!ordersApiBase && !env.ORDERS) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const r = await fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, { signal: controller.signal });
+    const r = await (env.ORDERS ? env.ORDERS.fetch(`https://orders/links/${encodeURIComponent(id)}`, { signal: controller.signal }) : fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, { signal: controller.signal }));
     clearTimeout(timer);
     if (!r.ok) return null;
     const body = (await r.json()) as { ok?: boolean; product?: string };

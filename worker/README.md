@@ -18,7 +18,7 @@ email) and R2 refuses to overwrite a file that already exists, so every name is 
 
 ## Orders: selling packs of links
 
-The site sells **1 link for $1.99** and **8 links for $9.99**, through **Paddle** (a Merchant of Record: Paddle is the legal seller on every
+The site sells **1 link for $3.99** and **8 links for $14.99** (one price worldwide, see PRICING.md), through **Paddle** (a Merchant of Record: Paddle is the legal seller on every
 transaction and handles VAT/GST/sales tax worldwide, so this site never has to register for it). After paying, the buyer chooses how many of
 each style (Pixel, Pinky, WinXP) to make, up to the number they paid for (with 8: for example 3 Pixel, 2 Pinky and 3 WinXP, in one go or over
 several visits).
@@ -29,7 +29,10 @@ GET  /orders/:token           the order: status, credits, remaining, links made 
 POST /orders/:token/generate  { "items": { "pixel": 3, "pinky": 2, "winxp": 3 } }              (only once paid; never more than were paid for)
 POST /orders/:token/confirm   mark it paid by hand   (owner only: Authorization: Bearer <ORDER_SECRET>)
 POST /orders/:token/refund    payment refunded: the order's links stop working  (same secret)
-POST /webhooks/paddle         Paddle calls this itself when a transaction completes (authenticated by Paddle's own signature)
+POST /orders/:token/refund-request   the buyer undoes the purchase themselves, within 10 minutes of paying: asks Paddle for a full
+                              refund and stops the links at once (the token is the buyer's key; refused after the 10 minutes)
+POST /webhooks/paddle         Paddle calls this itself when a transaction completes, and for refunds and chargebacks
+                              (authenticated by Paddle's own signature)
 ```
 
 ### Setting up Paddle
@@ -37,15 +40,19 @@ POST /webhooks/paddle         Paddle calls this itself when a transaction comple
 1. Sign up as a seller at [paddle.com](https://www.paddle.com). You do not need a registered company to start — an individual account works,
    though check Paddle's own onboarding for what it asks of you.
 2. **Dashboard → Catalog → Products.** Create two products, each with one **non-recurring** (one-time) Price:
-   - "1 link" — Price: **$1.99 USD**
-   - "8 links" — Price: **$9.99 USD**
+   - "1 link" — Price: **$3.99 USD**
+   - "8 links" — Price: **$14.99 USD**
 
    Copy each Price's id (it looks like `pri_01h...`) — you'll set these as `PADDLE_PRICE_SINGLE` and `PADDLE_PRICE_PACK` below.
-3. **Dashboard → Checkout → Checkout settings.** Set the **default payment link** (where a buyer lands after paying) to `https://sent4u.link/?paid=1`.
-   The site's own JS is already watching for that `?paid=1` and picks the order back up from there — you don't need to build anything for this step.
-4. **Dashboard → Developer Tools → Authentication.** Create an API key. This is `PADDLE_API_KEY`.
+3. **Dashboard → Checkout → Checkout settings.** Set the **default payment link** to `https://sent4u.link/pay` (the domain must be approved under
+   *My account → Settings → Website approval*). That page (`pay.html`) runs Paddle.js: the checkout link the Worker gets back from Paddle is that
+   address with `?_ptxn=<transaction id>` on the end, and Paddle.js opens the payment window by itself. Create a **client-side token** under
+   *My account → Settings → Authentication → Client-side tokens* and put it in `pay.html`. After paying, the buyer goes to `/?paid=1`, where the
+   site's own JS picks the order back up.
+4. **Dashboard → Developer Tools → Authentication.** Create an API key with **Transactions: read/write** and **Adjustments: read/write**
+   (the second is what refunds need). This is `PADDLE_API_KEY`. It has an expiry date: make a new one before it runs out.
 5. **Dashboard → Developer Tools → Notifications.** Add a webhook destination pointing at `https://<your-worker>.workers.dev/webhooks/paddle`,
-   subscribed to at least the **`transaction.completed`** event. Copy its signing secret — this is `PADDLE_WEBHOOK_SECRET`.
+   subscribed to **`transaction.completed`**, **`adjustment.created`** and **`adjustment.updated`**. Copy its signing secret — this is `PADDLE_WEBHOOK_SECRET`.
 6. Set the Worker's secrets and vars:
    ```bash
    npx wrangler secret put PADDLE_API_KEY
@@ -64,9 +71,11 @@ pay out via wire transfer to Wise's routing details. From your Wise balance, con
 Mongolian bank accounts directly in tögrög. This keeps Paddle handling the tax side while the money still ends up in your own bank, in your own
 currency.
 
-**Refunds aren't wired up automatically yet.** Paddle's refund payload needs confirming against a real refund before this trusts it — for now,
-when a refund or chargeback comes in, call `/orders/<token>/refund` by hand with `ORDER_SECRET` (see below). This is easy to automate later once
-we've seen what a real refund notification looks like.
+**Refunds.** For 10 minutes after paying, the buyer can undo the purchase from the order window or "My links" (`/orders/<token>/refund-request`):
+the links stop at once and Paddle is asked for a full refund. Paddle reviews most refunds before the money moves and reports back through the
+webhook: approved makes the order `refunded`, rejected gives the buyer the links back. A full refund or a chargeback made in the Paddle
+dashboard stops the links the same way; a partial refund leaves them working. `/orders/<token>/refund` (with `ORDER_SECRET`) is still there
+for fixing an order by hand.
 
 The buyer's browser comes back to the site, waits for the webhook to land, and then shows the "choose your links" step. Links are 128-bit random
 ids, made by the Worker, and each is stored as `links/<id>.json` (product, order) so the page that serves `?share=<id>` can check that a link
@@ -80,15 +89,19 @@ curl -X POST https://sent4u-reviews.<your-name>.workers.dev/orders/<token>/refun
 
 ## Signing in: no passwords
 
-A visitor can create an account with just an email — no password to choose, store, or reset. They enter their email, get a one-time link, and
-clicking it signs them in. This is what lets someone see every order they've ever paid for (not just the most recent one their browser
+A visitor can create an account with just an email — no password to choose, store, or reset. They enter their email and get a link that opens
+a confirmation page (a mail scanner that opens the link can't use it up). In the browser that asked, it is one button; opened on another
+device, it asks for the two-digit number the first screen shows, and that screen then signs in by itself. A session lasts 90 days from its
+last use, so a browser that has signed in once needs no more emails. This is what lets someone see every order they've ever paid for (not just the most recent one their browser
 remembers via "My links", which still works exactly as before — signing in is additive, never required to buy).
 
 ```
-POST /auth/request-link   { email }  ->  { ok: true }  (always this, whether the email is well-formed, rate-limited, or the send fails —
-                          never reveals which emails have signed in before)
-GET  /auth/verify         ?token=<from the email>  ->  302 redirect to /, with the session cookie set. This is the link in the email —
-                          meant to be opened directly, not fetched from a script
+POST /auth/request-link   { email }  ->  { ok: true, code } and a waiting cookie (always this, whether the email is well-formed,
+                          rate-limited, or the send fails — never reveals which emails have signed in before)
+GET  /auth/confirm        ?token=<from the email>  ->  the confirmation page (only shows it; /auth/verify in older emails shows it too)
+POST /auth/confirm        token [, choice]  ->  signs in this browser (303 to /?signedin=1), or approves the waiting one when
+                          choice is the number it shows (a wrong number cancels the request)
+GET  /auth/status         the waiting browser asks this every few seconds  ->  { signedIn } (and its session cookie once confirmed)
 POST /auth/logout         clears the session cookie
 GET  /me                  the signed-in visitor's own orders  ->  { email, orders: [...] }, or 401 if not signed in
 ```
@@ -99,14 +112,18 @@ Worker's own `*.workers.dev` address, which browsers increasingly restrict.
 
 ### Setting up Resend (sends the sign-in email)
 
+Resend now requires a verified domain before it will send to any real recipient — there's no more no-setup fallback via a shared
+`onboarding@resend.dev` sender. It's still only about 10 minutes:
+
 1. Sign up at [resend.com](https://resend.com) — the free tier (3,000 emails/month) is plenty for this.
-2. **Dashboard → API Keys → Create API Key.** Set it: `npx wrangler secret put RESEND_API_KEY`.
-3. For real production sending, **Dashboard → Domains → Add Domain**, add `sent4u.link` (or whichever domain you send from), and add the DNS
-   records Resend shows you (SPF/DKIM — this proves to email providers that you're really allowed to send as that domain, so the email doesn't
-   land in spam). Then set `EMAIL_FROM = "sent4u <hello@sent4u.link>"` in `wrangler.toml` (or any verified address at that domain).
-4. Without a verified domain, sign-in emails still work using Resend's own `onboarding@resend.dev` sender (the default when `EMAIL_FROM` is
-   unset) — fine for testing, not recommended for production: it's a shared address, and deliverability to arbitrary recipients isn't
-   guaranteed the way a verified domain's is.
+2. **Dashboard → Domains → Add Domain.** Use a subdomain, not the root domain (Resend's own recommendation, keeps sending reputation
+   isolated) — this project uses `mail.sent4u.link`.
+3. Add the DNS records Resend shows (SPF/DKIM TXT records, maybe a CNAME) to the domain's DNS — this proves you're really allowed to send
+   as that domain. If a record is a CNAME, leave it unproxied ("DNS only" in Cloudflare — no orange cloud) or verification won't complete.
+   Usually verifies within about 15 minutes.
+4. **Dashboard → API Keys → Create API Key** (a "Sending access"-scoped key is enough — no need for full access). Set it:
+   `npx wrangler secret put RESEND_API_KEY`.
+5. Set `EMAIL_FROM` in `wrangler.toml` to any address at the verified subdomain, e.g. `EMAIL_FROM = "sent4u <hello@mail.sent4u.link>"`.
 
 ### The KV namespace
 

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Checkout — sent4u</title>
+<meta name="description" content="Secure checkout for your sent4u links.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="/assets/brand/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="/assets/brand/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="legal-header">
+  <div class="container">
+    <a href="/" class="logo"><img class="logo-img" src="/assets/brand/logo.webp" width="507" height="120" alt="sent4u"></a>
+  </div>
+</header>
+
+<main class="legal-main">
+  <div class="container">
+    <h1 id="payTitle">Opening checkout…</h1>
+    <p id="payText">One moment. Your secure payment window is on its way.</p>
+    <p id="payBack" hidden><a href="/" class="legal-back">← Back to sent4u</a></p>
+  </div>
+</main>
+
+<!-- The page Paddle sends a buyer to (it is the "default payment link" in the Paddle dashboard). The orders Worker creates a
+     transaction, and Paddle gives back this address with ?_ptxn=<transaction id> on the end; Paddle.js sees that and opens the
+     payment window by itself. Once the buyer has paid, Paddle sends them to /?paid=1, where the site picks the order back up
+     (the order token was saved in this browser before they left). The token below is a client-side token: it is made to be
+     public and can only open checkouts, nothing else. -->
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<script>
+(function () {
+  var title = document.getElementById('payTitle'), text = document.getElementById('payText'), back = document.getElementById('payBack');
+  var paid = false;
+  function leave(message) {
+    if (paid) return;   // the window also closes after a payment, which is not a reason to say "closed"
+    title.textContent = message.title; text.textContent = message.text; back.hidden = false;
+  }
+  // no transaction in the address: someone opened this page by hand, so there is nothing to pay for
+  if (!/[?&]_ptxn=/.test(location.search)) { location.replace('/'); return; }
+  if (!window.Paddle) { leave({ title: 'Checkout isn’t available', text: 'The payment window couldn’t load. Please check your connection and try again.' }); return; }
+  Paddle.Initialize({
+    token: 'live_9d3a51b5138fde23b631f619bdb',
+    checkout: { settings: { displayMode: 'overlay', theme: 'light', locale: 'en', successUrl: location.origin + '/?paid=1' } },
+    eventCallback: function (event) {
+      if (event.name === 'checkout.completed') {
+        paid = true;
+        title.textContent = 'Payment received'; text.textContent = 'Taking you back to your links…';
+        setTimeout(function () { location.assign('/?paid=1'); }, 4000);
+      }
+      if (event.name === 'checkout.closed') leave({ title: 'Checkout closed', text: 'Nothing was charged unless you finished paying. You can start again from the pricing section.' });
+      if (event.name === 'checkout.error') leave({ title: 'Something went wrong', text: 'The payment window hit a problem. Nothing was charged. Please go back and try again.' });
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

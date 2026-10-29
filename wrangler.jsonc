@@ -2,18 +2,21 @@
   // The site itself: a Worker with static assets. `npm run build` puts the site in dist/, and `npx wrangler deploy` publishes that folder.
   // (The reviews / claims / orders Worker is a separate project in worker/ with its own wrangler.toml.)
   "name": "main-web",
-  // gateway/index.js decides, for every request, whether to reverse-proxy to one of the three
+  // gateway/index.js decides, for every request, whether to reverse-proxy to one of the
   // apps (see PIXEL_ORIGIN etc. below) or fall through to this site's own static assets.
   "main": "gateway/index.js",
   "compatibility_date": "2025-01-01",
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    // Cloudflare serves a matching static file directly, bypassing the Worker, unless
-    // told otherwise — but the gateway needs to see every request (to check ?share=,
-    // and to fall back an app's asset requests through the cookie) before deciding
-    // whether to hand it to ASSETS itself.
-    "run_worker_first": true
+    // Which requests the gateway sees first: everything, except the site's own pictures, models, fonts, libraries and
+    // page scripts below, which are served straight from storage (free, and not counted as Worker requests). An
+    // excluded path never reaches the gateway, not even when the file is missing (it is a plain 404), so only folders
+    // and files that are the site's alone may be listed: the apps keep their own files directly in /assets/ (and an
+    // app's /style.css must reach that app), which is why /assets/ itself is not excluded. scripts/deploy-card.mjs
+    // reads this list and refuses a card with a file on one of these paths.
+    "run_worker_first": ["/*", "!/vendor/*", "!/assets/data/*", "!/assets/fonts/*", "!/assets/models/*", "!/assets/showcase/*", "!/assets/styles/*", "!/assets/brand/*",
+                         "!/script.js", "!/earth-scene.js", "!/finale.js", "!/viewport.js", "!/tilt.js"]
   },
   "vars": {
     // Each app's real deployed origin (Cloudflare Pages, or wherever it ends up). Until an
@@ -22,8 +25,14 @@
     "PIXEL_ORIGIN": "https://pixel-dom-n49.pages.dev",
     "PINKY_ORIGIN": "https://pinky-dom.sent4u-link.workers.dev",
     "WINXP_ORIGIN": "https://winxp-dom.sent4u-link.workers.dev",
+    "PETAL_ORIGIN": "https://sent4u-petal.pages.dev",
+    "PICNIC_ORIGIN": "https://sent4u-picnic.pages.dev",
+    "SALON_ORIGIN": "https://sent4u-salon.pages.dev",
+    "MISSION_ORIGIN": "https://sent4u-mission.pages.dev",
+    "HALLOWEEN_ORIGIN": "https://sent4u-halloween.pages.dev",
+    "SPOOKY_ORIGIN": "https://sent4u-spooky.pages.dev",
     // The orders Worker (see /worker), used to look up which product a REAL (paid) share id
-    // belongs to. Demo ids (test-pixel / test-pinky / test-winxp) never need this.
+    // belongs to. Demo ids (test-pixel, test-picnic, ...) never need this.
     "ORDERS_API_BASE": "https://sent4u-reviews.sent4u-link.workers.dev",
   },
 }

@@ -4,8 +4,8 @@ import { onRealResize } from './viewport.js';
 import { tilt } from './tilt.js';
 
 /* ---------------- Dot-matrix Earth · messages flying between real cities · Moon · Satellite ----------------
-   The Earth is procedural: land is read from Natural Earth's public-domain 110m outlines
-   (assets/data/ne_110m_land.geojson), rasterised to a mask, and turned into a regular lat/lon dot grid on a dark
+   The Earth is procedural: land comes from Natural Earth's public-domain 110m outlines
+   (assets/data/ne_110m_land.geojson), baked into a regular lat/lon dot grid (scripts/build-land-dots.mjs) on a dark
    sphere with a thin Fresnel rim. Messages are paper planes riding lifted great-circle arcs between real cities.
    The Moon is procedural (grey, cratered, tidally locked); the Satellite is a Poly by Google model (CC-BY 3.0, via
    poly.pizza) drawn as a dark body with dots sampled from its surface, its dish always pointing at the Earth. The paper
@@ -63,47 +63,16 @@ function toVec(latDeg, lonDeg, r = 1, out = new THREE.Vector3()){
 
 /* ---------------- land → dots ---------------- */
 
-async function loadLandMask(){
-  const geo = await (await fetch('assets/data/ne_110m_land.geojson')).json();
-  const W = 2048, H = 1024;
-  const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
-  const ctx = cv.getContext('2d', { willReadFrequently: true });
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  for (const f of geo.features){
-    const g = f.geometry;
-    const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates];
-    for (const poly of polys) for (const ring of poly){
-      ring.forEach(([lon, lat], i) => {
-        const x = (lon + 180) / 360 * W, y = (90 - lat) / 180 * H;
-        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-      });
-      ctx.closePath();
-    }
+// The land dots are baked by scripts/build-land-dots.mjs (rows of dots 1.55° apart, each row offset half a step from the
+// last): Int16 pairs of latitude and longitude in hundredths of a degree, turned into points on the globe here.
+async function loadLandDots(){
+  const ll = new Int16Array(await (await fetch('assets/data/land-dots.bin')).arrayBuffer());
+  const pos = new Float32Array(ll.length / 2 * 3), v = new THREE.Vector3();
+  for (let i = 0, k = 0; i < ll.length; i += 2, k += 3){
+    toVec(ll[i] / 100, ll[i + 1] / 100, R, v);
+    pos[k] = v.x; pos[k + 1] = v.y; pos[k + 2] = v.z;
   }
-  ctx.fill('evenodd'); // holes (lakes, inland seas) are separate rings
-  const data = ctx.getImageData(0, 0, W, H).data;
-  return (lat, lon) => {
-    const x = Math.min(W - 1, Math.max(0, Math.floor((lon + 180) / 360 * W)));
-    const y = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H)));
-    return data[(y * W + x) * 4 + 3] > 128;
-  };
-}
-
-// rows of dots at equal angular spacing; each row is offset half a step from the last (a hex-ish grid)
-function buildLandDots(isLand, step = 1.55){
-  const pos = [], v = new THREE.Vector3();
-  let row = 0;
-  for (let lat = -90 + step / 2; lat < 90; lat += step, row++){
-    const n = Math.max(1, Math.round(360 * Math.cos(lat * Math.PI / 180) / step));
-    const shift = (row % 2) * 0.5;
-    for (let i = 0; i < n; i++){
-      const lon = -180 + (i + shift) * 360 / n;
-      if (isLand(lat, lon)){ toVec(lat, lon, R, v); pos.push(v.x, v.y, v.z); }
-    }
-  }
-  return new Float32Array(pos);
+  return pos;
 }
 
 // Colours. Dots: `lit` where the light hits, `dim` on the night side. Body: `base` in the dark, `baseLit` in the light
@@ -514,9 +483,8 @@ export async function initEarthScene({ canvas, reduceMotion }){
   earth.add(body);
 
   try {
-    const isLand = await loadLandMask();
     const dotGeo = new THREE.BufferGeometry();
-    dotGeo.setAttribute('position', new THREE.BufferAttribute(buildLandDots(isLand), 3));
+    dotGeo.setAttribute('position', new THREE.BufferAttribute(await loadLandDots(), 3));
     const dots = new THREE.Points(dotGeo, dotMaterial({ size: 0.021, color: PALETTE.earth.lit, dim: PALETTE.earth.dim, uniforms: dotUniforms }));
     dots.renderOrder = 2;
     earth.add(dots);
@@ -622,9 +590,12 @@ export async function initEarthScene({ canvas, reduceMotion }){
   const clock = new THREE.Clock();
   let running = false, raf = 0;
   let lastDraw = 0;
+  // 60 fps at most: a 120-165 Hz laptop screen would otherwise redraw the whole globe two or three times as often, for
+  // nothing anyone can see. 30 fps on a phone or once the page is in lite mode.
+  let minGap = coarse || document.body.classList.contains('lite') ? 30 : 15;
   function frame(now){
     if (!running){ raf = 0; return; }
-    if (coarse && now - lastDraw < 30){ raf = requestAnimationFrame(frame); return; }   // 30 fps is plenty on a phone
+    if (now - lastDraw < minGap){ raf = requestAnimationFrame(frame); return; }
     lastDraw = now;
     if (!coarse) placeLabel();   // (the label isn't shown on a phone)
     const dt = Math.min(clock.getDelta(), 0.05);
@@ -642,12 +613,15 @@ export async function initEarthScene({ canvas, reduceMotion }){
     renderer.render(scene, camera);
     raf = requestAnimationFrame(frame);
   }
+  // compile every shader now, in the background where the browser can, so the first frame doesn't stall the page
+  try { await renderer.compileAsync(scene, camera); } catch { /* the first render compiles them instead */ }
+
   // only draw while the hero is on screen; the rest of the time the GPU has better things to do
   new IntersectionObserver(([entry]) => {
     running = entry.isIntersecting;
     if (running && !raf){ clock.getDelta(); raf = requestAnimationFrame(frame); }
   }, { rootMargin: '150px' }).observe(heroEl || canvas);
-  const goLite = () => { renderer.setPixelRatio(1); resize(); };
+  const goLite = () => { renderer.setPixelRatio(1); resize(); minGap = 30; };
   window.addEventListener('sent4u:lite', goLite);
   if (document.body.classList.contains('lite')) goLite();   // the mode may have been switched on before this scene finished loading
 }

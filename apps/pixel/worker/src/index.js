@@ -232,11 +232,11 @@ function createSecretOk(request, env) {
 // ids that exist in a real, unrevoked order.
 async function selfHealShare(id, storage, env) {
   const ordersApiBase = String(env.ORDERS_API_BASE || '').replace(/\/$/, '');
-  if (!ordersApiBase) return null;
+  if (!ordersApiBase && !env.ORDERS) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const r = await fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, { signal: controller.signal });
+    const r = await (env.ORDERS ? env.ORDERS.fetch(`https://orders/links/${encodeURIComponent(id)}`, { signal: controller.signal }) : fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, { signal: controller.signal }));
     clearTimeout(timer);
     if (!r.ok) return null;
     const { ok, product } = await r.json();

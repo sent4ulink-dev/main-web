@@ -4,8 +4,8 @@ export interface DatePlan {
   time: string;
   restaurant: string;
   mapsLink?: string;
-  /** Photo of the chosen restaurant, when it has one (from the owner's options list or
-   * a Google Places fetch) — shown in the merged plan's location row. */
+  /** Photo of the chosen restaurant, when it has one (from the owner's options list,
+   * where the owner pastes it in) — shown in the merged plan's location row. */
   restaurantImageUrl?: string;
   partnerEmail?: string;
   customNote?: string;

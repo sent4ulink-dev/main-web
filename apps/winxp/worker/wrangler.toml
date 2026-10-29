@@ -14,6 +14,12 @@ bucket_name = "winxp-shares"
 binding = "PHOTOS"
 id = "9eb7a6e616df497e8e52a715c2d1b21b"
 
+# The orders Worker, bound directly: a Worker on workers.dev cannot fetch another Worker on the same
+# account's workers.dev address (Cloudflare error 1042), so the link check goes through this binding.
+[[services]]
+binding = "ORDERS"
+service = "sent4u-reviews"
+
 [vars]
 # The deployed frontend's exact origin(s), comma separated, no trailing slash. sent4u.link
 # is what the browser sees when reached through the gateway's ?share= proxy (the normal

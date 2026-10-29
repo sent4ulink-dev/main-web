@@ -145,13 +145,21 @@ export async function createPlanImageFile(plan: DatePlan, options: PlanImageOpti
 
   drawMarqueeBackground(ctx, options.celebrationWord);
 
-  // Wordmark, top and centered.
+  // Wordmark (the logo's own lettering, public/brand/wordmark.webp, 582x128), top and centered;
+  // the plain name in its place if the picture can't be loaded.
   const logoTop = 78;
-  ctx.font = '700 56px "Plus Jakarta Sans", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('sent4u', IMAGE_WIDTH / 2, logoTop);
+  const wordmark = await loadImage('/brand/wordmark.webp').catch(() => null);
+  ctx.textBaseline = 'top'; // the text below is laid out from this baseline too
+  if (wordmark) {
+    const logoH = 52;
+    const logoW = (logoH * 582) / 128;
+    ctx.drawImage(wordmark, (IMAGE_WIDTH - logoW) / 2, logoTop + 2, logoW, logoH);
+  } else {
+    ctx.font = '700 56px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('sent4u', IMAGE_WIDTH / 2, logoTop);
+  }
   ctx.textAlign = 'left';
   const cursorY = logoTop + 82;
 

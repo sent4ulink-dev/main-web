@@ -2453,6 +2453,12 @@ svg {
   letter-spacing: 0.06em;
   white-space: nowrap;
 }
+/* the logo's own lettering, in its dark-ink version for the LCD */
+.brand-wordmark {
+  display: block;
+  height: clamp(14px, 4vw, 18px);
+  width: auto;
+}
 .scene,
 .picker-scene,
 .sms-scene,

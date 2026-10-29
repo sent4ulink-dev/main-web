@@ -5,8 +5,6 @@
    GET    /api/shares/:id             the public share content and edit metadata; self-heals against the order Worker on a miss
    PUT    /api/shares/:id             replace validated content, only during the edit window
    POST   /api/shares/:id/finalize    permanently finalize, only during the edit window
-   GET    /api/maps/resolve           resolves a pasted Google Maps link to name/rating/hours/photo (needs GOOGLE_PLACES_API_KEY)
-   GET    /api/maps/photo             proxies a Place Photo so the Google API key never reaches the browser
 
    There is no public studio and no password: an invitation only ever comes into
    existence because the sent4u order Worker calls POST /api/shares/:id/ensure
@@ -108,11 +106,11 @@ function createSecretOk(request, env) {
 // ids that exist in a real, unrevoked order.
 async function selfHealShare(id, bucket, env) {
   const ordersApiBase = String(env.ORDERS_API_BASE || '').replace(/\/$/, '');
-  if (!ordersApiBase) return null;
+  if (!ordersApiBase && !env.ORDERS) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const r = await fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, { signal: controller.signal });
+    const r = await (env.ORDERS ? env.ORDERS.fetch(`https://orders/links/${encodeURIComponent(id)}`, { signal: controller.signal }) : fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, { signal: controller.signal }));
     clearTimeout(timer);
     if (!r.ok) return null;
     const { ok, product } = await r.json();
@@ -133,139 +131,6 @@ async function selfHealShare(id, bucket, env) {
   return entry;
 }
 
-// Today's line out of Google's Mon-first weekday_text array, or a condensed "(Daily)"
-// form when every day reads the same.
-function formatHours(openingHours) {
-  const weekdayText = openingHours?.weekday_text;
-  if (!Array.isArray(weekdayText) || weekdayText.length !== 7) return undefined;
-  const timesOnly = weekdayText.map((line) => line.replace(/^[^:]+:\s*/, ''));
-  if (timesOnly.every((t) => t === timesOnly[0])) return `${timesOnly[0]} (Daily)`;
-  const todayIndex = (new Date().getDay() + 6) % 7; // JS: 0=Sun; Google's array: 0=Mon
-  return `${timesOnly[todayIndex]} (Today)`;
-}
-
-// Resolves a pasted Google Maps link to the same rating/reviews/hours/photo you'd see
-// searching the place on Google — via the official Places API, not by scraping the page.
-async function resolveMaps(request, env, cors) {
-  const mapsLink = new URL(request.url).searchParams.get('url');
-  if (!mapsLink) return reply({ error: 'missing_url' }, 400, cors);
-  if (!env.GOOGLE_PLACES_API_KEY) return reply({ error: 'not_configured' }, 503, cors);
-  try {
-    // Short links redirect to one of two shapes depending on where they were
-    // shared from: maps.app.goo.gl/... (from the Maps app) lands on a real
-    // /maps/place/<name>/@<lat>,<lng>,<zoom>z URL; share.google/... (from a
-    // Search business panel) lands on a plain google.com/search?q=<name>&...
-    // page instead — no /maps/place/ path at all, just the name in `q`.
-    const resolved = await fetch(mapsLink, { redirect: 'follow' });
-    const finalUrl = resolved.url || mapsLink;
-    const parsedUrl = new URL(finalUrl);
-
-    const placeMatch = finalUrl.match(/\/maps\/place\/([^/@]+)/);
-    const name = placeMatch
-      ? decodeURIComponent(placeMatch[1].replace(/\+/g, ' '))
-      : parsedUrl.searchParams.get('q');
-    if (!name) return reply({ error: 'unrecognized_link' }, 422, cors);
-    const coordMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-
-    // Text Search instead of Find Place From Text — for a share.google link there's no
-    // @lat,lng to bias with (unlike maps.app.goo.gl), so a short, generic name ("56°
-    // Coffee Bar") can otherwise match a same-ish-named place anywhere in the world
-    // (tried the API's `region` bias param first — it sometimes zeroed out real
-    // results entirely instead of just deprioritizing, so dropped it). Baking a
-    // location hint straight into the query text works far better in practice.
-    // This app's whole audience is Mongolia, so the hint is Ulaanbaatar — falls
-    // back to the bare name if the hinted search comes up empty, since not every
-    // place someone looks up is actually there.
-    async function textSearch(query) {
-      const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
-      url.searchParams.set('query', query);
-      if (coordMatch) {
-        url.searchParams.set('location', `${coordMatch[1]},${coordMatch[2]}`);
-        url.searchParams.set('radius', '10000');
-      }
-      url.searchParams.set('key', env.GOOGLE_PLACES_API_KEY);
-      return fetch(url).then((r) => r.json());
-    }
-
-    const hintedQuery = coordMatch ? name : `${name}, Ulaanbaatar, Mongolia`;
-    let findData = await textSearch(hintedQuery);
-    if (!findData.results?.[0]?.place_id && findData.status === 'ZERO_RESULTS' && hintedQuery !== name) {
-      findData = await textSearch(name);
-    }
-    const placeId = findData.results?.[0]?.place_id;
-    if (!placeId) {
-      // findData.status is Google's own reason (ZERO_RESULTS, REQUEST_DENIED,
-      // OVER_QUERY_LIMIT, INVALID_REQUEST, ...) — surfaced here since otherwise
-      // this is the single hardest failure to diagnose from the outside.
-      console.error('Text Search returned no place_id:', findData.status, findData.error_message, 'query:', name);
-      return reply(
-        { error: 'place_not_found', googleStatus: findData.status, googleMessage: findData.error_message, debugQuery: name },
-        404,
-        cors,
-      );
-    }
-
-    const detailsUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
-    detailsUrl.searchParams.set('place_id', placeId);
-    detailsUrl.searchParams.set('fields', 'name,rating,user_ratings_total,opening_hours,photos');
-    detailsUrl.searchParams.set('key', env.GOOGLE_PLACES_API_KEY);
-    const detailsData = await fetch(detailsUrl).then((r) => r.json());
-    const place = detailsData.result;
-    if (!place) {
-      console.error('Place Details returned no result:', detailsData.status, detailsData.error_message);
-      return reply(
-        { error: 'place_not_found', googleStatus: detailsData.status, googleMessage: detailsData.error_message },
-        404,
-        cors,
-      );
-    }
-
-    const photoRef = place.photos?.[0]?.photo_reference;
-    return reply(
-      {
-        name: place.name,
-        rating: place.rating != null ? String(place.rating) : undefined,
-        reviewCount: place.user_ratings_total != null ? `${place.user_ratings_total.toLocaleString()}+ reviews` : undefined,
-        hours: formatHours(place.opening_hours),
-        // Relative path — the frontend prefixes it with its own API base (same as every
-        // other endpoint here) so the key-bearing Google URL never reaches the browser.
-        photoUrl: photoRef ? `/api/maps/photo?ref=${encodeURIComponent(photoRef)}` : undefined,
-      },
-      200,
-      cors,
-    );
-  } catch (err) {
-    console.error('Maps resolve failed:', err);
-    return reply({ error: 'resolve_failed' }, 502, cors);
-  }
-}
-
-// Proxies a Place Photo through our own Worker so the API key never appears in an <img src>.
-async function mapsPhoto(request, env, cors) {
-  const ref = new URL(request.url).searchParams.get('ref');
-  if (!ref) return new Response(null, { status: 400, headers: cors });
-  if (!env.GOOGLE_PLACES_API_KEY) return new Response(null, { status: 503, headers: cors });
-  try {
-    const photoUrl = new URL('https://maps.googleapis.com/maps/api/place/photo');
-    photoUrl.searchParams.set('maxwidth', '800');
-    photoUrl.searchParams.set('photo_reference', ref);
-    photoUrl.searchParams.set('key', env.GOOGLE_PLACES_API_KEY);
-    const photoResp = await fetch(photoUrl);
-    if (!photoResp.ok) return new Response(null, { status: 502, headers: cors });
-    return new Response(photoResp.body, {
-      status: 200,
-      headers: {
-        ...cors,
-        'Content-Type': photoResp.headers.get('content-type') || 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400',
-      },
-    });
-  } catch (err) {
-    console.error('Maps photo proxy failed:', err);
-    return new Response(null, { status: 502, headers: cors });
-  }
-}
-
 export default {
   async fetch(request, env) {
     const cors = corsHeaders(request, env);
@@ -274,8 +139,6 @@ export default {
     const bucket = env.BUCKET;
     try {
       if (url.pathname === '/health' && request.method === 'GET') return reply({ ok: true }, 200, cors);
-      if (url.pathname === '/api/maps/resolve' && request.method === 'GET') return await resolveMaps(request, env, cors);
-      if (url.pathname === '/api/maps/photo' && request.method === 'GET') return await mapsPhoto(request, env, cors);
 
       const ensure = url.pathname.match(/^\/api\/shares\/([^/]+)\/ensure$/);
       if (ensure && request.method === 'POST') {
