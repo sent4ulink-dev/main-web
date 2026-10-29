@@ -1,0 +1,81 @@
+/* A plum night sky, sleepy companions, and a handful of Halloween sweets. */
+.asset-still { display:none; }
+.sourced-cat { filter:drop-shadow(0 2px 2px #140d1b33); }
+.boo-visitor .single-ghost.sourced-boo { width:130px; height:130px; margin-top:17px; }
+.sourced-boo img,.flying-treat img { width:100%; height:100%; object-fit:contain; }
+.sourced-boo picture,.flying-treat picture { display:block; width:100%; height:100%; }
+.site-footer .art-credit { color:#d4bacb; text-decoration:none; font-size:10px; letter-spacing:.4px; padding:10px 0; }
+.site-footer .art-credit:hover { color:var(--orange); text-decoration:underline; }
+@media(prefers-reduced-motion:reduce) { .asset-motion { display:none; } .asset-still { display:inline; } }
+:root { --bg:#211332; --muted:#cfb9d4; --line:#543260; }
+body { background:linear-gradient(180deg,#211332 0%,#352047 52%,#291737 100%); background-attachment:fixed; }
+.site-shell { position:relative; z-index:1; }
+.moonlit-landscape { position:fixed; inset:0; overflow:hidden; pointer-events:none; }
+.moonlit-landscape svg { width:100%; height:100%; }
+.far-hills { fill:#513264; opacity:.44; }
+.near-hills { fill:#372044; opacity:.7; }
+.forest { color:#1b1027; }
+.crooked-tree { transform-box:fill-box; transform-origin:50% 100%; animation:tree-sway 9s ease-in-out infinite; }
+.forest>g:nth-child(even) .crooked-tree { animation-delay:-4s; }
+.masthead,.site-footer { border-color:#dcc1e515; }
+.scene-art .moon-haze { fill:#f3a76d; opacity:.045; }
+.subtitle { color:#ddc8df; }
+.details-list { background:#281936df; border-color:#745381; }
+.heart-found blockquote { background:#281936; border-color:#745381; }
+.heart-found blockquote:before { background:#281936; border-color:#745381; }
+.cat-eyes { transform-box:fill-box; transform-origin:center; animation:cat-blink 6.2s ease-in-out infinite; }
+.cat-yawn { opacity:0; transform-box:fill-box; transform-origin:50% 0; animation:cat-yawn 11s ease-in-out infinite; }
+.cat-smile { animation:cat-smile 11s ease-in-out infinite; }
+.cat-tail { animation:tail 5s ease-in-out infinite; }
+.ghost-eyes { transform-box:fill-box; transform-origin:center; animation:ghost-blink 7s ease-in-out infinite; }
+.invitation .ghost-float { animation:shy-float 4s ease-in-out infinite; transform-origin:244px 267px; }
+.boo-visitor { position:relative; margin-bottom:12px; animation:boo-hello .7s cubic-bezier(.2,.8,.3,1) both; }
+.boo-visitor .single-ghost { width:105px; height:114px; margin:12px auto 14px; }
+.boo-bubble { background:#f7e8d9; color:#422744; border-radius:50% 50% 45% 45%; padding:12px 32px 16px; margin:0; font:600 39px/1 var(--serif); position:relative; transform:rotate(-5deg); }
+.boo-bubble:after { content:''; position:absolute; bottom:-8px; right:45px; border-width:12px 9px 0 0; border-style:solid; border-color:#f7e8d9 transparent transparent; }
+.boo-bubble span { display:block; margin-top:6px; font:11px/1.4 var(--sans); }
+.decline h1 { margin-bottom:14px; }
+.decline .subtitle { margin-bottom:22px; }
+.themed-button { position:relative; isolation:isolate; background:transparent; border:0; border-radius:18px; min-height:74px; padding:15px 26px 26px; color:#172b17; transition:transform .2s ease,filter .2s ease; }
+.themed-button:hover { background:transparent; transform:translateY(-3px) rotate(-1deg); filter:brightness(1.07); }
+.themed-button:active { transform:translateY(1px) scale(.97); }
+.themed-button.secondary,.themed-button.secondary:hover { background:transparent; border:0; color:#e5f7df; }
+.button-skin { position:absolute; inset:0; width:100%; height:100%; z-index:-1; pointer-events:none; overflow:visible; filter:drop-shadow(0 4px 5px #0c09162b); }
+.button-label { position:relative; z-index:1; }
+.slime-body { fill:#9de849; stroke:#c1fa87; stroke-width:1.3; }
+.slime-shine { stroke:#eaffcd; opacity:.7; }
+.secondary .slime-body { fill:#397547; stroke:#89c878; }
+.secondary .slime-shine { stroke:#bdedac; opacity:.5; }
+.candy-button { color:#371a32; padding:20px 48px; }
+.candy-wrap { fill:#a5e880; stroke:#c5f7a7; stroke-width:1; }
+.candy-body { fill:#ffc0d5; stroke:#ec9ac4; stroke-width:1.3; }
+.candy-stripe { stroke:#fff6ee; opacity:.75; }
+.candy-shine { stroke:#fff6ee; }
+.graveyard-button.secondary,.graveyard-button.secondary:hover { color:#e5f7df; padding:16px 35px 30px; }
+.graveyard-body { fill:#364d3d; stroke:#9bc190; stroke-width:1.3; }
+.direction.themed-button { min-height:44px; min-width:0; padding:0 0 7px; border-radius:10px; color:#172b17; }
+.button-stack { gap:18px; }
+.maze-monster { position:absolute; width:11.111%; height:11.111%; display:flex; align-items:center; justify-content:center; pointer-events:none; transition:left .3s ease,top .3s ease; }
+.maze-monster img { width:85%; height:85%; object-fit:contain; animation:monster-bounce 1.5s ease-in-out infinite; filter:drop-shadow(0 0 5px #d697ed66); }
+.game-hint { max-width:150px; text-align:right; line-height:1.4; color:#cee5b9; }
+.controls-note { line-height:1.7; max-width:340px; }
+@keyframes monster-bounce { 50% { transform:translateY(-2px) rotate(4deg); } }
+.celebrating .scene-art svg>g { animation:none; }
+.celebrating .scene-art .moon-bat { animation:bat-pass .8s ease both; }
+.celebrating .ghost-float,.confirmed .ghost-float { animation:happy-bob 1.8s ease-in-out infinite; }
+.celebrating .ghost-smile { opacity:1; animation:none; }
+.treat-salute { position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:20; }
+.flying-treat { position:absolute; left:var(--start); top:85%; width:36px; height:38px; opacity:0; animation:treat-flight 1.65s var(--delay) cubic-bezier(.2,.55,.4,1) both; }
+.flying-treat svg { width:100%; height:100%; }
+.flying-treat .pumpkin { margin:0; }
+@keyframes cat-blink { 0%,28%,32%,74%,78%,100%{transform:scaleY(1)} 30%,76%{transform:scaleY(.06)} }
+@keyframes cat-yawn { 0%,36%,60%,100%{opacity:0;transform:scale(.4,.15)} 41%,53%{opacity:1;transform:scale(1)} }
+@keyframes cat-smile { 0%,36%,60%,100%{opacity:1} 40%,56%{opacity:0} }
+@keyframes ghost-blink { 0%,45%,49%,100%{transform:scaleY(1)} 47%{transform:scaleY(.1)} }
+@keyframes shy-float { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-6px) rotate(2deg)} }
+@keyframes happy-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+@keyframes boo-hello { from{opacity:0;transform:translateY(65px) scale(.8)} 65%{opacity:1;transform:translateY(-7px) scale(1.03)} to{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes tree-sway { 50%{transform:rotate(1.2deg)} }
+@keyframes treat-flight { 0%{opacity:0;transform:translate(0,30px) rotate(0) scale(.5)} 10%{opacity:1} 65%{opacity:1;transform:translate(calc(var(--travel)*.7),var(--rise)) rotate(var(--turn)) scale(1)} 100%{opacity:0;transform:translate(var(--travel),calc(var(--rise) + 80px)) rotate(calc(var(--turn)*1.5)) scale(.65)} }
+@media(max-width:600px) { .moonlit-landscape svg { opacity:.65; } .forest>g:first-child { transform:translate(90px,363px) scale(3,1.8); } .forest>g:nth-child(3) { transform:translate(1360px,343px) scale(-3,1.8); } .forest>g:nth-child(even) { display:none; } .flying-treat { width:30px; height:34px; } .decline { padding-top:42px; } .boo-visitor .single-ghost { margin-bottom:4px; } }
+@media(prefers-reduced-motion:reduce) { .treat-salute { display:none; } .cat-yawn { opacity:0; } .themed-button:hover,.themed-button:active { transform:none; } .maze-monster { transition:none; } .maze-monster img { animation:none; } }

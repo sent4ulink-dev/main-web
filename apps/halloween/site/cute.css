@@ -1,0 +1,181 @@
+/* The cute layer: the paper of the page, the friends around it, and the
+   sweets-shaped buttons. Everything here is decoration; the layout lives in
+   responsive.css. */
+
+/* ---- Header and footer: small stickers ---- */
+.brand { font:800 clamp(1.05rem,4.6vw,1.3rem)/1 var(--serif); letter-spacing:0; color:#ffe2b0; white-space:nowrap; gap:5px; text-shadow:0 2px 0 var(--outline); }
+.brand>span { font-size:inherit; color:inherit; text-shadow:inherit; }
+.brand>span[aria-hidden="true"] { font-size:1.25em; color:#ffd08c; }
+.edition { font:900 .68rem/1 var(--sans); letter-spacing:.4px; padding:6px 10px; border-radius:999px; border-width:2.5px; box-shadow:0 3px 0 var(--outline); transform:rotate(-2deg); }
+.edition:empty { display:none; }
+.sound-toggle { position:relative; flex:none; width:40px; height:40px; min-height:0; padding:0; border:2.5px solid var(--outline); border-radius:50%; background:#fff0d8; color:#4b2a66; box-shadow:0 3px 0 var(--outline); font-size:0; transition:transform .1s,box-shadow .1s; }
+.sound-toggle::before { content:'♫'; font:900 1.15rem/1 var(--sans); }
+.sound-toggle:active { transform:translateY(2px); box-shadow:0 1px 0 var(--outline); }
+.sound-toggle[aria-pressed="false"] { background:#9478b8; color:#efe3fb; }
+.sound-toggle[aria-pressed="false"]::after { content:''; position:absolute; left:7px; right:7px; top:calc(50% - 1.5px); height:3px; border-radius:2px; background:var(--outline); transform:rotate(-40deg); }
+.mode-label { flex:1 1 auto; min-width:0; margin-right:auto; text-align:left; font:800 .72rem/1.3 var(--sans); color:#eadcfb; opacity:.9; overflow-wrap:anywhere; }
+.mode-label:empty { display:none; }
+.site-footer { color:#f0dbff; }
+.site-footer>span:first-child { font-size:.72rem; line-height:1.25; text-shadow:0 2px 0 #2c193f88; }
+.site-footer .art-credit { font-size:.72rem; }
+#progress { gap:5px; padding:6px 9px; border-radius:999px; }
+#progress:empty { display:none; }
+#progress span { width:6px; height:6px; border-radius:50%; }
+#progress .active { width:15px; height:8px; border-radius:6px; }
+
+/* ---- The paper ---- */
+.page-paper {
+  border:3px solid var(--outline); border-radius:34px;
+  background:
+    radial-gradient(circle at 14% 22%,#ffe8b855 0 1.6px,transparent 2.4px),
+    radial-gradient(circle at 82% 12%,#ffe8b844 0 1.3px,transparent 2px),
+    radial-gradient(circle at 90% 58%,#ffc4e04d 0 1.6px,transparent 2.4px),
+    radial-gradient(circle at 8% 70%,#ffc4e040 0 1.3px,transparent 2px),
+    radial-gradient(circle at 60% 92%,#ffe8b840 0 1.4px,transparent 2.2px),
+    radial-gradient(120% 85% at 50% 0%,#8a5fb8e0 0%,#5d3889e6 48%,#41235fed 100%);
+  box-shadow:0 7px 0 var(--outline),0 26px 60px #12062480,inset 0 2px 0 #ffffff2e;
+  -webkit-backdrop-filter:blur(7px) saturate(1.15); backdrop-filter:blur(7px) saturate(1.15);
+}
+/* a row of stitches just inside the edge */
+
+/* ---- Around the page: bunting, a ghost looking over the top, sweets ---- */
+.trim-garland { position:absolute; left:30px; right:30px; top:-3px; height:22px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 26'%3E%3Cg stroke='%232c193f' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M5 3h22l-11 20z' fill='%23ffaad2'/%3E%3Cpath d='M37 3h22l-11 20z' fill='%23ffd08c'/%3E%3Cpath d='M69 3h22l-11 20z' fill='%23b5ee93'/%3E%3Cpath d='M101 3h22l-11 20z' fill='%23cdb3f0'/%3E%3C/g%3E%3Cpath d='M0 3h128' stroke='%232c193f' stroke-width='3'/%3E%3C/svg%3E") left top/auto 100% round no-repeat; }
+.trim-ghost { position:absolute; right:15%; top:-41px; width:56px; height:41px; overflow:hidden; }
+.trim-ghost svg { display:block; width:100%; height:auto; animation:trim-peek 6s ease-in-out infinite; }
+.trim-ghost-eyes { transform-box:fill-box; transform-origin:center; animation:ghost-blink 5.5s ease-in-out infinite; }
+.trim-paws { position:absolute; right:calc(15% - 5px); top:-7px; width:66px; height:15px; }
+.trim-paws i { position:absolute; top:0; width:17px; height:15px; border:2.5px solid #3b2250; border-radius:9px 9px 8px 8px; background:#fff8ed; }
+.trim-paws i:first-child { left:0; }
+.trim-paws i:last-child { right:0; }
+.trim-pumpkin,.trim-candy { display:none; position:absolute; }
+.trim-pumpkin svg,.trim-candy svg { display:block; width:100%; height:auto; overflow:visible; filter:drop-shadow(0 4px 0 #2c193f66); }
+@keyframes trim-peek { 0%,100% { transform:translateY(7px); } 45%,60% { transform:translateY(0); } }
+
+/* ---- The sky behind: twinkles, and two bats when there is room ---- */
+.sky-friends { position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+.twinkle { position:absolute; width:11px; height:11px; background:#ffe9b8; clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%); animation:twinkle 3.6s ease-in-out infinite; }
+.twinkle:nth-child(1) { left:7%; top:12%; }
+.twinkle:nth-child(2) { left:19%; top:31%; width:8px; height:8px; animation-delay:-1.1s; }
+.twinkle:nth-child(3) { left:88%; top:9%; animation-delay:-2s; }
+.twinkle:nth-child(4) { left:93%; top:38%; width:8px; height:8px; animation-delay:-.6s; background:#ffc4e0; }
+.twinkle:nth-child(5) { left:4%; top:52%; width:7px; height:7px; animation-delay:-2.7s; background:#ffc4e0; }
+.twinkle:nth-child(6) { left:72%; top:20%; width:7px; height:7px; animation-delay:-1.6s; }
+.twinkle:nth-child(7) { left:31%; top:8%; width:9px; height:9px; animation-delay:-3.1s; }
+.twinkle:nth-child(8) { left:81%; top:55%; width:9px; height:9px; animation-delay:-.3s; }
+.twinkle:nth-child(9) { left:12%; top:74%; width:8px; height:8px; animation-delay:-2.2s; }
+.twinkle:nth-child(10) { left:58%; top:5%; width:8px; height:8px; animation-delay:-1.4s; background:#ffc4e0; }
+@keyframes twinkle { 0%,100% { opacity:.2; transform:scale(.6) rotate(0); } 50% { opacity:1; transform:scale(1.15) rotate(20deg); } }
+.sky-bat { display:none; position:absolute; width:58px; height:58px; }
+.sky-bat img { display:block; width:100%; height:100%; object-fit:contain; }
+.sky-bat-a { left:5%; top:20%; animation:sky-bat-a 17s ease-in-out infinite; }
+.sky-bat-b { right:6%; top:44%; width:44px; height:44px; animation:sky-bat-b 21s ease-in-out infinite; }
+@keyframes sky-bat-a { 25% { transform:translate(60px,-40px) rotate(8deg); } 50% { transform:translate(120px,20px) rotate(-6deg); } 75% { transform:translate(40px,50px) rotate(6deg); } }
+@keyframes sky-bat-b { 25% { transform:translate(-50px,30px) rotate(-8deg); } 50% { transform:translate(-110px,-30px) rotate(6deg); } 75% { transform:translate(-30px,-50px) rotate(-5deg); } }
+
+/* ---- Inside the page ---- */
+#app .scene .eyebrow { padding:4px 13px; border-radius:999px; font-size:.74rem; box-shadow:0 2px 0 var(--outline); }
+#app .scene .eyebrow::before { content:'✦'; margin-right:6px; color:#ffacd2; }
+#app .scene .eyebrow::after { content:'✦'; margin-left:6px; color:#ffacd2; }
+#app .story-count { font:800 .66rem/1 var(--sans); letter-spacing:.8px; color:#cdb6e6; opacity:.85; }
+#app .corner-star { font-size:20px; animation:twinkle 3.2s ease-in-out infinite; }
+.scene-art svg { filter:drop-shadow(0 6px 0 #2c193f40); }
+.heart-counter { border-radius:999px; padding:5px 12px; }
+#app .scene .big-heart { position:relative; transform:rotate(-7deg); }
+#app .scene .big-heart svg { animation:found-beat 1.6s ease-in-out infinite; transform-origin:50% 60%; }
+#app .scene .big-heart::after { content:''; position:absolute; left:24%; right:24%; top:30%; height:34%; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 34'%3E%3Cellipse cx='18' cy='11' rx='3.6' ry='5.2' fill='%2338213d'/%3E%3Cellipse cx='42' cy='11' rx='3.6' ry='5.2' fill='%2338213d'/%3E%3Ccircle cx='19.3' cy='9' r='1.4' fill='%23fff'/%3E%3Ccircle cx='43.3' cy='9' r='1.4' fill='%23fff'/%3E%3Cellipse cx='9' cy='21' rx='5' ry='3.2' fill='%23ff6fa8' opacity='.75'/%3E%3Cellipse cx='51' cy='21' rx='5' ry='3.2' fill='%23ff6fa8' opacity='.75'/%3E%3Cpath d='M25 21q5 6 10 0' fill='none' stroke='%2338213d' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat; animation:found-beat 1.6s ease-in-out infinite; }
+@keyframes found-beat { 0%,100% { transform:scale(1); } 14% { transform:scale(1.08); } 28% { transform:scale(1); } 42% { transform:scale(1.05); } 56% { transform:scale(1); } }
+/* the editor wraps words in spans: "Boo!" keeps its own big letters */
+.boo-bubble>[data-inline-key] { display:inline; margin:0; font:inherit; }
+.partner-text>[data-inline-key] { display:inline; font:inherit; color:inherit; line-height:inherit; }
+.maze,.game .maze { border-radius:24px; }
+.heart-toast { border-radius:18px; }
+.heart-toast.visible { background:#fff3e0; }
+.details-list { border-radius:26px; }
+.detail-row svg { border-radius:12px; }
+
+/* ---- Buttons shaped like sweets ---- */
+.button-skin { filter:drop-shadow(0 4px 0 var(--outline)); }
+.pumpkin-button { color:#4a1f3a; }
+.pumpkin-body { fill:#ffa45c; stroke:var(--outline); stroke-width:3; stroke-linejoin:round; }
+.pumpkin-rib { fill:none; stroke:#ee8338; stroke-width:3; stroke-linecap:round; }
+.pumpkin-shine { fill:none; stroke:#ffe6c4; stroke-width:4.5; stroke-linecap:round; opacity:.95; }
+.pumpkin-cheek,.ghost-cheek { fill:#ff8fbf; opacity:.6; }
+.button-stem { position:absolute; left:50%; top:-13px; z-index:-1; width:34px; height:22px; margin-left:-13px; overflow:visible; pointer-events:none; }
+.ghost-button,.themed-button.secondary.ghost-button,.themed-button.secondary.ghost-button:hover { color:#3b2250; }
+.ghost-body { fill:#efe4ff; stroke:var(--outline); stroke-width:3; stroke-linejoin:round; }
+.ghost-shine { fill:none; stroke:#fff; stroke-width:4.5; stroke-linecap:round; opacity:.9; }
+#app .scene .ghost-button { padding-bottom:20px; }
+#app .scene .candy-button { padding:14px 40px; }
+#app .scene .graveyard-button { padding:10px 26px 22px; }
+#app .scene .pumpkin-button { padding-bottom:13px; }
+#app .scene .button { width:min(100%,256px); min-height:60px; }
+#app .scene .button-stack { width:min(100%,256px); }
+.pumpkin-rib.far { stroke-width:2.2; opacity:.7; }
+.themed-button:hover .pumpkin-body { fill:#ffb072; }
+.themed-button:hover .ghost-body { fill:#f8f0ff; }
+/* the arrow keys of the hunt: cream keys that press down */
+#app .direction { position:relative; padding:0; border:3px solid var(--outline); border-radius:16px; background:linear-gradient(#fffaf0,#ffe5c2); color:#4b2a66; box-shadow:0 4px 0 var(--outline); font-size:1.35rem; font-weight:900; line-height:1; touch-action:manipulation; user-select:none; transition:transform .08s,box-shadow .08s,background .15s; }
+#app .direction:hover { background:linear-gradient(#fff,#ffeed6); }
+#app .direction:active { transform:translateY(3px); box-shadow:0 1px 0 var(--outline); background:#ffd9a8; }
+
+/* ---- Waiting, the studio door, and a link that is not there ---- */
+#app .mode-state { gap:12px; }
+#app .mode-state::before { content:''; display:block; position:static; flex:none; width:84px; height:92px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 70'%3E%3Cpath d='M8 60V32C8 16 18 5 32 5s24 11 24 27v28q-6 8-12 0-6 8-12 0-6 8-12 0-6 8-12 0Z' fill='%23fff8ed' stroke='%233b2250' stroke-width='3' stroke-linejoin='round'/%3E%3Cellipse cx='24' cy='29' rx='3.7' ry='5.2' fill='%2338213d'/%3E%3Cellipse cx='40' cy='29' rx='3.7' ry='5.2' fill='%2338213d'/%3E%3Ccircle cx='25.3' cy='27' r='1.4' fill='%23fff'/%3E%3Ccircle cx='41.3' cy='27' r='1.4' fill='%23fff'/%3E%3Cellipse cx='16.5' cy='37' rx='4.6' ry='3' fill='%23ffafd2'/%3E%3Cellipse cx='47.5' cy='37' rx='4.6' ry='3' fill='%23ffafd2'/%3E%3Cpath d='M28.5 37q3.5 3.6 7 0' fill='none' stroke='%2338213d' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat; animation:happy-bob 2.4s ease-in-out infinite; }
+#app .mode-state h1 { font-size:clamp(1.6rem,min(8cqw,6cqh),2.5rem); }
+.studio-password-form { gap:10px; font-weight:800; }
+.studio-password-form input { border:2.5px solid var(--outline); border-radius:16px; background:#fff3e0; color:#3b2250; box-shadow:inset 0 3px 0 #2c193f1f; }
+.studio-password-form input:focus-visible { outline:3px solid #ffacd2; outline-offset:2px; }
+.mode-button { border:2.5px solid var(--outline); border-radius:999px; background:#ffa45c; color:#4a1f3a; font-weight:900; box-shadow:0 4px 0 var(--outline); padding:10px 18px; transition:transform .1s,box-shadow .1s; }
+.mode-button:hover { background:#ffb072; }
+.mode-button:active { transform:translateY(3px); box-shadow:0 1px 0 var(--outline); }
+.mode-button:disabled { opacity:.6; }
+.share-link-dialog { border:3px solid var(--outline); border-radius:30px; background:radial-gradient(120% 85% at 50% 0%,#8a5fb8,#5d3889 55%,#41235f); box-shadow:0 7px 0 var(--outline),0 26px 60px #12062480; }
+.share-link-dialog output { border:2.5px dashed #ffdfaa88; border-radius:16px; background:#2c193f55; }
+.share-link-dialog .mode-button+.mode-button { background:#efe4ff; color:#3b2250; }
+
+/* ---- Wide screens: more friends, more room ---- */
+@media(min-width:860px) {
+  .brand { font-size:1.45rem; }
+  .edition { font-size:.74rem; padding:7px 12px; }
+  .sound-toggle { width:auto; height:40px; padding:0 15px; border-radius:999px; font:900 .8rem/1 var(--sans); }
+  .sound-toggle::before { content:none; }
+  .sound-toggle[aria-pressed="false"]::after { content:none; }
+  .mode-label { font-size:.78rem; }
+  .site-footer>span:first-child,.site-footer .art-credit { font-size:.78rem; }
+}
+@media(min-width:640px) and (min-aspect-ratio:5/4) {
+  .editor-toolbar { width:min(100%,clamp(1000px,58vw,1160px)); }
+  .page-paper { border-radius:38px; }
+  .page-paper::before { border-radius:28px; }
+  /* the fold of the open book */
+  .page-paper::after { content:''; position:absolute; left:50%; top:30px; bottom:30px; border-left:2px dashed #ffdfaa33; }
+  .page:has(.scene:is(.loading,.mode-state)) .page-paper::after { display:none; }
+  #app .scene { border-radius:36px; }
+  .trim-garland { left:36px; right:36px; height:26px; }
+  .trim-ghost { right:11%; top:-50px; width:68px; height:50px; }
+  .trim-paws { right:calc(11% - 6px); top:-8px; width:80px; height:17px; }
+  .trim-paws i { width:20px; height:17px; }
+  .trim-pumpkin { display:block; left:-38px; bottom:-20px; width:84px; animation:trim-sit 4.5s ease-in-out infinite; transform-origin:50% 100%; }
+  .trim-candy { display:block; right:-30px; bottom:-8px; width:62px; transform:rotate(-14deg); animation:trim-wobble 5s ease-in-out infinite; }
+  .sky-bat { display:block; }
+  #app .scene .eyebrow { font-size:.8rem; padding:5px 14px; }
+  #app .scene .button { width:min(100%,270px); min-height:64px; font-size:.95rem; }
+  #app .scene .button-stack { width:min(100%,270px); }
+}
+@keyframes trim-sit { 50% { transform:scale(1.04,.96); } }
+@keyframes trim-wobble { 50% { transform:rotate(-4deg) translateY(-3px); } }
+@media(prefers-reduced-motion:reduce) { #app .scene .big-heart svg,#app .scene .big-heart::after,.twinkle,.sky-bat,.trim-ghost svg,.trim-ghost-eyes,.trim-pumpkin,.trim-candy,#app .corner-star,#app .mode-state::before { animation:none; } .twinkle { opacity:.7; } }
+/* A phone lying on its side: the same open book, with less around it. */
+@media(max-height:520px) and (min-aspect-ratio:5/4) {
+  .masthead { padding-top:4px; }
+  .site-footer { padding-bottom:4px; }
+  .site-footer>span:first-child { visibility:hidden; }
+  .sky-bat { display:none; }
+  #app .scene .button { width:min(100%,256px); }
+  .storybook { padding:8px 0 4px; }
+  .page-trim { display:none; }
+  #app .scene { padding-top:18px; padding-bottom:16px; gap:6px; }
+  #app .scene h1 { font-size:1.75rem; }
+  #app .scene .button { min-height:48px; padding-block:9px 11px; }
+  #app .scene .eyebrow,#app .game .controls-note,#app .scene .whisper { display:none; }
+}

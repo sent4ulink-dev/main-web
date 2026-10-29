@@ -1,0 +1,1 @@
+{"version": 2, "x0": -31.0, "z0": -74.0, "cell": 0.1, "cols": 546, "rows": 841, "offset": 5.0, "scale": 0.001, "heightMask": 16383, "bodyBit": 16384, "waterBit": 32768, "materials": ["none", "grass", "stone", "wood", "water", "leaf", "sand", "cloth", "metal"], "head": 0.95}

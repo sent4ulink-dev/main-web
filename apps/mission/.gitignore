@@ -1,0 +1,12 @@
+node_modules/
+dist/
+art/downloads/
+*.blend1
+art/snaps/
+.claude/
+.wrangler/
+.sites-runtime/
+.env*.local
+.dev.vars
+art/blender/export/
+art/blender/previews/

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#442663">
+  <meta name="description" content="A little mystery. A few hidden hearts. And a Halloween question, just for you.">
+  <title>For You &lt;3</title>
+  <link rel="icon" href="/brand/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="icon" href="/brand/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css?v=18">
+  <link rel="stylesheet" href="./enchantment.css?v=18">
+  <link rel="stylesheet" href="./cartoon.css?v=18">
+  <link rel="stylesheet" href="./responsive.css?v=18">
+  <link rel="stylesheet" href="./editor.css?v=18">
+  <link rel="stylesheet" href="./cute.css?v=18">
+  <link rel="preload" as="image" href="./assets/jumpscare-photo.png">
+</head>
+<body>
+  <div class="sky-friends" aria-hidden="true">
+    <i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i><i class="twinkle"></i>
+    <picture class="sky-bat sky-bat-a"><source media="(prefers-reduced-motion: reduce)" srcset="./assets/bat-still.svg"><img src="./assets/bat.webp" width="512" height="512" alt="" decoding="async"></picture>
+    <picture class="sky-bat sky-bat-b"><source media="(prefers-reduced-motion: reduce)" srcset="./assets/bat-still.svg"><img src="./assets/bat.webp" width="512" height="512" alt="" decoding="async"></picture>
+  </div>
+  <div class="site-shell">
+    <header class="masthead"><span class="brand"><span aria-hidden="true">☾</span> All Hallows’ Eve</span><span class="header-note">A little invitation, just for you</span><span class="edition"></span><button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="true" aria-label="Toggle sound">♫ Sound on</button><div class="masthead-owner"><span id="mode-label" class="mode-label"></span><button id="edit-toggle" class="edit-toggle" type="button" hidden>Edit</button><button id="generate-link" class="edit-toggle" type="button" hidden>Generate link</button><button id="reset-demo" class="edit-toggle" type="button" hidden>Reset demonstration</button></div></header>
+    <div id="editor-toolbar" class="editor-toolbar" aria-label="Inline editing tools" hidden></div>
+    <div class="storybook">
+      <div class="page">
+        <div class="page-paper" aria-hidden="true"></div>
+        <main id="app" aria-label="Halloween date invitation"></main>
+        <div class="page-trim" aria-hidden="true">
+          <span class="trim-garland"></span>
+          <span class="trim-ghost"><svg viewBox="0 0 64 70"><path d="M8 70V32C8 16 18 5 32 5s24 11 24 27v38Z" fill="#fff8ed" stroke="#3b2250" stroke-width="3" stroke-linejoin="round"/><g class="trim-ghost-eyes"><ellipse cx="24" cy="29" rx="3.7" ry="5.2" fill="#38213d"/><ellipse cx="40" cy="29" rx="3.7" ry="5.2" fill="#38213d"/><circle cx="25.3" cy="27" r="1.4" fill="#fff"/><circle cx="41.3" cy="27" r="1.4" fill="#fff"/></g><ellipse cx="16.5" cy="37" rx="4.6" ry="3" fill="#ffafd2"/><ellipse cx="47.5" cy="37" rx="4.6" ry="3" fill="#ffafd2"/><path d="M28.5 37q3.5 3.6 7 0" fill="none" stroke="#38213d" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+          <span class="trim-paws"><i></i><i></i></span>
+          <span class="trim-pumpkin"><svg viewBox="0 0 80 74"><path d="M40 18q-2-9 6-13" fill="none" stroke="#2c193f" stroke-width="8" stroke-linecap="round"/><path d="M40 18q-2-9 6-13" fill="none" stroke="#7cc45a" stroke-width="4" stroke-linecap="round"/><path d="M45 13q9-7 16 1-9 5-16-1Z" fill="#9be07a" stroke="#2c193f" stroke-width="2" stroke-linejoin="round"/><path d="M40 20C14 8 2 32 6 48c4 16 18 22 34 22s30-6 34-22C78 32 66 8 40 20Z" fill="#ffa45c" stroke="#2c193f" stroke-width="3" stroke-linejoin="round"/><path d="M26 22q-9 22 2 45M54 22q9 22-2 45" fill="none" stroke="#ec8438" stroke-width="2.5" stroke-linecap="round"/><path d="M15 31q4-7 11-9" fill="none" stroke="#ffd9ad" stroke-width="3" stroke-linecap="round"/><ellipse cx="29" cy="42" rx="3.4" ry="4.8" fill="#38213d"/><ellipse cx="51" cy="42" rx="3.4" ry="4.8" fill="#38213d"/><circle cx="30.2" cy="40.2" r="1.3" fill="#fff"/><circle cx="52.2" cy="40.2" r="1.3" fill="#fff"/><ellipse cx="21" cy="50" rx="4.8" ry="3.1" fill="#ff8fbf" opacity=".8"/><ellipse cx="59" cy="50" rx="4.8" ry="3.1" fill="#ff8fbf" opacity=".8"/><path d="M35 50q5 5 10 0" fill="none" stroke="#38213d" stroke-width="2.4" stroke-linecap="round"/></svg></span>
+          <span class="trim-candy"><svg viewBox="0 0 70 46"><path d="m21 17-16-9q-3 15 0 30l16-9Zm28 0 16-9q3 15 0 30l-16-9Z" fill="#b5ee93" stroke="#2c193f" stroke-width="2.5" stroke-linejoin="round"/><rect x="17" y="8" width="36" height="30" rx="14" fill="#ffb7d6" stroke="#2c193f" stroke-width="2.5"/><path d="m27 10 9 26m3-27 8 22" stroke="#fff3e2" stroke-width="5" stroke-linecap="round"/></svg></span>
+        </div>
+      </div>
+    </div>
+    <footer class="site-footer"><span>A little spooky.<br>A little sweet.</span><div id="progress" aria-label="Story progress"></div><a class="art-credit" href="./assets/credits.html" target="_blank" rel="noopener">Art credits</a><span id="plan-load-status" class="plan-load-status" role="status"></span></footer>
+  </div>
+  <script src="./sound.js" defer></script>
+  <dialog id="share-link-dialog" class="share-link-dialog" aria-labelledby="share-link-title"><h2 id="share-link-title">Your invitation link</h2><p>Anyone with access to this link can edit it for five days, unless editing is permanently finished.</p><output id="share-url"></output><div class="editor-commands"><button type="button" class="mode-button" data-copy-link>Copy Link</button><button type="button" class="mode-button" data-close-link>Close</button></div><p class="link-status" role="status"></p></dialog>
+  <script type="module" src="./app.js?v=18"></script>
+</body>
+</html>

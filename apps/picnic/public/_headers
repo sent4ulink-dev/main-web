@@ -1,0 +1,15 @@
+# Cloudflare Pages response headers
+# Vite's hashed bundles never change: cache forever
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 3D models and sounds: cache for a week (file names are stable, so not immutable)
+/models/*
+  Cache-Control: public, max-age=604800
+/audio/*
+  Cache-Control: public, max-age=604800
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: microphone=(self), camera=(), geolocation=()

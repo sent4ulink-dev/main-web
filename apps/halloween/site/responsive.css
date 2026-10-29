@@ -1,0 +1,231 @@
+/* The whole story is told on one storybook page (.page). A phone shows a
+   single page; a wide screen opens the book: picture on the left page, words
+   on the right. Sizes follow the page (#app is a size container), so every
+   scene fits whatever room the browser leaves. */
+
+/* ---- The shell: header, the page, footer ---- */
+.site-shell {
+  width:100%; max-width:none; height:100vh; height:100dvh; min-height:0;
+  display:grid; grid-template-rows:auto minmax(0,1fr) auto;
+  padding:env(safe-area-inset-top) max(12px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(12px,env(safe-area-inset-left));
+}
+.masthead { width:min(100%,1040px); margin:0 auto; min-height:0; padding:8px 2px 0; display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:6px 8px; border:0; }
+.header-note { display:none; }
+.masthead-owner { flex-basis:100%; min-width:0; display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:6px; }
+.masthead-owner:not(:has(.edit-toggle:not([hidden]))):has(.mode-label:empty) { display:none; }
+.sound-toggle { margin-left:auto; }
+.site-footer { width:min(100%,1040px); margin:0 auto; min-height:0; padding:4px 2px 8px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:4px 8px; border:0; }
+.site-footer>span:first-child { justify-self:start; max-width:none; }
+.site-footer .art-credit { justify-self:end; padding:8px 0; white-space:nowrap; }
+.plan-load-status { grid-column:1/-1; justify-self:center; max-width:none; text-align:center; }
+#progress { justify-self:center; }
+
+/* ---- The page ---- */
+.storybook { min-width:0; min-height:0; display:grid; place-items:center; padding:clamp(30px,5dvh,44px) 0 8px; }
+.page { position:relative; isolation:isolate; width:min(100%,440px); height:min(100%,740px); }
+.page-paper { position:absolute; inset:0; z-index:0; }
+.page-trim { position:absolute; inset:0; z-index:2; pointer-events:none; }
+#app { position:relative; z-index:1; display:block; flex:none; width:100%; height:100%; min-width:0; min-height:0; container-type:size; }
+
+/* ---- A scene on one page (phones, and anything tall) ---- */
+#app .scene {
+  position:relative; width:100%; max-width:none; height:100%; min-height:0; margin:0;
+  padding:40px 18px 24px; display:flex; flex-direction:column; align-items:center;
+  justify-content:safe center; gap:clamp(6px,1.5cqh,14px); text-align:center;
+  overflow:auto; overscroll-behavior:contain; scrollbar-width:none; border-radius:32px;
+}
+#app .scene::-webkit-scrollbar { display:none; }
+#app .scene>* { flex-shrink:0; max-width:100%; }
+#app .scene h1 { font-size:clamp(1.7rem,min(9.6cqw,6.4cqh),2.9rem); line-height:1.07; margin:0; -webkit-text-stroke:1.8px var(--outline); text-shadow:0 3px 0 var(--outline); }
+#app .scene .eyebrow { margin:0; }
+#app .scene .subtitle { margin:0; line-height:1.4; font-size:1rem; }
+#app .scene .whisper { margin:0; font-size:.75rem; line-height:1.4; }
+#app .scene .question-small { font-size:clamp(1rem,3cqh,1.35rem); line-height:1.25; margin:3px 0; }
+#app .story-count { top:auto; bottom:14px; left:26px; }
+#app .corner-star { top:30px; right:20px; }
+
+#app .scene .scene-art { width:min(100%,360px); height:clamp(110px,33cqh,290px); margin:0; }
+#app .invitation .scene-art { height:clamp(100px,29cqh,260px); }
+#app .scene .confirmation-art { position:relative; width:min(100%,400px); height:clamp(120px,38cqh,330px); }
+#app .scene .confirmation-art .scene-art { width:100%; height:100%; }
+#app .scene .button { min-width:0; width:min(100%,270px); min-height:58px; padding:12px 22px 14px; font-size:.9rem; }
+#app .scene .button-stack { width:min(100%,270px); gap:12px; }
+#app .scene .single-ghost { width:clamp(54px,12cqh,92px); height:clamp(60px,14cqh,104px); margin:0; }
+#app .scene .big-heart { width:clamp(52px,12cqh,92px); height:clamp(50px,11.5cqh,88px); margin:0; }
+#app .scene blockquote { margin:0; padding:14px 22px; font-size:clamp(1.1rem,3.4cqh,1.55rem); }
+#app .scene .boo-visitor { margin:0; }
+#app .scene .boo-bubble { margin:0; padding:10px 22px; font-size:clamp(1.75rem,6cqh,3rem); }
+#app .scene .sourced-boo { width:clamp(64px,17cqh,130px); height:clamp(64px,17cqh,130px); margin:10px auto 0; }
+#app .scene .partner-text { margin:0; font-size:.875rem; line-height:1.4; }
+#app .scene .loading-track { margin:0; max-width:80%; }
+#app .scene .crescent { margin:0; }
+#app .loading .crescent { width:clamp(34px,9cqh,62px); height:clamp(40px,10cqh,76px); }
+#app .loading .cemetery { bottom:16px; left:50%; width:min(84%,480px); transform:translateX(-50%); }
+
+/* The plan: a ticket of rows, then what can be done with it. */
+#app .details { gap:clamp(6px,1.2cqh,12px); }
+#app .scene .pumpkin { display:none; width:clamp(28px,6cqh,46px); height:clamp(28px,6cqh,46px); margin:0; }
+#app .scene .details-list { width:min(100%,400px); margin:0; padding:2px 14px; display:grid; grid-template-columns:1.3fr 1fr; column-gap:12px; }
+#app .scene .detail-row { grid-column:1/-1; min-width:0; padding:clamp(4px,.95cqh,9px) 0; gap:9px; }
+#app .scene .detail-row:nth-child(3),#app .scene .detail-row:nth-child(4) { grid-column:auto; }
+#app .scene .detail-row svg { flex-shrink:0; width:22px; height:22px; padding:4px; }
+#app .scene .detail-row dt { margin:0; font-size:.64rem; }
+#app .scene .detail-row dd { font-size:.93rem; line-height:1.22; }
+#app .scene .plan-timezone { font-size:.66rem; }
+#app .details .plan-actions { width:min(100%,400px); }
+#app .details>.details-list { flex-shrink:1; min-height:150px; overflow-y:auto; scrollbar-width:thin; }
+
+/* The last page: a love letter with hearts and one friendly bat. */
+#app .scene .final-sky { width:min(100%,300px); height:clamp(30px,8cqh,62px); margin:0; }
+#app .scene .final-sky .crescent { height:100%; width:54px; }
+#app .scene .see-you { margin:0; font-size:.875rem; }
+#app .scene .final-heart { font-size:24px; line-height:1; }
+#app .finale .love-letter-finale { position:relative; width:min(100%,400px); height:clamp(130px,40cqh,340px); margin:0; overflow:visible; }
+.final-letter { position:absolute; inset:10% 10% 2%; display:block; filter:drop-shadow(0 10px 18px #2b164c55); animation:love-letter-float 4s ease-in-out infinite; }
+.final-letter img,.final-sparkle img,.final-pink-bat img,.final-heart-ghost img { display:block; width:100%; height:100%; object-fit:contain; }
+.final-heart-ghost { position:absolute; z-index:1; display:block; left:32%; top:4%; width:36%; height:42%; pointer-events:none; transform-origin:center bottom; filter:drop-shadow(0 0 14px #ffc9df88); animation:letter-ghost-peek 6.14s ease-in-out infinite; }
+@keyframes letter-ghost-peek {
+  0%,8%,100% { opacity:0; transform:translateY(95%) scale(.15); }
+  22% { opacity:1; transform:translateY(8%) scale(.9) rotate(-6deg); }
+  38%,65% { opacity:1; transform:translateY(-4%) scale(1) rotate(5deg); }
+  52% { transform:translateY(3%) scale(1.04) rotate(-5deg); }
+  82% { opacity:1; transform:translateY(10%) scale(.9) rotate(-4deg); }
+  94% { opacity:0; transform:translateY(95%) scale(.15); }
+}
+.final-sparkle { position:absolute; display:block; width:20%; height:23%; animation:love-heart-drift 5s ease-in-out infinite; }
+.sparkle-1 { left:4%; top:27%; }
+.sparkle-2 { right:3%; top:14%; animation-delay:-1.7s; }
+.sparkle-3 { right:10%; bottom:0; width:15%; animation-delay:-3.2s; }
+.final-pink-bat { position:absolute; left:18%; top:0; width:17%; height:20%; animation:love-bat-swoop 7s ease-in-out infinite; }
+@keyframes love-letter-float { 50% { transform:translateY(-8px) rotate(-3deg); } }
+@keyframes love-heart-drift { 50% { transform:translateY(-12px) rotate(8deg) scale(1.08); } }
+@keyframes love-bat-swoop { 35% { transform:translate(130%,-8%) rotate(8deg); } 70% { transform:translate(240%,35%) rotate(-8deg); } }
+@media(prefers-reduced-motion:reduce) { .final-letter,.final-sparkle,.final-pink-bat,.final-heart-ghost { animation:none; } .final-heart-ghost { opacity:1; transform:none; } }
+
+/* "It's a yes": a beating heart over the moon and three bats. */
+.confirmation-heart { position:absolute; left:50%; top:21%; width:34%; height:36%; transform:translateX(-50%); color:#ff9dc8; filter:drop-shadow(0 0 12px #ffafd280); animation:confirmation-heartbeat 2.5s ease-in-out infinite; }
+.confirmation-heart svg { width:100%; height:100%; overflow:visible; }
+.confirmation-heart path { stroke:#823d69; stroke-width:1; }
+.confirmation-bats { position:absolute; inset:0; pointer-events:none; }
+.confirmation-bat { position:absolute; width:15%; height:20%; animation:confirmation-bat-flight 7s ease-in-out infinite; }
+.confirmation-bat img { display:block; width:100%; height:100%; object-fit:contain; }
+.confirmation-bat img,.flying-treat img[src$="bat.webp"],.final-pink-bat img,.sky-bat img { filter:grayscale(1) sepia(1) saturate(5) hue-rotate(285deg) brightness(1.45); }
+.moon-bat>path { fill:#ff9dc8; stroke:#823d69; }
+.confirmation-bat.bat-1 { left:6%; top:15%; }
+.confirmation-bat.bat-2 { right:5%; top:32%; animation-name:confirmation-bat-return; animation-delay:-2.5s; }
+.confirmation-bat.bat-3 { left:24%; top:4%; animation-delay:-4.5s; width:12%; }
+@keyframes confirmation-heartbeat { 50% { transform:translateX(-50%) scale(1.08); filter:drop-shadow(0 0 20px #ffafd2b0); } }
+@keyframes confirmation-bat-flight { 25% { transform:translate(60%,-35%) rotate(10deg); } 50% { transform:translate(160%,20%) rotate(-8deg); } 75% { transform:translate(55%,55%) rotate(5deg); } }
+@keyframes confirmation-bat-return { 25% { transform:translate(-60%,-35%) rotate(-10deg); } 50% { transform:translate(-160%,20%) rotate(8deg); } 75% { transform:translate(-55%,55%) rotate(-5deg); } }
+@media(prefers-reduced-motion:reduce) { .confirmation-heart,.confirmation-bat { animation:none; } }
+
+/* The heart hunt: the board, then its arrow keys underneath. */
+#app .game { max-width:none; gap:clamp(6px,1.3cqh,12px); }
+#app .game .eyebrow { display:none; }
+#app .game h1 { font-size:clamp(1.5rem,min(8cqw,5cqh),2.3rem); }
+#app .game .game-hud { width:min(100%,360px); margin:0; gap:8px; justify-content:space-between; }
+#app .game .heart-counter { flex-shrink:0; white-space:nowrap; }
+#app .game .game-hint { font-size:.82rem; max-width:none; }
+#app .game .maze { width:min(100%,calc(100cqh - 312px),390px); flex-shrink:0; }
+#app .game .direction-pad { display:grid; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(2,50px); gap:8px; margin:2px 0 0; }
+#app .game .maze { grid-template-columns:repeat(9,minmax(0,1fr)); grid-template-rows:repeat(9,minmax(0,1fr)); touch-action:none; -webkit-user-select:none; user-select:none; }
+#app .game .direction { min-height:44px; touch-action:none; -webkit-touch-callout:none; }
+#app .game .controls-note { max-width:none; margin:0; font-size:.72rem; }
+#app .game .controls-note span,#app .game .controls-note br { display:none; }
+#app .game .heart-toast { position:absolute; z-index:4; top:10px; bottom:auto; left:50%; transform:translateX(-50%); width:min(92%,380px); min-height:44px; margin:0; pointer-events:none; }
+/* A short phone page: the keys stay a cross under the board (a column of
+   four beside it was hard to steer); the board gives up a little room. */
+@container (max-height:590px) and (max-width:700px) {
+  #app .game .maze { width:min(100%,calc(100cqh - 250px),390px); }
+  #app .game .direction-pad { grid-template-columns:repeat(3,58px); grid-template-rows:repeat(2,42px); gap:6px; margin:0; }
+  #app .game .direction { min-height:40px; }
+  #app .game .controls-note { display:none; }
+}
+@container (max-height:560px) and (max-width:700px) {
+  #app .scene { padding-top:32px; padding-bottom:20px; gap:5px; }
+  #app .scene .button { min-height:52px; padding-block:9px 11px; }
+  #app .scene .detail-row { padding:3px 0; }
+  #app .scene .detail-row svg { width:18px; height:18px; padding:3px; }
+  #app .scene .detail-row dd { font-size:.88rem; }
+  #app .scene .eyebrow { display:none; }
+  #app .quest .whisper,#app .invitation .whisper { display:none; }
+  #app .details .pumpkin { display:none; }
+}
+
+/* ---- The open book: wide screens ---- */
+/* Room for the whole header on one line. */
+@media(min-width:700px) {
+  .masthead { gap:10px; }
+  .masthead-owner { flex-basis:auto; margin-left:auto; }
+  .mode-label { flex:none; }
+  .sound-toggle { margin-left:0; order:3; }
+  .masthead:not(:has(.masthead-owner .edit-toggle:not([hidden]))):has(.mode-label:empty) .sound-toggle { margin-left:auto; }
+}
+/* A tablet held upright: the same single page, larger. */
+@media(min-width:600px) and (max-aspect-ratio:5/4) {
+  .page { width:min(100%,520px); height:min(100%,840px); }
+}
+@media(min-width:640px) and (min-aspect-ratio:5/4) {
+  .masthead,.site-footer { width:min(100%,clamp(1000px,58vw,1160px)); }
+  .masthead { padding-top:12px; }
+  .site-footer { padding-bottom:12px; }
+  .storybook { padding:clamp(34px,6dvh,54px) 0 14px; }
+  .page { width:min(100%,clamp(1000px,58vw,1160px)); height:min(100%,clamp(640px,66dvh,730px)); }
+  #app .scene:not(.loading,.mode-state,.jumpscare) {
+    display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:clamp(40px,7cqw,84px);
+    row-gap:clamp(8px,2cqh,16px); align-content:safe center; justify-items:center; padding:44px clamp(30px,5cqw,56px) 34px;
+  }
+  #app .scene:not(.loading,.mode-state,.jumpscare)>* { grid-column:2; }
+  /* the picture sits on the left page, centred, and never pushes the words */
+  #app .scene:not(.loading,.mode-state,.jumpscare)>:is(.scene-art,.confirmation-art,.boo-visitor,.details-list,.final-art,.maze,.big-heart) { position:absolute; grid-column:1/2; inset:0; margin:auto; }
+  #app .scene>:is(.story-count,.corner-star,.heart-toast,.sr-only) { grid-column:auto; }
+  #app .declined>.single-ghost { position:absolute; grid-column:1/2; inset:0; margin:auto; width:min(26cqw,44cqh,230px); height:min(29cqw,49cqh,256px); }
+  #app .scene h1 { font-size:clamp(1.9rem,min(5cqw,10cqh),3.3rem); }
+  #app .scene .subtitle { font-size:1.08rem; }
+  #app .scene :is(.scene-art,.confirmation-art) { width:min(100%,440px); height:min(80cqh,420px); }
+  #app .scene .confirmation-art .scene-art { width:100%; height:100%; }
+  #app .scene .boo-visitor { width:fit-content; height:fit-content; }
+  #app .scene .boo-bubble { font-size:clamp(2.2rem,9cqh,3.6rem); }
+  #app .scene .sourced-boo { width:min(22cqw,38cqh,210px); height:min(22cqw,38cqh,210px); }
+  #app .heart-found { --heart:min(24cqw,40cqh,220px); }
+  #app .heart-found>.big-heart { width:var(--heart); height:calc(var(--heart)*.95); translate:-9% -7%; }
+  #app .heart-found>.single-ghost { position:absolute; grid-column:1/2; inset:0; margin:auto; width:calc(var(--heart)*.42); height:calc(var(--heart)*.48); translate:calc(var(--heart)*.43) calc(var(--heart)*.36); }
+  #app .scene .details-list { width:min(100%,430px); height:fit-content; max-height:calc(100% - 64px); overflow:auto; scrollbar-width:thin; }
+  #app .scene .detail-row { padding:clamp(6px,1.5cqh,12px) 0; }
+  #app .scene .detail-row dt { font-size:.72rem; }
+  #app .scene .detail-row dd { font-size:1rem; }
+  #app .scene .plan-timezone { font-size:.72rem; }
+  #app .scene .pumpkin { display:block; width:clamp(34px,8cqh,54px); height:clamp(34px,8cqh,54px); }
+  #app .finale .love-letter-finale { width:min(100%,440px); height:min(82cqh,440px); }
+  #app .scene .final-sky { height:clamp(40px,11cqh,72px); }
+  #app .story-count { left:50%; bottom:13px; translate:-50%; padding:0 10px; }
+  #app .corner-star { top:38px; right:30px; }
+  /* the hunt: board on the left page, score and keys on the right */
+  #app .game { display:grid; }
+  #app .game .eyebrow { display:block; }
+  #app .game h1 { font-size:clamp(1.9rem,min(4.6cqw,9cqh),3rem); }
+  #app .game .maze { width:min(40cqw,calc(100cqh - 92px),450px); height:min(40cqw,calc(100cqh - 92px),450px); max-width:none; }
+  #app .game .game-hud { width:min(100%,340px); flex-direction:column; gap:10px; }
+  #app .game .game-hint { text-align:center; font-size:.95rem; }
+  #app .game .direction-pad { grid-template-columns:repeat(3,62px); grid-template-rows:repeat(2,52px); gap:8px; margin:4px 0; }
+  #app .game .direction { grid-row:auto; }
+  #app .game .direction.up { grid-column:2; grid-row:1; }
+  #app .game .direction.left { grid-column:1; grid-row:2; }
+  #app .game .direction.down { grid-column:2; grid-row:2; }
+  #app .game .direction.right { grid-column:3; grid-row:2; }
+  #app .game .controls-note { font-size:.74rem; max-width:none; }
+  #app .game .controls-note span,#app .game .controls-note br { display:inline; }
+  #app .game .controls-note span { display:block; }
+  #app .game .heart-toast { grid-column:2/3; left:0; right:0; bottom:clamp(8px,3cqh,34px); width:min(100%,340px); margin-inline:auto; transform:none; }
+}
+@media(max-width:380px) {
+  #app .scene { padding-inline:12px; }
+  .site-footer>span:first-child { font-size:.66rem; }
+}
+
+/* The fright covers everything, page or no page. */
+#app .scene.jumpscare { position:fixed; inset:0; z-index:50; display:flex; width:100%; max-width:none; height:100dvh; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); gap:0; overflow:hidden; border-radius:0; }
+body:has(.jumpscare) #app { container-type:normal; }
+body:has(.jumpscare) :is(.page-paper,.page-trim,.sky-friends) { display:none; }
+#app .jumpscare .scare-caption { width:min(100%,340px); padding:8px 12px; }
+#app .jumpscare h1 { font-size:clamp(2rem,10vmin,4rem); margin-bottom:8px; }

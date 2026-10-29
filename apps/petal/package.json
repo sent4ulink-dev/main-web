@@ -1,0 +1,30 @@
+{
+  "name": "sent4u-petal",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "lint": "eslint src server tests",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run lint && npm run test && npm run build",
+    "deploy": "npm run build && node ../../scripts/deploy-card.mjs petal"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.12.0",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.3"
+  },
+  "description": "Petal Isle — an interactive floating-garden date invitation built with Three.js."
+}

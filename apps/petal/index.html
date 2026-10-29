@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="theme-color" content="#78bee8" />
+    <title>For You &lt;3</title>
+    <meta
+      name="description"
+      content="Wander a floating 3D garden island, answer a question carved in stone, and choose the details of your little adventure together."
+    />
+    <meta
+      property="og:title"
+      content="For You &lt;3"
+    />
+    <meta
+      property="og:description"
+      content="Follow the butterflies. There is something I have been meaning to ask you."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:image"
+      content="/og.png"
+    />
+    <meta
+      property="og:image:alt"
+      content="Petal Isle — a magical invitation."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="For You &lt;3"
+    />
+    <meta
+      name="twitter:description"
+      content="Follow the butterflies. There is something I have been meaning to ask you."
+    />
+    <meta
+      name="twitter:image"
+      content="/og.png"
+    />
+    <link rel="icon" href="/brand/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="/brand/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Nunito:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body data-state="loading">
+    <main
+      id="experience"
+      aria-label="Floating garden island invitation"
+    >
+      <canvas
+        id="world"
+        aria-label="A 3D floating flower island with butterflies, gardens and a stone carved with a question"
+      ></canvas>
+      <div class="vignette" aria-hidden="true"></div>
+      <header class="hud">
+        <div class="controls">
+          <button
+            id="sound"
+            class="icon-button"
+            aria-label="Turn the sound on"
+            aria-pressed="false"
+            title="Ambient sound"
+          >
+            ♪
+          </button>
+        </div>
+      </header>
+      <section id="intro" class="intro" aria-labelledby="intro-title">
+        <div class="cloud-sky" aria-hidden="true"></div>
+        <div class="cloud-bank" aria-hidden="true"></div>
+        <div class="intro-card">
+          <span class="eyebrow" data-edit="intro.eyebrow">A LITTLE WORLD ABOVE THE CLOUDS</span>
+          <h1 id="intro-title"><span data-edit="intro.headline">Shall we begin</span><br /><em data-edit="intro.headlineAccent">our little journey?</em></h1>
+          <p data-edit="intro.copy">Beyond these clouds, a question is waiting for you.</p>
+          <button id="enter" class="enter-button" disabled>
+            Gathering the clouds…
+          </button>
+        </div>
+      </section>
+      <button
+        id="yes-heart"
+        class="heart-hitbox"
+        aria-label="“Yes” heart stone — say yes to the date"
+        disabled
+        hidden
+      >
+        <span class="sr-only">Yes — it’s a date</span></button
+      ><button
+        id="no-heart"
+        class="heart-hitbox"
+        aria-label="“No” heart stone"
+        disabled
+        hidden
+      >
+        <span class="sr-only">No</span>
+      </button>
+      <div id="message" class="message" role="status" aria-live="polite"></div>
+      <div id="walk-hint" class="walk-hint" role="status" hidden></div>
+      <div id="steps" class="steps" hidden></div>
+      <footer class="foot">
+        <span id="guide"
+          >A garden above the clouds. A question waiting for you.</span
+        ><button id="skip" class="text-button">Skip to the question ↗</button
+        ><button id="recenter" class="text-button" hidden>
+          Centre the garden ⌖
+        </button>
+      </footer>
+      <dialog id="slot-dialog" class="slot-dialog">
+        <form method="dialog" class="slot-card">
+          <button class="slot-close" value="cancel" aria-label="Close">×</button>
+          <span id="slot-kicker" class="slot-kicker"></span>
+          <h2 id="slot-title"></h2>
+          <p id="slot-body"></p>
+          <div id="slot-control" class="slot-control"></div>
+          <button id="slot-save" class="slot-save" value="default" type="button">Choose this</button>
+        </form>
+      </dialog>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

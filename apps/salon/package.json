@@ -1,0 +1,24 @@
+{
+  "name": "sent4u-salon",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A candle-lit 3D birthday salon: portraits, a letter, a quill that writes in golden stars, instruments that play themselves, fireworks over the city, and the evening painted as a portrait.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && node ../../scripts/deploy-card.mjs salon",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@fontsource/bad-script": "^5.3.0",
+    "@fontsource/cormorant-garamond": "^5.3.0",
+    "gsap": "3.15.0",
+    "postprocessing": "6.39.5",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

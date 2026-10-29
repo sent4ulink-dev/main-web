@@ -1,0 +1,754 @@
+:root {
+  font-family: "Nunito", sans-serif;
+  color: #f2eddf;
+  background: #83c7ea;
+  font-synthesis: none;
+  color-scheme: dark;
+  --gold: #fff1b8;
+  --line: #ffffff57;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: pan-x pan-y; /* phones: no pinching or double-tapping the page into a zoom */
+}
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled {
+  cursor: default;
+}
+button:focus-visible {
+  outline: 2px solid #f6db9b;
+  outline-offset: 5px;
+}
+[hidden] {
+  display: none !important;
+}
+/* Dialogs float above the page (their own top layer), so they say it too. */
+dialog {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+/* A game, not a page: no browser gestures on it (pinch or double-tap zoom,
+   dragging the page) and nothing picked up as text, nor a long-press menu,
+   when the controls are tapped fast. Text fields still work as usual. */
+#experience {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  position: relative;
+  container-type: inline-size;
+  width: 100%;
+  height: 100svh;
+  min-height: 480px;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, #fff0da14 0%, transparent 42%, #b8c9f01a 100%),
+    linear-gradient(180deg, #4f97ec 0%, #9cc9f7 45%, #f4e4f3 58%, #8fc2f7 100%),
+    #b9d9ef;
+}
+html.phone-preview body {
+  display: grid;
+  place-items: center;
+  background: #28233d;
+}
+html.phone-preview #experience {
+  width: min(390px, 100vw, calc(100svh * 0.4621));
+  height: auto;
+  max-height: 100svh;
+  aspect-ratio: 390 / 844;
+  box-shadow: 0 0 70px #090711aa;
+}
+#world {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+#world:active {
+  cursor: grabbing;
+}
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    #b8789a18 0%,
+    transparent 18%,
+    transparent 76%,
+    #76608c24 100%
+  );
+  box-shadow: inset 0 0 110px #6b60921a;
+}
+.hud {
+  position: absolute;
+  z-index: 12;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 25px 3.2%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* just ⚙ and ♪, top right */
+  gap: 16px;
+  pointer-events: none;
+}
+.controls {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+.icon-button {
+  display: grid;
+  place-items: center;
+  min-width: 35px;
+  height: 35px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #296a8c66;
+  backdrop-filter: blur(8px);
+  font-size: 15px;
+  color: #ffffff;
+  transition: background 0.2s;
+}
+.icon-button:hover {
+  background: #448fb0a8;
+}
+/* The first scene: a sky full of clouds, and a question to begin with. When
+   the journey begins the clouds part, each bank drifting off outwards as it
+   fades; they close in again on a restart. */
+.intro {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  text-align: center;
+}
+.intro.gone {
+  visibility: hidden;
+}
+.cloud-sky {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 85% 75% at 50% 45%, #fffafd 0%, #fdeff7 38%, #eceefc 70%, #d8e8f9 100%);
+  transition: opacity 1.8s ease 0.45s;
+}
+.cloud-bank {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cloud {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: calc(var(--size) * 0.62);
+  margin: calc(var(--size) * -0.31) 0 0 calc(var(--size) * -0.5);
+  transition:
+    transform 2.8s cubic-bezier(0.55, 0, 0.2, 1),
+    opacity 2.2s ease 0.45s;
+  animation: cloud-drift var(--drift) ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+/* Soft round puffs: bright on top, a touch of shade underneath, and a long
+   gentle falloff at the edge so heaped together they read as cloud. */
+.puff {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 36%, #ffffff 0%, #ffffff 30%, #fefbfdf2 42%, #f8f1f8bf 52%, #f5eef666 61%, #f5eef61a 67%, #f5eef600 71%);
+}
+.puff.rose {
+  background: radial-gradient(circle at 50% 36%, #fffafc 0%, #fff6f9 30%, #fff0f6f2 42%, #fde6efbf 52%, #fbe3ed66 61%, #fbe3ed1a 67%, #fbe3ed00 71%);
+}
+.puff.lilac {
+  background: radial-gradient(circle at 50% 36%, #fdfcff 0%, #f9f7ff 30%, #f3f0fef2 42%, #ebe6fcbf 52%, #e8e2fb66 61%, #e8e2fb1a 67%, #e8e2fb00 71%);
+}
+@keyframes cloud-drift {
+  to {
+    translate: var(--drift-x) var(--drift-y);
+  }
+}
+.intro.parting .cloud {
+  transform: translate(var(--dx), var(--dy)) scale(1.5);
+  opacity: 0;
+}
+.intro.parting .cloud-sky {
+  opacity: 0;
+}
+.intro-card {
+  position: relative;
+  width: min(90%, 560px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+.intro.parting .intro-card {
+  opacity: 0;
+  transform: translateY(14px) scale(0.95);
+}
+.intro .eyebrow {
+  display: block;
+  margin-bottom: 18px;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: #b9809d;
+}
+.intro h1 {
+  margin: 0 0 16px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(38px, 5.4vw, 66px);
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+  color: #6d3f58;
+}
+.intro h1 em {
+  color: #d86d9e;
+  font-weight: 500;
+}
+.intro p {
+  margin: 0 auto 28px;
+  max-width: 400px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #8d6479;
+}
+.enter-button {
+  padding: 15px 34px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #ff8fb8, #f4a9d0 55%, #c9a8f2);
+  box-shadow:
+    0 10px 30px #e57ba455,
+    inset 0 1px 0 #ffffff80;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition:
+    transform 0.25s,
+    box-shadow 0.25s,
+    opacity 0.3s;
+}
+.enter-button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow:
+    0 14px 36px #e57ba477,
+    inset 0 1px 0 #ffffff80;
+}
+.enter-button:disabled {
+  opacity: 0.65;
+  background: linear-gradient(120deg, #e9c3d4, #dcc8ec);
+  box-shadow: none;
+}
+/* While the clouds cover everything the footer rests, and the header's words
+   turn rosy so they show against them. */
+body[data-state="loading"] .foot,
+body[data-state="intro"] .foot {
+  opacity: 0;
+  pointer-events: none;
+}
+.foot {
+  position: absolute;
+  bottom: 0;
+  left: 3.2%;
+  right: 3.2%;
+  min-height: 65px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  pointer-events: none;
+  color: #b1c2ba;
+}
+.foot #guide {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 17px;
+  letter-spacing: 0.015em;
+  max-width: 60%;
+  text-shadow: 0 2px 8px #000;
+}
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #d0d2bd;
+  padding: 12px 0;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  pointer-events: auto;
+}
+.text-button:hover {
+  color: #fff2c4;
+}
+.heart-hitbox {
+  position: absolute;
+  z-index: 5;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 40%;
+  touch-action: manipulation;
+}
+.heart-hitbox:focus-visible {
+  outline: 1px solid #eeedb8;
+  box-shadow: 0 0 20px #e4fabb55;
+}
+.heart-hitbox .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.message {
+  position: absolute;
+  left: 50%;
+  top: 96px;
+  transform: translate(-50%, -8px);
+  padding: 10px 20px;
+  border: 1px solid #9fae8e35;
+  border-radius: 30px;
+  max-width: 85%;
+  width: max-content;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 20px;
+  color: #e2dcc0;
+  background: #071b1cc9;
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transition:
+    opacity 0.5s,
+    transform 0.5s;
+  pointer-events: none;
+  text-align: center;
+  z-index: 8;
+}
+.message.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.walk-pad {
+  position: absolute;
+  left: 50%;
+  bottom: 106px;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(3, 38px);
+  gap: 5px;
+  z-index: 7;
+}
+.walk-pad button {
+  border: 1px solid #a7c9b34f;
+  background: #102e2edb;
+  border-radius: 9px;
+  height: 38px;
+  font-size: 19px;
+  touch-action: none;
+  user-select: none;
+}
+.walk-pad button:active { background: #427165; }
+.walk-pad button:first-child { grid-column: 2; }
+.walk-pad button:nth-child(2) { grid-column: 1; }
+.slot-dialog {
+  width: min(430px, calc(100vw - 30px));
+  padding: 0;
+  border: 1px solid #fff8e4b0;
+  border-radius: 30px;
+  color: #674654;
+  background: transparent;
+  box-shadow: 0 30px 90px #58435d8a;
+}
+.slot-dialog::backdrop {
+  background: #5a627076;
+  backdrop-filter: blur(9px);
+}
+.slot-card {
+  position: relative;
+  padding: 40px 38px 34px;
+  overflow: hidden;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 80% 0, #e8dcff 0, transparent 40%),
+    linear-gradient(145deg, #fffdf5, #f9e8ed 62%, #e8e7fa);
+  text-align: center;
+}
+.slot-card::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 1px solid #c994a363;
+  border-radius: 21px;
+  pointer-events: none;
+}
+.slot-close {
+  position: absolute;
+  z-index: 2;
+  top: 17px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #996f7f;
+  font-family: Georgia, serif;
+  font-size: 27px;
+}
+.slot-kicker {
+  display: block;
+  margin-bottom: 9px;
+  color: #a8788b;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: .23em;
+}
+.slot-card h2 {
+  margin: 0 0 12px;
+  color: #6b4b59;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 36px;
+  font-weight: 500;
+  line-height: 1;
+}
+.slot-card p {
+  margin: 0 auto 22px;
+  max-width: 330px;
+  color: #7d6870;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 19px;
+  line-height: 1.45;
+}
+.slot-control { margin: 4px 0 22px; }
+.slot-control label,
+.choice-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #94707f;
+  font-size: 10px;
+  letter-spacing: .06em;
+}
+.slot-control input[type="date"] {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid #d5afbd;
+  border-radius: 14px;
+  color: #664552;
+  background: #fffdf9cc;
+  font: 500 14px "Nunito", sans-serif;
+}
+.slot-save {
+  position: relative;
+  z-index: 1;
+  padding: 13px 25px;
+  border: 1px solid #ffffffb8;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #d990ac, #9997cc);
+  box-shadow: 0 9px 24px #bd819d54;
+  color: white;
+  font-size: 10px;
+  letter-spacing: .06em;
+}
+@container (max-width: 650px) {
+  .hud {
+    padding: 19px 5%;
+    align-items: flex-start;
+  }
+  .icon-button {
+    min-width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+  .controls {
+    gap: 6px;
+  }
+  .intro h1 {
+    font-size: 40px;
+  }
+  .intro p {
+    font-size: 13px;
+    max-width: 290px;
+  }
+  .intro .eyebrow {
+    font-size: 8px;
+    letter-spacing: 0.24em;
+  }
+  .foot {
+    left: 5%;
+    right: 5%;
+    min-height: 73px;
+    gap: 12px;
+    align-items: center;
+  }
+  .foot #guide {
+    font-size: 14px;
+    line-height: 1.25;
+    max-width: 65%;
+  }
+  .text-button {
+    font-size: 8px;
+    text-align: right;
+    max-width: 32%;
+    line-height: 1.5;
+  }
+  .message {
+    top: 104px;
+    font-size: 16px;
+    padding: 9px 14px;
+    max-width: 90%;
+  }
+  .vignette {
+    box-shadow: inset 0 0 75px #01071244;
+  }
+  .slot-card { padding: 38px 25px 30px; }
+  .desktop-only {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* What to do here: low on the screen (the boards you walk up to stand in the
+   top half), just above the stick and the game's buttons. */
+.walk-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 200px;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #fff7fbe6;
+  color: #8a4466;
+  font: italic 600 18px "Cormorant Garamond", Georgia, serif;
+  box-shadow: 0 8px 24px #7a3d5a33;
+  pointer-events: none;
+  white-space: nowrap;
+}
+/* How far the plan has come, and what is next (while walking). */
+.steps {
+  position: absolute;
+  left: 50%;
+  top: 58px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 15px 6px 12px;
+  border-radius: 999px;
+  background: #fff7fbe6;
+  color: #8a4466;
+  font: 700 13px "Nunito", sans-serif;
+  box-shadow: 0 6px 18px #7a3d5a26;
+  white-space: nowrap;
+  max-width: 94%;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.steps[hidden] { display: none; }
+.steps-hearts { display: inline-flex; gap: 3px; font-size: 15px; line-height: 1; }
+.steps-hearts i { font-style: normal; color: #e3b3c8; }
+.steps-hearts i.done { color: #ff5f9e; }
+/* Out of the way while a board is open or the bunnies dance. */
+.picking .steps, .in-scene .steps { opacity: 0; }
+.walk-stick {
+  position: absolute;
+  left: 28px;
+  bottom: 110px;
+  z-index: 7;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff55 0%, #ffffff30 60%, #ffffff18 100%);
+  border: 2px solid #ffffff90;
+  box-shadow: 0 8px 30px #5b3a4a33;
+  touch-action: none;
+  backdrop-filter: blur(4px);
+}
+.walk-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #ffc2d9 70%);
+  box-shadow: 0 4px 14px #a0406b55;
+  pointer-events: none;
+}
+@media (pointer: fine) and (min-width: 700px) {
+  .walk-stick { opacity: 0.8; }
+}
+@media (max-width: 700px) {
+  .walk-hint { bottom: 236px; font-size: 16px; white-space: normal; text-align: center; max-width: 86%; }
+  .walk-stick { left: 22px; bottom: 104px; width: 116px; height: 116px; }
+}
+
+/* While the bunnies dance at the book, the game's controls step out of the shot. */
+.play-buttons,
+.walk-stick {
+  transition: opacity 0.35s ease;
+}
+.in-scene .play-buttons,
+.in-scene .walk-stick,
+.picking .play-buttons {
+  opacity: 0;
+  pointer-events: none;
+}
+/* On an upright phone a picking board takes the whole screen below the header
+   (tapping away from it closes it). */
+@media (orientation: portrait) {
+  .picking .walk-stick {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* Walkthrough play UI */
+.play-quests { cursor: pointer; }
+.play-panel {
+  position: absolute;
+  top: 112px;
+  left: 3.2%;
+  z-index: 9;
+  width: min(320px, 88vw);
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: #fff9fcf2;
+  color: #6f3d55;
+  box-shadow: 0 12px 40px #5b3a4a40;
+  font: 14px "Nunito", sans-serif;
+}
+.play-panel h3 { margin: 0 0 8px; font: italic 600 24px "Cormorant Garamond", Georgia, serif; }
+.play-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.play-panel li.done { color: #c2527f; text-decoration: line-through; text-decoration-color: #c2527f66; }
+.play-panel p { margin: 10px 0 0; font-size: 12px; color: #9a7486; }
+.play-buttons {
+  position: absolute;
+  right: 22px;
+  bottom: 106px;
+  z-index: 8;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.play-round {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 2px solid #ffffffb0;
+  background: #fff7fbd9;
+  color: #8a4466;
+  font-size: 22px;
+  box-shadow: 0 8px 24px #7a3d5a33;
+  touch-action: manipulation;
+}
+.play-jump {
+  width: 76px;
+  height: 76px;
+  font-size: 30px;
+  background: radial-gradient(circle at 35% 30%, #fff, #ffc2d9 75%);
+}
+.play-action {
+  align-self: center;
+  max-width: 190px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 0;
+  background: #ff8fb8;
+  color: #fff;
+  font: 600 14px "Nunito", sans-serif;
+  box-shadow: 0 8px 24px #b8406f55;
+  animation: play-pop 0.25s ease-out;
+}
+@keyframes play-pop { from { transform: scale(0.85); opacity: 0; } }
+.carve-dialog {
+  border: 0;
+  border-radius: 24px;
+  padding: 20px;
+  background: #fff9f3;
+  color: #6a4030;
+  box-shadow: 0 20px 60px #3a2a2a55;
+  max-width: min(440px, 92vw);
+}
+.carve-dialog::backdrop { background: #3a2a3a66; }
+.carve-dialog h2 { margin: 0 0 4px; font: italic 600 28px "Cormorant Garamond", Georgia, serif; }
+.carve-dialog p { margin: 0 0 12px; font: 13px "Nunito", sans-serif; color: #8b6a58; }
+.carve-pad {
+  display: block;
+  width: min(380px, 80vw);
+  aspect-ratio: 1;
+  border-radius: 18px;
+  touch-action: none;
+  cursor: crosshair;
+  background:
+    repeating-linear-gradient(90deg, #00000010 0 3px, transparent 3px 11px),
+    linear-gradient(180deg, #c99470, #a9734f);
+}
+.carve-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.carve-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #f3e2d8;
+  color: #6a4030;
+  font: 600 14px "Nunito", sans-serif;
+}
+.carve-actions .primary { background: #ff8fb8; color: #fff; }
+@media (max-width: 700px) {
+  .play-panel { top: 104px; left: 16px; }
+  .play-buttons { right: 16px; bottom: 100px; gap: 8px; }
+  .play-round { width: 52px; height: 52px; font-size: 20px; }
+  .play-jump { width: 70px; height: 70px; }
+  .play-action { max-width: 150px; font-size: 13px; padding: 10px 12px; }
+}
+.who-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0 12px; }
+.who-choice {
+  border: 2px solid #f3d6e2;
+  border-radius: 18px;
+  padding: 18px 10px;
+  background: #fff;
+  color: #6a4030;
+  font: 600 15px "Nunito", sans-serif;
+  cursor: pointer;
+}
+.who-choice:hover, .who-choice:focus-visible { border-color: #ff8fb8; background: #fff5f9; }
+.who-date { display: flex; gap: 8px; align-items: center; font: 14px "Nunito", sans-serif; color: #8b6a58; }

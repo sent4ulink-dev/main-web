@@ -1,0 +1,30 @@
+import {validShareID} from './mode-repository.js';
+export class URLModesUI{
+  constructor({app,editor,repository,pause}){Object.assign(this,{app,editor,repository,pause});this.generate=document.querySelector('#generate-link');this.reset=document.querySelector('#reset-demo');this.dialog=document.querySelector('#share-link-dialog');
+    this.generate.addEventListener('click',()=>this.generateLink());this.reset.addEventListener('click',()=>this.resetDemo());
+    app.addEventListener('submit',event=>{if(event.target.id==='studio-password-form'){event.preventDefault();this.login(event.target);}});
+    app.addEventListener('click',event=>{if(event.target.closest('[data-mode-retry]'))this.retry();});
+    this.dialog.querySelector('[data-close-link]').addEventListener('click',()=>this.dialog.close());this.dialog.querySelector('[data-copy-link]').addEventListener('click',()=>this.copyLink());
+    window.addEventListener('popstate',()=>location.reload());window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
+  }
+  state(title,message,retry=false){this.pause();this.editor.loading=true;this.editor.editing=false;this.editor.toolbar.hidden=true;this.editor.toggle.hidden=true;this.generate.hidden=true;this.app.innerHTML='<section class="scene mode-state"><h1 tabindex="-1"></h1><p class="subtitle" role="status"></p></section>';this.app.querySelector('h1').textContent=title;this.app.querySelector('p').textContent=message;if(retry){const button=document.createElement('button');button.type='button';button.dataset.modeRetry='';button.className='mode-button';button.textContent='Try again';this.app.querySelector('section').append(button);}this.app.querySelector('h1').focus({preventScroll:true});}
+  async start(){const kind=this.repository.mode.kind;this.reset.hidden=kind!=='test';document.querySelector('#mode-label').textContent=kind==='test'?'Test mode · local demo':kind==='studio'?'Private studio':'';
+    if(kind==='studio'){this.passwordGate();return;}
+    if(kind==='unavailable'){this.state('Link unavailable','This invitation link is invalid. Please check the complete link.');return;}
+    this.state('Loading invitation…',kind==='test'?'Preparing your local demonstration.':'Opening your saved invitation.');
+    // (the server may be waking up: say so while the patient load waits)
+    const waking=kind==='invitation'?setTimeout(()=>{const status=this.app.querySelector('.mode-state [role="status"]');if(status)status.textContent='Waking the invitation up… this can take up to a minute.';},6000):0;
+    await this.editor.load();clearTimeout(waking);
+  }
+  passwordGate(){this.repository.clearAccess();this.state('Private studio','Enter your password to edit invitations and create links.');this.app.querySelector('section').insertAdjacentHTML('beforeend','<form id="studio-password-form" class="studio-password-form"><label for="studio-password">Studio password</label><input id="studio-password" type="password" autocomplete="current-password" maxlength="512" required><button type="submit" class="mode-button">Open studio</button><p class="password-status" role="status"></p></form>');}
+  async login(form){const input=form.querySelector('input'),button=form.querySelector('button'),status=form.querySelector('.password-status');const password=input.value;input.value='';button.disabled=true;status.textContent='Checking password…';try{await this.repository.login(password);this.state('Loading studio…','Opening your saved draft.');if(await this.editor.load())this.generate.hidden=false;}catch(error){status.textContent=error.message;button.disabled=false;input.focus();}}
+  issue(error){if(this.repository.mode.kind==='studio'&&error.status===401){this.passwordGate();this.app.querySelector('.password-status').textContent='Please enter the password again. Your session has ended.';return;}if(error.status===404){this.state('Link unavailable','No saved invitation exists for this link. Please check with the sender.');return;}this.state('Connection error',error.message||'Please check your connection and try again.',true);}
+  async retry(){if(this.repository.mode.kind==='studio'&&!this.repository.token){this.passwordGate();return;}this.state('Loading…','Trying again.');if(await this.editor.load())this.generate.hidden=this.repository.mode.kind!=='studio';}
+  async resetDemo(){if(this.repository.mode.kind!=='test')return;this.reset.disabled=true;try{await this.repository.reset();this.editor.dirty=false;this.editor.editing=false;this.editor.toolbar.hidden=true;this.state('Resetting demonstration…','Restoring the sample invitation.');await this.editor.load();}catch(error){this.issue(error);}finally{this.reset.disabled=false;}}
+  async generateLink(){if(this.repository.mode.kind!=='studio'||this.generating)return;this.generating=true;this.generate.disabled=true;this.generate.textContent='Saving and creating…';try{
+    if(!await this.editor.save(false))return;
+    const data=await this.repository.createLink(this.editor.revision);if(!validShareID(data.id))throw new Error('The server did not return a valid invitation link.');
+    const url=new URL('/',location.origin);url.searchParams.set('share',data.id);this.dialog.querySelector('#share-url').textContent=url.href;this.dialog.querySelector('.link-status').textContent='';this.dialog.showModal();
+  }catch(error){this.editor.status(`Failed — ${error.message}`);if(error.status===401)this.issue(error);}finally{this.generating=false;this.generate.disabled=false;this.generate.textContent='Generate link';}}
+  async copyLink(){const output=this.dialog.querySelector('#share-url'),status=this.dialog.querySelector('.link-status');try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(output.textContent);else{const selection=window.getSelection(),range=document.createRange();range.selectNodeContents(output);selection.removeAllRanges();selection.addRange(range);if(!document.execCommand('copy'))throw new Error('Copy unavailable');selection.removeAllRanges();}status.textContent='Link copied.';}catch{status.textContent='Copy failed. Select the link above and copy it manually.';}}
+}

@@ -1,0 +1,35 @@
+/* Editing changes outlines and interaction only; the website retains its typography. */
+[hidden]{display:none!important;}
+.site-shell:has(.editor-toolbar:not([hidden])){grid-template-rows:auto auto minmax(0,1fr) auto;}
+.editor-toolbar{width:min(100%,1040px);margin:0 auto;padding:6px 2px 0;position:static;color:#fff7e8;font:800 .8rem/1.4 Nunito,sans-serif;}
+.editor-commands{display:flex;gap:6px;flex-wrap:wrap;}
+.editor-toolbar button,.edit-toggle,.plan-actions button,.plan-actions a{font:inherit;color:#3b2250;background:#efe4ff;border:2.5px solid #2c193f;border-radius:999px;padding:6px 12px;cursor:pointer;text-decoration:none;box-shadow:0 3px 0 #2c193f;transition:transform .1s,box-shadow .1s;}
+.editor-toolbar button:active,.edit-toggle:active,.plan-actions button:active,.plan-actions a:active{transform:translateY(2px);box-shadow:0 1px 0 #2c193f;}
+.editor-toolbar button[data-editor-command="save"],.editor-toolbar button[data-editor-command="confirm"]{background:#b5ee93;}
+.edit-toggle{font:800 .74rem/1.2 Nunito,sans-serif;flex-shrink:0;}
+.editor-toolbar button{min-height:38px;flex:1 1 auto;}
+.editor-status{display:block;font-size:.75rem;min-height:1.4em;padding-top:5px;}
+.finish-question{margin:0 0 6px;}
+.inline-editable{outline:2px dashed #ffdfaa99;outline-offset:3px;border-radius:4px;cursor:text;}
+.inline-editable:focus{outline-color:#ffafd2;outline-style:solid;}
+[data-inline-key]{white-space:inherit;overflow-wrap:inherit;}
+[data-plan-field]{white-space:pre-wrap;overflow-wrap:anywhere;}
+.plan-timezone{display:block;font-size:.75rem;opacity:.8;}
+.plan-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;font:800 .72rem/1.15 Nunito,sans-serif;}
+.plan-actions button,.plan-actions a{min-height:44px;display:flex;align-items:center;justify-content:center;text-align:center;padding:6px;border-radius:15px;}
+.plan-actions p{grid-column:1/-1;margin:0;font-size:.7rem;line-height:1.3;}
+.plan-actions p:empty{display:none;}
+.plan-actions button:disabled,.plan-actions [aria-disabled="true"]{opacity:.55;cursor:default;}
+.plan-load-status:empty{display:none;}
+.plan-load-status{font-size:.75rem;}
+@media(max-width:380px){.editor-toolbar button{font-size:.72rem;padding:6px 8px;}.editor-commands button{flex:1 1 42%;}}
+.mode-state h1{color:#fff7e8;}
+.studio-password-form{display:grid;gap:12px;width:min(100%,340px);text-align:left;font-size:1rem;}
+.studio-password-form input{width:100%;box-sizing:border-box;border:1px solid #e2c1ee88;background:#382052;color:#fff7e8;border-radius:12px;padding:12px;font:inherit;}
+.mode-button{background:#513077;color:#fff7e8;border:1px solid #e2c1ee88;border-radius:12px;font:700 1rem/1.4 Nunito,sans-serif;padding:10px 14px;min-height:44px;cursor:pointer;}
+.studio-password-form p{margin:0;min-height:1.4em;font-size:.875rem;}
+.share-link-dialog{width:min(90vw,460px);box-sizing:border-box;background:#513077;color:#fff7e8;border:1px solid #c9a9e8;border-radius:22px;padding:24px;font:600 1rem/1.5 Nunito,sans-serif;}
+.share-link-dialog::backdrop{background:#1d103bd9;}
+.share-link-dialog h2{margin:0;font:800 1.7rem/1.2 'Baloo 2',sans-serif;}
+.share-link-dialog output{display:block;overflow-wrap:anywhere;user-select:text;border:1px solid #e2c1ee66;border-radius:12px;padding:12px;margin:14px 0;}
+.share-link-dialog .link-status{margin-bottom:0;min-height:1.5em;}

@@ -1,0 +1,24 @@
+# Cloudflare Pages: the Vite build in dist/ plus this card's API (functions/api, same address).
+# Deploy with `npm run deploy` (scripts/deploy-card.mjs): Pages looks upwards for its config and would find the repo root's wrangler.jsonc,
+# and refuses --config, so the card is staged in an empty folder first.
+name = "sent4u-spooky"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-10-01"
+
+# the saved cards: one JSON per ?share=<id> link, plus the studio draft and uploaded photos (see server/api.js)
+# create it once: npx wrangler r2 bucket create sent4u-spooky-shares
+[[r2_buckets]]
+binding = "SHARES"
+bucket_name = "sent4u-spooky-shares"
+
+[vars]
+# the sent4u orders server: every ?share=<id> is checked against it (GET /links/<id>) before a card is made
+ORDERS_API_BASE = "https://sent4u-reviews.sent4u-link.workers.dev"
+# the address generated links start with, and the sites allowed to save changes: sent4u.link is what the browser
+# sees (the gateway proxies this card), the pages.dev address covers visiting the card directly
+PUBLIC_ORIGIN = "https://sent4u.link"
+CORS_ORIGIN = "https://sent4u.link,https://sent4u-spooky.pages.dev"
+
+# Secrets (never in this file): npx wrangler pages secret put NAME --project-name sent4u-spooky
+#   STUDIO_PASSWORD      opens the private studio at the card's own address (required; every studio call fails closed without it)
+#   SHARE_CREATE_SECRET  optional: lets a server call POST /api/invitations/<id>/ensure; without it the orders server is asked

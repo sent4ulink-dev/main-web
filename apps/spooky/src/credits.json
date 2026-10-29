@@ -1,0 +1,149 @@
+{
+  "polyhaven": [],
+  "sounds": [
+    {
+      "name": "25 CC0 bang / firework SFX",
+      "authors": [
+        "rubberduck"
+      ],
+      "url": "https://opengameart.org/content/25-cc0-bang-firework-sfx",
+      "license": "CC0 1.0"
+    },
+    {
+      "name": "Goofy Sounds for Scary Monsters",
+      "authors": [
+        "Christopher Hahn (Stormyman) et al."
+      ],
+      "url": "https://stormyman.itch.io/goofy-sounds-for-scary-monsters",
+      "license": "CC0 1.0",
+      "use": "witch, zombie, bat and Dracula voices"
+    },
+    {
+      "name": "Music Jingles, Interface Sounds, RPG Audio",
+      "authors": [
+        "Kenney"
+      ],
+      "url": "https://kenney.nl/assets/music-jingles",
+      "license": "CC0 1.0",
+      "use": "pizzicato flourishes, pops, creaks, knife, pages"
+    }
+  ],
+  "music": [
+    {
+      "name": "4 Music Box Tracks (Spooky Waltz, Cute Tune)",
+      "authors": [
+        "Aureolus_Omicron"
+      ],
+      "url": "https://opengameart.org/content/4-music-box-tracks",
+      "license": "CC0 1.0",
+      "use": "background music"
+    },
+    {
+      "name": "Toccata and Fugue in D minor, BWV 565 (opening)",
+      "authors": [
+        "Johann Sebastian Bach (c. 1704)"
+      ],
+      "url": "https://en.wikipedia.org/wiki/Toccata_and_Fugue_in_D_minor,_BWV_565",
+      "license": "Public domain — arranged for a synthesised pipe organ in the browser"
+    }
+  ],
+  "fonts": [
+    {
+      "name": "Rubik Wet Paint",
+      "authors": [
+        "NaN, Luke Prowse"
+      ],
+      "url": "https://fonts.google.com/specimen/Rubik+Wet+Paint",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "Rubik",
+      "authors": [
+        "Hubert & Fischer, Meir Sadan, Cyreal"
+      ],
+      "url": "https://fonts.google.com/specimen/Rubik",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "Yeseva One",
+      "authors": [
+        "Jovanny Lemonad"
+      ],
+      "url": "https://fonts.google.com/specimen/Yeseva+One",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "Bad Script",
+      "authors": [
+        "Gaslight"
+      ],
+      "url": "https://fonts.google.com/specimen/Bad+Script",
+      "license": "SIL Open Font License 1.1"
+    },
+    {
+      "name": "Caveat",
+      "authors": [
+        "Impallari Type"
+      ],
+      "url": "https://fonts.google.com/specimen/Caveat",
+      "license": "SIL Open Font License 1.1"
+    }
+  ],
+  "code": [
+    {
+      "name": "three.js",
+      "authors": [
+        "three.js authors"
+      ],
+      "url": "https://threejs.org",
+      "license": "MIT"
+    },
+    {
+      "name": "postprocessing",
+      "authors": [
+        "pmndrs (Raoul van Rüschen)"
+      ],
+      "url": "https://github.com/pmndrs/postprocessing",
+      "license": "Zlib"
+    },
+    {
+      "name": "GSAP",
+      "authors": [
+        "GreenSock / Webflow"
+      ],
+      "url": "https://gsap.com",
+      "license": "GSAP Standard License (free, incl. commercial use)"
+    }
+  ],
+  "blender": [
+    {
+      "name": "The graveyard",
+      "detail": "tombstones (round, gothic, cross, small), dirt mounds, an iron fence and a creaking double gate, a dead tree with crooked branches, a crypt with a hinged door, lamp posts, rocks, skulls and glowing mushrooms — all original, modelled with Blender's Python API"
+    },
+    {
+      "name": "Halloween things",
+      "detail": "a giant pumpkin and its patch, a coffin mailbox with a hinged lid, a witch's cauldron on a fire, a haunted gramophone, a jack-o'-lantern candy bucket, an old box camera on a tripod, candles, bats, crows and the haunted mansion — all original"
+    }
+  ],
+  "original": "Made for this project, in its own storybook-toon look: the moonlit hill and its sky, the fog and will-o'-wisps, lightning, the carved-pumpkin name, the hanging polaroids, the rising plan stones and crypt plaque, the cauldron and its brew, the cartoon ghosts, the bat heart round the moon, the spirit photograph and its poster, fireworks, and all synthesised sounds and music.",
+  "models": [
+    {
+      "name": "KayKit: Spooktober Seasonal Pack (witch, Jack)",
+      "authors": [
+        "Kay Lousberg"
+      ],
+      "url": "https://opengameart.org/node/118249",
+      "license": "CC0 1.0",
+      "use": "the witch and the pumpkin-headed Jack"
+    },
+    {
+      "name": "Zombie (animated)",
+      "authors": [
+        "Quaternius"
+      ],
+      "url": "https://poly.pizza/m/VlXjG0N8Eg",
+      "license": "CC0 1.0",
+      "use": "the dancing zombie"
+    }
+  ]
+}

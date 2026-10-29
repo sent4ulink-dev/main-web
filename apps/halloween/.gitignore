@@ -1,0 +1,9 @@
+.qa/
+.sites-runtime/
+*.tar.gz
+node_modules/
+dist/client/
+dist/server/
+dist/.openai/
+.wrangler/
+.env

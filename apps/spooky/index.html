@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#120c1c" />
+    <title>Halloween Night</title>
+    <meta name="description" content="A 3D Halloween invitation on a haunted hill: carved pumpkins, memories, a date plan and a ghost photo." />
+    <link rel="icon" href="/brand/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="/brand/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+  </head>
+  <body>
+    <!-- inline editing toolbar: its own strip at the top (the scene moves down; nothing is covered) -->
+    <div id="editor-toolbar" class="editor-toolbar" aria-label="Editing tools" hidden></div>
+    <canvas id="scene" aria-label="A 3D Halloween night on a haunted hill"></canvas>
+
+    <div id="ui">
+      <div id="scene-logo"><img src="/brand/wordmark.webp" width="582" height="128" alt="sent4u" /></div>
+      <!-- loading -->
+      <section id="loader" class="screen" aria-live="polite">
+        <div class="loader-inner">
+          <div class="loader-ring"><svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52" /><circle class="bar" cx="60" cy="60" r="52" /></svg><span class="loader-pct">0%</span></div>
+          <p class="loader-text">Flying in through the fog…</p>
+        </div>
+      </section>
+
+      <!-- intro -->
+      <section id="intro" class="screen" hidden>
+        <div class="intro-float float-type" id="intro-float">
+          <h1 class="display"><span data-intro="title"></span>, <span class="name" data-intro="name" data-k="name"></span></h1>
+          <p class="hand rotating"><span class="hand-prefix" data-intro="prefix"></span> <span class="hand-word" aria-live="off" aria-hidden="true"></span></p>
+          <button class="btn-float primary big" id="open-gift"><span class="spark" aria-hidden="true">🎃</span> Open the gate</button>
+          <p class="hint">Best with the sound on 🔊</p>
+        </div>
+      </section>
+
+      <!-- chapter text: floats beside the 3D object it belongs to -->
+      <section id="chapter" hidden>
+        <article class="float-type" id="chapter-card">
+          <p class="eyebrow" id="ch-eyebrow"></p>
+          <h2 class="display" id="ch-title"></h2>
+          <div class="card-body" id="ch-body"></div>
+          <div class="card-actions" id="ch-actions"></div>
+        </article>
+      </section>
+
+      <!-- blow -->
+      <div id="blow-meter" hidden><div class="blow-fill"></div></div>
+
+      <!-- the scope: you take the last shot yourself -->
+      <section id="viewfinder" hidden aria-label="Camera viewfinder"> 
+        <div class="vf-frame" aria-hidden="true"><i></i><i></i><i></i><i></i><span class="vf-rec">● REC</span><b class="vf-dot"></b></div>
+        <div class="vf-controls">
+          <p class="vf-hint float-type">Tap to take the photo — hold still…</p>
+          <div class="vf-shutter-wrap">
+            <span class="vf-pointer" aria-hidden="true">👆</span>
+            <button class="vf-shutter" id="vf-shutter" aria-label="Take the photo"><span></span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- finale -->
+      <section id="finale" class="screen" hidden>
+        <div class="finale-card float-type">
+          <h2 class="display finale-title"></h2>
+          <p class="hand finale-sub"></p>
+          <div class="float-actions">
+            <button class="btn-float primary" id="capture-moment"><span class="spark" aria-hidden="true">📷</span> Take a ghost photo</button>
+            <button class="btn-float" id="watch-again">↻ Watch again</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- navigation -->
+      <nav id="nav" hidden aria-label="Chapters">
+        <button class="nav-btn" id="nav-prev" aria-label="Previous">‹</button>
+        <div class="nav-mid">
+          <span class="nav-title" id="nav-title"></span>
+          <span class="nav-dots" id="nav-dots"></span>
+        </div>
+        <span class="nav-count" id="nav-count"></span>
+        <button class="nav-btn primary" id="nav-next" aria-label="Next">›</button>
+      </nav>
+
+      <!-- top bar -->
+      <div id="topbar" hidden>
+        <button class="icon-btn" id="hide-ui" hidden aria-label="Hide text" title="Hide text">🙈</button>
+        <button class="icon-btn" id="btn-sound" aria-label="Mute" aria-pressed="false">🔊</button>
+        <button class="icon-btn" id="btn-full" aria-label="Full screen">⛶</button>
+        <button class="icon-btn" id="btn-credits" aria-label="Credits">ⓘ</button>
+      </div>
+
+      <!-- credits -->
+      <section id="credits-sheet" class="sheet" hidden>
+        <div class="credits" role="dialog" aria-modal="true" aria-label="Credits">
+          <button class="icon-btn close" data-close aria-label="Close">✕</button>
+          <h2 class="display">Credits</h2>
+          <div class="credits-list"></div>
+        </div>
+      </section>
+
+      <div id="toast" role="status" aria-live="polite"></div>
+
+      <!-- owner controls: mode, Edit, Generate link (studio), Reset (test) -->
+      <div id="owner-bar" class="owner-bar" hidden><span id="mode-label" class="mode-label"></span><button id="edit-toggle" class="owner-btn" type="button" hidden>✎ Edit</button><button id="generate-link" class="owner-btn primary" type="button" hidden>🔗 Generate link</button><button id="reset-demo" class="owner-btn" type="button" hidden>↺ Reset</button></div>
+      <!-- the letter's words, laid exactly over the 3D page while editing -->
+      <div id="letter-edit" class="letter-edit" hidden></div>
+      <!-- studio password, loading and "link unavailable" states -->
+      <section id="mode-gate" class="screen mode-gate" hidden></section>
+      <button class="ui-show" id="ui-show" hidden aria-label="Show text"><span aria-hidden="true">👁</span> Show</button>
+    </div>
+
+    <dialog id="share-link-dialog" class="share-link-dialog" aria-labelledby="share-link-title">
+      <h2 id="share-link-title" class="display">Your link</h2>
+      <p>Whoever has this link can edit the gift for 5 days (unless they finish it for good). After that it can only be viewed.</p>
+      <output id="share-url"></output>
+      <div class="tb-row"><button type="button" class="btn-float primary" data-copy-link>Copy</button><button type="button" class="btn-float" data-close-link>Close</button></div>
+      <p class="link-status" role="status"></p>
+    </dialog>
+    <noscript>This needs JavaScript and WebGL.</noscript>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

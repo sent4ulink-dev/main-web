@@ -1,0 +1,127 @@
+{
+  "polyhaven": [
+    {
+      "name": "Island Tree 02",
+      "kind": "3D model",
+      "use": "Big tree behind the table (optimised in Blender)",
+      "authors": [
+        "Rob Tuytel",
+        "Rico Cilliers"
+      ],
+      "url": "https://polyhaven.com/a/island_tree_02",
+      "license": "CC0 1.0"
+    },
+    {
+      "name": "Portable Cassette Player",
+      "kind": "3D model",
+      "use": "Cassette player",
+      "authors": [
+        "Mateusz Sadek"
+      ],
+      "url": "https://polyhaven.com/a/portable_cassette_player",
+      "license": "CC0 1.0"
+    },
+    {
+      "name": "Tree Stump 01",
+      "kind": "3D model",
+      "use": "Tree stump",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "url": "https://polyhaven.com/a/tree_stump_01",
+      "license": "CC0 1.0"
+    },
+    {
+      "name": "Wooden Picnic Table",
+      "kind": "3D model",
+      "use": "Picnic table",
+      "authors": [
+        "Ulan Cabanilla"
+      ],
+      "url": "https://polyhaven.com/a/wooden_picnic_table",
+      "license": "CC0 1.0"
+    }
+  ],
+  "sounds": [
+    {
+      "name": "Park ambiences (birds, open-field wind)",
+      "authors": [
+        "Thimras"
+      ],
+      "url": "https://opengameart.org/content/park-ambiences",
+      "license": "CC0 1.0"
+    },
+    {
+      "name": "25 CC0 bang / firework SFX",
+      "authors": [
+        "rubberduck"
+      ],
+      "url": "https://opengameart.org/content/25-cc0-bang-firework-sfx",
+      "license": "CC0 1.0"
+    }
+  ],
+  "music": [
+    {
+      "name": "“Happy Birthday to You” melody (Mildred & Patty Hill)",
+      "authors": [
+        "Public domain"
+      ],
+      "url": "https://en.wikipedia.org/wiki/Happy_Birthday_to_You",
+      "license": "Public domain — played by a music box synthesised in the browser"
+    }
+  ],
+  "fonts": [
+    {
+      "name": "Caveat",
+      "authors": [
+        "Impallari Type"
+      ],
+      "url": "https://fonts.google.com/specimen/Caveat",
+      "license": "SIL Open Font License 1.1"
+    }
+  ],
+  "code": [
+    {
+      "name": "three.js",
+      "authors": [
+        "three.js authors"
+      ],
+      "url": "https://threejs.org",
+      "license": "MIT"
+    },
+    {
+      "name": "postprocessing",
+      "authors": [
+        "pmndrs (Raoul van Rüschen)"
+      ],
+      "url": "https://github.com/pmndrs/postprocessing",
+      "license": "Zlib"
+    },
+    {
+      "name": "GSAP",
+      "authors": [
+        "GreenSock / Webflow"
+      ],
+      "url": "https://gsap.com",
+      "license": "GSAP Standard License (free, incl. commercial use)"
+    }
+  ],
+  "blender": [
+    {
+      "name": "Picnic food & presents set",
+      "detail": "bread basket with grapes, lattice cherry pie, layered birthday cake, berry bowl, cheese, sausage board, olives, dip, wine bottle and glasses, potted plant, napkins, cutlery, wrapped presents",
+      "file": "art/blender/scripts/stylized_food.py"
+    },
+    {
+      "name": "Storybook forest & sky",
+      "detail": "pines, round broadleaf trees, flowering bushes and the soft twilight clouds",
+      "file": "art/blender/scripts/stylized_nature.py"
+    },
+    {
+      "name": "Instant camera, crystal-ball stand & magic wand",
+      "detail": "the pastel instant camera that prints the last-moment photo, the walnut stand of the crystal ball and the wand",
+      "file": "art/blender/scripts/stylized_props.py"
+    }
+  ],
+  "original": "Made for this project: the painted twilight sky (gradient, sunset glow and stars — no HDRI), toon shading with ink outlines, the floating storybook text, the gingham tablecloth, candles and flames, letter, envelope and wax seal, balloons, the glowing crystal ball and the stars that write a name in the sky, wish jar, month calendar, polaroids and the instant-film developing effect, cassette label, string lights, meadow grass and flowers, fireflies, wind system, fireworks, confetti and all synthesised sound effects."
+}

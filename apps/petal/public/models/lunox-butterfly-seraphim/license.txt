@@ -1,0 +1,11 @@
+Model Information:
+* title:	Lunox - Butterfly Seraphim
+* source:	https://sketchfab.com/3d-models/lunox-butterfly-seraphim-8fa757f57de544e6862c72bc05b2aa24
+* author:	Maxell A. (https://sketchfab.com/maxell.a)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Lunox - Butterfly Seraphim" (https://sketchfab.com/3d-models/lunox-butterfly-seraphim-8fa757f57de544e6862c72bc05b2aa24) by Maxell A. (https://sketchfab.com/maxell.a) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
