@@ -29,7 +29,7 @@ function clean(def, val, path) {
     if (path === 'date.iso' && !/^\d{4}-\d{2}-\d{2}$/.test(val)) fail('Use a date like 2026-10-14.');
     if (/^photos\.\d+\.src$/.test(path) && !image(val)) fail('Invalid photo.');
     if (path === 'song.voice' && val && !MEDIA_AUDIO.test(val)) fail('Invalid voice message.');
-    if (path === 'song.youtube' && val && (val.length > 300 || !parseYouTube(val))) fail('YouTube link is not valid.');
+    if ((path === 'song.youtube' || path === 'song.bg') && val && (val.length > 300 || !parseYouTube(val))) fail('YouTube link is not valid.');
     return val;
   }
   if (typeof def === 'number' || def === null) {

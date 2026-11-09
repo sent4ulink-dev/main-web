@@ -56,6 +56,7 @@ export const content = {
     title: 'Happy birthday — a music box',
     note: 'A little tune, wound up just for you.',
     cover: 0,               // which photo goes on the cassette label (index into photos), or an uploaded image
+    bg: '',                 // a YouTube link played quietly (40%) in the background through the card
     youtube: '',            // a YouTube link the walkman plays (empty: the music box)
     voice: '',              // an uploaded voice message (max 30 s), played instead of the music box
   },
@@ -69,6 +70,7 @@ export const content = {
   share: {
     logo: '',                                  // a logo image for the top of the story image (empty: the brand text is drawn)
     brand: 'sent4u',              // text logo used when no logo image is set
+    title: 'Happy birthday,',                  // the headline above the name (empty: none)
     line: 'This night will stay a memory forever ✨', // short line at the bottom
   },
 };

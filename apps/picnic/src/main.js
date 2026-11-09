@@ -35,8 +35,11 @@ import { Presenter } from './util/present.js';
 import { ModeRepository, selectMode } from './share/repository.js';
 import { CardEditor } from './share/editor.js';
 import { getPath } from './share/content-core.js';
+import { startPreview, silentAudio, silentTube } from './share/embed.js';
 
 const params = new URLSearchParams(location.search);
+const EMBED = params.has('embed') && window.parent !== window;   // the step editor's live preview (share/embed.js)
+if (EMBED) document.documentElement.classList.add('embed');
 // every letter the textures and the story picture will need
 const FONT_SAMPLE = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ${JSON.stringify(content)}`.slice(0, 4000);
 const DEBUG = params.has('debug');
@@ -79,7 +82,7 @@ async function boot() {
     loadAll(setProgress),
     // font subsets load on demand: ask for them with the real text before painting textures
     ...['500 30px Caveat', '700 30px Caveat']
-      .map((f) => document.fonts.load(f, FONT_SAMPLE).catch(() => {})),
+      .map((f) => Promise.race([document.fonts.load(f, FONT_SAMPLE).catch(() => {}), new Promise((res) => setTimeout(res, 6000))])),
   ]);
   if (!await contentReady) { loaderEl.remove(); return; }   // link unavailable: the gate says so
   ui._fillIntro();
@@ -138,7 +141,7 @@ async function boot() {
   flashLight.position.copy(o.instant.focusPoint).add(new THREE.Vector3(0.1, 0.15, 0));
   scene.add(flashLight);
 
-  const audio = new AudioEngine();
+  const audio = EMBED ? silentAudio() : new AudioEngine();
   const fireworks = new Fireworks(scene, camera, {
     onBurst: ({ position, color, distance, type }) => {
       const p = position.clone().project(camera);
@@ -161,13 +164,16 @@ async function boot() {
   // render the scene from another viewpoint (the instant camera's lens) into a square image
   let captureReq = null;
   const capture = (pose, fov = 50, size = 1024) => new Promise((resolve) => { captureReq = { pose, fov, size, resolve }; });
-  const tube = new TubePlayer({ onEnd: () => story.stopSong(), onFail: () => ui.toast('This YouTube song cannot be played here.') });
+  const tube = EMBED ? silentTube() : new TubePlayer({ onEnd: () => story.stopSong(), onFail: () => { ui.toast('This YouTube song can’t play on this device.'); story.songFailed(); } });
   const story = new Story({ director, ui, audio, sky, wind, o, content, presenter, capture, tube, mediaURL: url });
+  // the song in the background, at 40%; it never plays over the walkman's song or the voice (story.js)
+  // (the walkman's player is made when its chapter opens, and goes when it closes: two players at once are heavy on a phone)
+  story.bgTube = EMBED ? silentTube() : new TubePlayer({ volume: 40, loop: true, onFail: () => { story.bgOn = false; } });
   // edits repaint the 3D things that show them (envelope, letter page, stars, polaroids, calendar)
   editor.story = story;
   editor.letterBlank = (b) => o.letter.setBlank(b);
   editor.calendarBlank = (b) => o.calendar.setLabelHidden(b);
-  editor.apply = (paths) => {
+  const apply = (paths) => {
     let letter = false;
     for (const p of paths) {
       if (p === 'name') { letter = true; o.stars.setName(content.name); }
@@ -188,11 +194,20 @@ async function boot() {
     if (letter) o.letter.setContent(content);
     story._storyFile = null;   // the story picture is drawn again with the new words
   };
+  editor.apply = apply;
+  // the step editor's preview runs a picnic of its own: while it is open this page lets go of its 3D and its sound
+  // (two 3D scenes at once are too much for a phone; closing the editor reloads the page)
+  editor.release3d = () => {
+    story.stopSong(); story.bgTube.stop(); audio.setMuted?.(true);
+    R.renderer.setAnimationLoop(null);
+    try { R.renderer.dispose(); R.renderer.forceContextLoss(); } catch { /* already gone */ }
+  };
   story.flashLight = (p, k = 30) => { if (p) flashLight.position.copy(p).add(new THREE.Vector3(-0.15, 0.08, 0)); flashLight.intensity = k; };
   ui.setupNav(story.chapters, { onPrev: () => story.prev(), onNext: () => story.next(), onJump: (i) => story.goTo(i) });
   ui.el.sound.addEventListener('click', () => {
     audio.setMuted(!audio.muted);
     tube.setMuted(audio.muted);
+    story.bgTube.setMuted(audio.muted);
     ui.el.sound.textContent = audio.muted ? '🔇' : '🔊';
     ui.el.sound.setAttribute('aria-pressed', String(audio.muted));
     ui.el.sound.setAttribute('aria-label', audio.muted ? 'Unmute sound' : 'Mute sound');
@@ -355,7 +370,10 @@ async function boot() {
   // ── reveal ──
   loaderEl.classList.add('done');
   setTimeout(() => loaderEl.remove(), 1000);
+  if (EMBED) { startPreview({ R, story, ui, o, content, apply, director, camera, capture }); return; }
+  story.bgTube.prepare(content.song.bg);   // the 3D is loaded by now, and a tap on the intro's button can start it
   ui.showIntro(async () => {
+    story.startBackground();   // right in the tap: phones allow sound to start only there
     try { await audio.init(); } catch (e) { console.warn('audio init failed', e); }
     ui.hideIntro();
     audio.sparkle();

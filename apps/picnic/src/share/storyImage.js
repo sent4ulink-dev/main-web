@@ -78,7 +78,7 @@ function sparkle(ctx, x, y, r, color) {
 export async function drawStoryImage({ photo, content, base = '' }) {
   const s = content.share || {};
   const date = new Date(`${content.date.iso}T12:00:00`);
-  const texts = [s.brand, s.line, content.name, content.from, enDate(date), 'The last moment · Happy birthday'].filter(Boolean).join(' ');
+  const texts = [s.brand, s.title, s.line, content.name, content.from, enDate(date), 'The last moment'].filter(Boolean).join(' ');
   await Promise.all([`italic 600 76px ${F.display}`, `700 92px ${F.display}`, `700 64px ${F.hand}`, `600 30px ${F.ui}`].map((f) => document.fonts.load(f, texts).catch(() => {})));
   await document.fonts.ready;
   const logo = s.logo ? await loadImage(`${base}${s.logo}`).catch(() => null) : null;
@@ -95,7 +95,7 @@ export async function drawStoryImage({ photo, content, base = '' }) {
   // headline: small italic line + the name, big
   ctx.textAlign = 'left';
   ctx.font = `italic 600 60px ${F.display}`; ctx.fillStyle = 'rgba(255,240,230,0.92)';
-  ctx.fillText('Happy birthday,', 80, 262);
+  if (s.title) { fit(ctx, s.title, 'italic 600', 60, F.display, W - 160); ctx.fillText(s.title, 80, 262); }
   const ns = fit(ctx, content.name, 700, 104, F.display, W - 160);
   const ng = ctx.createLinearGradient(80, 0, W - 80, 0);
   ng.addColorStop(0, '#ffd3e2'); ng.addColorStop(0.5, '#ff9fc4'); ng.addColorStop(1, '#ffc58f');

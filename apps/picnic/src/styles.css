@@ -495,3 +495,8 @@ body.moving #nav, body.moving #chapter, body.moving #media-spots { opacity: 0 !i
 #scene-logo img { display: block; height: clamp(22px, 5.6vw, 32px); width: auto; }
 .brand-eyebrow img { display: block; height: 20px; width: auto; }
 .float-type .eyebrow.brand-eyebrow::before { content: none; }
+
+/* the step editor's live preview (?embed=1): the card as they will see it, without the owner's controls, the sound
+   buttons, messages and hints (nothing in it can be tapped) */
+html.embed #owner-bar, html.embed #editor-toolbar, html.embed #toast, html.embed #topbar, html.embed #mode-gate,
+html.embed #ui-show, html.embed .hint { display: none !important; }

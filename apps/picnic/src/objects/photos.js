@@ -130,6 +130,7 @@ export function loadImage(url) {
 
 /** Load user photos (or paint placeholders) into drawable images. `url` turns a stored src into an address. */
 export async function loadPhotos(list, url) {
-  const images = await Promise.all(list.map((p) => loadImage(p.src ? url(p.src) : '')));
+  // (a photo that never answers on a bad network must not keep the whole card on the loading screen)
+  const images = await Promise.all(list.map((p) => Promise.race([loadImage(p.src ? url(p.src) : ''), new Promise((res) => setTimeout(res, 15000, null))])));
   return list.map((p, i) => ({ image: images[i] || placeholderPhoto(i, p.caption), caption: p.caption, src: images[i] ? p.src : '' }));
 }

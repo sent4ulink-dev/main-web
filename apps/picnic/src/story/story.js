@@ -117,7 +117,7 @@ export class Story {
         },
         label: () => ({ at: o.cassette.focusPoint, r: 0.085 }),
         onHit: () => this.toggleSong(),
-        leave: () => { this.stopSong(); this.tube.show(false); },
+        leave: () => { this.stopSong(); this.tube.show(false); this.tube.destroy(); },
       },
       {
         id: 'candles', navTitle: 'Candles', time: 0.55,
@@ -377,6 +377,7 @@ export class Story {
   toggleSong(kind = this.content.song.voice ? 'voice' : 'music') {
     const cas = this.o.cassette, song = this.content.song;
     if (cas.playing) { const same = this._songKind === kind; this.stopSong(); if (same) { this.audio.click(); return; } }
+    this.bgTube?.stop();   // one song at a time: the background waits for the instrument
     cas.playing = true;
     this._songKind = kind;
     this.o.notes.active = true;
@@ -397,6 +398,17 @@ export class Story {
   /** Show the current chapter's text again (after an edit changed what it holds). */
   refreshCard() { const card = this.current?.enter(); if (card) this.ui.showCard(card, { reveal: true }); }
 
+  /** The song in the background (quiet, set on the link): starts with the first tap, waits while the walkman or the voice plays. */
+  startBackground() {
+    this.bgOn = !!this.bgTube?.available;
+    if (this.bgOn) this.bgTube.play();
+  }
+
+  /** The walkman's YouTube song can't play on this device: the music box plays instead. */
+  songFailed() {
+    if (this.o.cassette.playing && this._songKind === 'music') this.audio.playMusicBox();
+  }
+
   stopSong() {
     const cas = this.o.cassette;
     this._songToken = (this._songToken || 0) + 1;
@@ -405,6 +417,7 @@ export class Story {
     this.audio.stopMusicBox();
     this.audio.stopVoice();
     this.tube.stop();
+    if (this.bgOn) this.bgTube.play();   // and comes back after it
     this.o.notes.active = false;
     this._songLabel();
   }
