@@ -20,6 +20,9 @@ interface YesCelebrationOverlayProps {
    * the visitor building their own live plan, which is a different thing from the
    * owner editing the underlying options. */
   editingStep?: 'celebration' | 'activity' | 'restaurant';
+  /** The step editor's live preview only: which of the screens behind the marquee to show, as the visitor sees it
+   * ('word': the marquee with the planner's hearts). */
+  previewStep?: 'word' | 'activity' | 'restaurant';
   onEditCelebrationWord?: (v: string) => void;
   onAddActivity?: (emoji: string, text: string) => void;
   onUpdateActivity?: (id: string, patch: Partial<Pick<ActivityOption, 'emoji' | 'text'>>) => void;
@@ -38,6 +41,7 @@ export function YesCelebrationOverlay({
   activities,
   restaurants,
   editingStep,
+  previewStep,
   onEditCelebrationWord,
   onAddActivity,
   onUpdateActivity,
@@ -220,7 +224,13 @@ export function YesCelebrationOverlay({
             onRemoveRestaurant={onRemoveRestaurant}
           />
         )}
-        {!editingStep && (
+        {!editingStep && previewStep === 'activity' && (
+          <ActivitySection activities={activities} initialActivity="" onSave={() => {}} onCancel={() => {}} />
+        )}
+        {!editingStep && previewStep === 'restaurant' && (
+          <RestaurantSection restaurants={restaurants} initialRestaurant="" onSave={() => {}} onCancel={() => {}} />
+        )}
+        {!editingStep && (!previewStep || previewStep === 'word') && (
           <HeartPlannerHub
             activities={activities}
             restaurants={restaurants}

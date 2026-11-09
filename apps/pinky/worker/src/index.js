@@ -71,6 +71,29 @@ function reply(body, status, cors, extra = {}) {
   return new Response(JSON.stringify(body), { status, headers: { ...JSON_TYPE, ...cors, ...extra } });
 }
 
+// Can this YouTube song play inside the card (the step editor's song box)? Its owner may have closed it to other
+// sites. YouTube's own oEmbed answers 401/403 for a song closed to embedding and 400/404 for one that is missing or
+// private; anything else: can't tell, so it isn't stopped.
+async function youtubeCheck(id, cors) {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 8000);
+  const day = { 'Cache-Control': 'public, max-age=86400' };
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`, { signal: stop.signal });
+    if (r.ok) {
+      const d = await r.json().catch(() => ({}));
+      return reply({ ok: true, title: String(d.title || '').slice(0, 200) }, 200, cors, day);
+    }
+    if (r.status === 401 || r.status === 403) return reply({ ok: false, reason: 'blocked' }, 200, cors, day);
+    if (r.status === 400 || r.status === 404) return reply({ ok: false, reason: 'missing' }, 200, cors, day);
+  } catch {
+    // no answer
+  } finally {
+    clearTimeout(timer);
+  }
+  return reply({ ok: true }, 200, cors);
+}
+
 function allowedOrigins(env) {
   return String(env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
 }
@@ -179,6 +202,9 @@ export default {
         await putShare(bucket, share[1], entry);
         return reply({ ok: true }, 200, cors);
       }
+
+      const yt = url.pathname.match(/^\/api\/yt-check\/([A-Za-z0-9_-]{11})$/);
+      if (yt && request.method === 'GET') return youtubeCheck(yt[1], cors);
 
       return reply({ error: 'not_found' }, 404, cors);
     } catch (err) {

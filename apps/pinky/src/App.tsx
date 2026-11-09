@@ -31,9 +31,21 @@ const EDIT_SCREENS = [
 ] as const;
 type EditScreenKey = (typeof EDIT_SCREENS)[number]['key'];
 
+// The step editor's live preview (?embed=1, in its frame): the card itself, silent, with nothing to tap. The editor
+// says which screen to show (easy/easy-steps.js: q, plea + which one, word, act, rest) and hands over the words.
+const EMBED = new URLSearchParams(location.search).has('embed') && window.parent !== window;
+if (EMBED) document.documentElement.classList.add('embed');
+const PREVIEW_STEPS = { word: 'word', act: 'activity', rest: 'restaurant' } as const;
+type PreviewScene = { scene: string; sub: number | null };
+
+// A link and the demo are edited step by step, with the card itself running live beside the words (easy/).
+function openStepEditor(session: ReturnType<typeof useShareSession>) {
+  import('./easy/open-editor.js').then(({ openCardEditor }) => openCardEditor({ mode: session.mode, shareId: session.shareId }));
+}
+
 export default function App() {
   const session = useShareSession();
-  const music = useBackgroundMusic(session.content.musicUrl);
+  const music = useBackgroundMusic(EMBED ? '' : session.content.musicUrl);
   const msLeft = useEditWindowCountdown(session.editUntil);
 
   const [selectedChoice, setSelectedChoice] = useState<'yes' | 'no' | null>(null);
@@ -46,6 +58,25 @@ export default function App() {
   // start every time editing turns on.
   const [editScreenIndex, setEditScreenIndex] = useState(0);
   const [editPleaIndex, setEditPleaIndex] = useState(0);
+
+  // The live preview's screen, set by the step editor through window.__ez.
+  const [preview, setPreview] = useState<PreviewScene>({ scene: 'q', sub: null });
+  const { previewContent } = session;
+  useEffect(() => {
+    if (!EMBED) return;
+    (window as unknown as { __ez: unknown }).__ez = {
+      show: (scene: string, sub?: number | null) => setPreview({ scene, sub: Number.isInteger(sub) ? (sub as number) : null }),
+      setContent: previewContent,
+      reframe() {},
+      dpr() {}
+    };
+  }, [previewContent]);
+  useEffect(() => {
+    if (!EMBED) return;
+    // a plea step shows the question as it is after that many taps on No
+    setSelectedChoice(null);
+    setNoCount(preview.scene === 'plea' ? (preview.sub ?? 0) + 1 : 0);
+  }, [preview]);
 
   useEffect(() => {
     if (session.isEditing) {
@@ -180,7 +211,8 @@ export default function App() {
   // forcing that overlay open here is what lets clicking Next actually show them, without
   // the owner ever needing to tap Yes/pick a heart themselves.
   const editScreen: EditScreenKey | null = session.isEditing ? EDIT_SCREENS[editScreenIndex].key : null;
-  const forceCelebration = editScreen !== null && editScreen !== 'question';
+  const previewStep = EMBED ? PREVIEW_STEPS[preview.scene as keyof typeof PREVIEW_STEPS] : undefined;
+  const forceCelebration = (editScreen !== null && editScreen !== 'question') || Boolean(previewStep);
   const showQuestionScreen = !isYesSelected && !forceCelebration;
   const showCelebrationOverlay = (isYesSelected && celebrationScene === 3) || forceCelebration;
 
@@ -231,7 +263,7 @@ export default function App() {
           would be actively misleading, so it just vanishes instead of showing a stale
           number. Deliberately no copy-link control here — the link is already in the
           address bar for whoever created it. */}
-      {!session.isEditing && session.canEdit && (
+      {!session.isEditing && session.canEdit && !EMBED && (
         <div
           className="fixed top-3 left-3 z-[100] px-3 py-1.5 rounded-full bg-black/70 border border-white/20 backdrop-blur-md text-[11px] font-semibold text-white/70 shadow-lg"
           title="Time left to edit this card before it locks"
@@ -241,12 +273,12 @@ export default function App() {
       )}
 
       {/* Top-right: the persistent Edit entry point, whenever the card is still editable. */}
-      {!session.isEditing && session.canEdit && (
+      {!session.isEditing && session.canEdit && !EMBED && (
         <div className="fixed top-3 right-3 z-[100] flex items-center gap-2">
           <button
             type="button"
             id="btn-open-edit"
-            onClick={() => session.setIsEditing(true)}
+            onClick={() => openStepEditor(session)}
             className="w-9 h-9 rounded-full bg-black/70 hover:bg-black border border-white/20 backdrop-blur-md flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer shadow-lg"
             title="Edit this card"
           >
@@ -294,7 +326,8 @@ export default function App() {
           celebrationWord={session.content.celebrationWord}
           activities={session.content.activities}
           restaurants={session.content.restaurants}
-          editingStep={forceCelebration ? (editScreen as 'celebration' | 'activity' | 'restaurant') : undefined}
+          editingStep={forceCelebration && editScreen ? (editScreen as 'celebration' | 'activity' | 'restaurant') : undefined}
+          previewStep={previewStep}
           onEditCelebrationWord={session.setCelebrationWord}
           onAddActivity={session.addActivity}
           onUpdateActivity={session.updateActivity}

@@ -78,6 +78,9 @@ export function useShareSession() {
     [persist]
   );
 
+  /** The step editor's live preview: the words as they are being typed, shown and never saved from here. */
+  const previewContent = useCallback((next: ShareContent) => setContent(next), []);
+
   const setQuestion = useCallback((v: string) => mutate((prev) => ({ ...prev, question: v })), [mutate]);
   const setYesLabel = useCallback((v: string) => mutate((prev) => ({ ...prev, yesLabel: v })), [mutate]);
   const setNoLabel = useCallback((v: string) => mutate((prev) => ({ ...prev, noLabel: v })), [mutate]);
@@ -175,6 +178,7 @@ export function useShareSession() {
     isEditing,
     setIsEditing,
     canEdit,
+    previewContent,
     setQuestion,
     setYesLabel,
     setNoLabel,
