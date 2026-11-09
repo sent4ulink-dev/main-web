@@ -669,3 +669,8 @@ body.reading #scene-logo { opacity: 0; }
   body:has(.owner-bar:not([hidden]) .owner-btn:not([hidden])) #scene-logo { top: calc(max(14px, env(safe-area-inset-top)) + 98px); }
 }
 body.ui-hidden .owner-bar { opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+
+/* the step editor's live preview (?embed=1): the card as they will see it, without the owner's controls, the sound
+   buttons, messages and hints (nothing in it can be tapped) */
+html.embed #owner-bar, html.embed #editor-toolbar, html.embed #toast, html.embed #topbar, html.embed #mode-gate,
+html.embed #ui-show, html.embed .hint { display: none !important; }

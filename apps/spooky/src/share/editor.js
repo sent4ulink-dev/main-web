@@ -13,6 +13,9 @@ import { pickImage, shrinkImage } from './media.js';
 import { openYouTube, openVoice } from './sheets.js';
 import { parseYouTube } from '../core/youtube.js';
 import { monthDay } from '../util/textures.js';
+import { openEasyEditor, saveKeepingLatest } from './easy-editor.js';
+import { LivePreview } from './live-preview.js';
+import { makeSteps, title as easyTitle } from './easy-steps.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (s) => document.querySelector(s);
@@ -174,6 +177,8 @@ export class CardEditor {
   enable() {
     this.checkDeadline();
     if (!this.canEdit || this.finished) return;
+    // a saved link and the demo get the step-by-step editor; the private studio keeps editing in place
+    if (this.repo.mode.kind !== 'studio') { this.openEasy(); return; }
     this.editing = true;
     this.toggle.hidden = true; this.generate.hidden = true;
     document.body.classList.add('editing');
@@ -182,6 +187,36 @@ export class CardEditor {
     this.layout();
     this.refreshBindings();
     this.story?.refreshCard?.();
+  }
+
+  /**
+   * The step-by-step editor, with the card itself running live beside the form. Only one 3D hill at a time: this
+   * page's own is let go while it is open (closing reloads the page with the new words).
+   */
+  openEasy() {
+    const repo = this.repo, kind = repo.mode.kind;
+    let revision = this.revision, deadline = this.editingDeadline;
+    const embed = new URL(location.href); embed.searchParams.set('embed', '1'); embed.hash = '';
+    const live = new LivePreview({ src: embed.href });
+    const link = new URL(location.href); link.searchParams.delete('embed'); link.hash = '';
+    openEasyEditor({
+      title: easyTitle, live,
+      steps: makeSteps({ picture: () => live.picture() }),
+      load: async () => { const d = await repo.load(); revision = d.revision; deadline = d.editingDeadline ?? deadline; return d; },
+      save: saveKeepingLatest({
+        save: (c, rev, { finish }) => repo.save(c, rev, finish),
+        latest: () => repo.load(),
+        getRevision: () => revision,
+        setRevision: (r) => { revision = r; },
+      }),
+      upload: (blob) => repo.upload(blob),
+      mediaURL: (name) => repo.mediaURL(name),
+      canFinish: kind === 'invitation',
+      shareUrl: kind === 'invitation' ? link.href : '',
+      deadlineText: () => (kind === 'invitation' && deadline ? `You can edit this link until ${new Date(deadline).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}.` : kind === 'test' ? 'This is a demo: what you write is kept on this device only.' : ''),
+      onOpen: () => this.release3d?.(),
+      done: () => location.reload(),
+    });
   }
 
   stop() {

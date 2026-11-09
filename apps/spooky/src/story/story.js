@@ -9,7 +9,7 @@ import { monthDay } from '../util/textures.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
-const LENS_FOV = 44;                        // the box camera's view
+export const LENS_FOV = 44;                        // the box camera's view
 const portraitScreen = () => innerWidth / innerHeight < 1.1;
 
 /** A shot that looks at `at` from `dist` metres along the horizontal normal `n`, raised by `up`. */
@@ -123,7 +123,7 @@ export class Story {
         },
         label: () => ({ at: gramAt.clone().add(V(0, 0.1, 0)), r: 0.9, place: 'side', placePortrait: 'below' }),
         onHit: () => this.toggleSong(),
-        leave: () => { this.stopSong(); this.tube.show(false); },
+        leave: () => { this.stopSong(); this.tube.show(false); this.tube.destroy(); },
       },
       {
         id: 'trick', navTitle: 'Trick?',
@@ -164,6 +164,20 @@ export class Story {
   _shot(ch) { return portraitScreen() && ch.shotPortrait ? ch.shotPortrait : ch.shot; }
   labelAnchor() { return this.current?.label?.() || null; }
   refreshCard() { const card = this.current?.enter(); if (card) this.ui.showCard(card, { reveal: true }); }
+
+  /** The song in the background (quiet, set on the link): starts with the first tap, waits while the record or the whisper plays. */
+  startBackground() {
+    this.bgOn = !!this.bgTube?.available;
+    if (this.bgOn) this.bgTube.play();
+  }
+
+  /** The record's YouTube song can't play on this device: the haunted organ plays instead. */
+  songFailed() {
+    const gram = this.o.gram, token = this._songToken;
+    if (!gram.playing || this._songKind !== 'music') return;
+    this.audio.musicDuck(0);
+    this.audio.playOrgan((m, d) => { if (token === this._songToken && gram.playing) gram.pulse(Math.min(1, d * 1.5)); });
+  }
   get editing() { return document.body.classList.contains('editing'); }
 
   // ── the gate ─────────────────────────────────────────
@@ -391,6 +405,7 @@ export class Story {
   toggleSong(kind = this.content.song.voice ? 'voice' : 'music') {
     const gram = this.o.gram, song = this.content.song;
     if (gram.playing) { const same = this._songKind === kind; this.stopSong(); if (same) return; }
+    this.bgTube?.stop();   // one song at a time: the background waits for the record
     this._songKind = kind;
     const token = (this._songToken = (this._songToken || 0) + 1);
     const still = () => token === this._songToken && gram.playing;
@@ -416,6 +431,7 @@ export class Story {
     this.audio.stopVoice();
     this.tube.stop();
     this.audio.musicDuck(0);
+    if (this.bgOn) this.bgTube.play();   // and comes back after it
     this._songLabel();
   }
 

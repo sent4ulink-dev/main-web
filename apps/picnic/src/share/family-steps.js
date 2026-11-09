@@ -60,7 +60,8 @@ export const songStep = (card) => ({
   id: 'song', pill: 'Song', title: 'Add a song and your voice', hint: 'The songs never play over each other: when one plays, the other pauses and picks up again after.',
   cards: [
     { title: 'Background song', hint: 'Plays softly (40%) from the moment the card opens. Optional.', fields: [{ type: 'youtube', path: 'song.bg' }] },
-    { title: card.instrument.title, hint: card.instrument.hint, fields: [{ type: 'youtube', path: 'song.youtube' }, { type: 'textarea', path: 'song.note', label: 'Words with the song', max: 200, rows: 2 }] },
+    // (the song's words, where the card shows them)
+    { title: card.instrument.title, hint: card.instrument.hint, fields: [{ type: 'youtube', path: 'song.youtube' }, ...(card.songNote === false ? [] : [{ type: 'textarea', path: 'song.note', label: 'Words with the song', max: 200, rows: 2 }])] },
     { title: 'Your voice', hint: 'Record a greeting of up to 30 seconds in your own voice. A quiet room sounds clearest.', fields: [{ type: 'voice', path: 'song.voice' }] },
   ],
   preview: card.song,
@@ -77,9 +78,10 @@ export const endStep = (card) => ({
     moreLabel: 'More words',
   }, {
     title: 'The saved picture',
-    hint: 'At the end, “Save image” makes this picture. Their name and the date fill themselves in.',
+    hint: card.pictureHint || 'At the end, “Save image” makes this picture. Their name and the date fill themselves in.',
     fields: [
-      { type: 'text', path: 'share.title', label: 'Headline', max: 40, pv: 3, placeholder: card.storyTitlePlaceholder || '' },
+      // (a card whose picture takes its headline from the closing title has no headline of its own)
+      ...(card.storyTitle === false ? [] : [{ type: 'text', path: 'share.title', label: 'Headline', max: 40, pv: 3, placeholder: card.storyTitlePlaceholder || '' }]),
       { type: 'text', path: 'share.line', label: 'Bottom line', max: 60, pv: 3 },
     ],
   }],
@@ -87,4 +89,5 @@ export const endStep = (card) => ({
   previews: [card.finale, card.magic || card.finale, card.intro, { picture: card.picture }],
 });
 
-export const familySteps = (card) => [whoStep(card), letterStep(card), photosStep(card), wishStep(card), dateStep(card), songStep(card), endStep(card)];
+// (a card can bring a date step of its own, e.g. Halloween Night's with the plan for the night)
+export const familySteps = (card) => [whoStep(card), letterStep(card), photosStep(card), wishStep(card), card.dateStep || dateStep(card), songStep(card), endStep(card)];

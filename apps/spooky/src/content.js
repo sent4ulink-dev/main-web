@@ -64,6 +64,7 @@ export const content = {
     note: 'Spin the record and make the ghosts dance.',
     youtube: '',            // a YouTube link played on the gramophone (empty: the haunted organ)
     voice: '',              // an uploaded voice message (max 30 s), played as a ghostly whisper
+    bg: '',                 // a YouTube song played softly (40%) in the background from the start (empty: none)
   },
 
   finale: {
@@ -73,7 +74,7 @@ export const content = {
 
   // the "Save image" story picture (1080×1920): an old spirit photograph on a haunted poster
   share: {
-    logo: 'brand/logo-white.png',
+    logo: '',                                  // a logo image for the top (empty: the brand text is drawn)
     brand: 'Halloween Night',
     line: 'The night we got scared — together 🎃',
   },

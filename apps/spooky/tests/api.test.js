@@ -127,3 +127,23 @@ test('media: uploads are served, replaced ones deleted, links get copies', async
   assert.equal(keys('media/studio/').length, 2, 'the studio keeps its own');
   async function api(path) { return createApi().fetch(new Request(`https://card.test${path}`), env); }
 });
+
+test('yt-check: whether a YouTube song can play inside the card', async () => {
+  const answer = (status, body = {}) => async (u) => { assert.match(String(u), /^https:\/\/www\.youtube\.com\/oembed\?format=json&url=/); return Response.json(body, { status }); };
+  const check = async (fetchImpl, id = 'dQw4w9WgXcQ') => (await (await createApi({ fetchImpl }).fetch(new Request(`https://card.test/api/yt-check/${id}`), {})).json());
+  assert.deepEqual(await check(answer(200, { title: 'A song' })), { ok: true, title: 'A song' });
+  assert.deepEqual(await check(answer(401)), { ok: false, reason: 'blocked' });
+  assert.deepEqual(await check(answer(404)), { ok: false, reason: 'missing' });
+  assert.deepEqual(await check(answer(500)), { ok: true }, 'cannot tell: not stopped');
+  assert.deepEqual(await check(async () => { throw new Error('offline'); }), { ok: true });
+  assert.equal((await createApi().fetch(new Request('https://card.test/api/yt-check/not-an-id'), {})).status, 503, 'a wrong id is not a song check (no storage in this test)');
+});
+
+test('content: the background song and the bottom line of the saved picture are kept, a bad link is refused', () => {
+  const c = freshContent();
+  assert.equal(c.song.bg, '');
+  const ok = cleanContent({ ...c, song: { ...c.song, bg: 'https://youtu.be/dQw4w9WgXcQ' }, share: { ...c.share, line: 'Love you' } });
+  assert.equal(ok.song.bg, 'https://youtu.be/dQw4w9WgXcQ');
+  assert.equal(ok.share.line, 'Love you');
+  assert.throws(() => cleanContent({ ...c, song: { ...c.song, bg: 'not a link' } }));
+});
