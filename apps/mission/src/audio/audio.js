@@ -145,7 +145,7 @@ export class AudioEngine {
         } else src.connect(this.master);
       }
     } catch { /* plays directly */ }
-    this.duckAmbience(0.6, 0.8);
+    this.duckAmbience(1, 0.3);   // the yard goes quiet under a voice message, so the voice stays clear
     const ended = new Promise((resolve) => { el.onended = resolve; el.onerror = resolve; el._stop = resolve; });
     el.play().catch(() => el._stop());
     return ended.then(() => {

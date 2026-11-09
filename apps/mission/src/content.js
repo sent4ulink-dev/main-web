@@ -56,6 +56,7 @@ export const content = {
     note: 'Turn on the radio and listen.',
     youtube: '',            // a YouTube link played as background music (empty: the radio's own birthday song)
     voice: '',              // an uploaded voice message (max 30 s), played as a radio call
+    bg: '',                 // a YouTube song played softly (40%) in the background from the start (empty: none)
   },
 
   finale: {
@@ -67,6 +68,7 @@ export const content = {
   share: {
     logo: '',                                  // a logo image for the top of the story image (empty: the brand text is drawn)
     brand: 'sent4u',           // text logo used when no logo image is set
+    title: 'HAPPY BIRTHDAY',                   // the headline at the top
     line: 'GG WP — stay an MVP in your new year too 🏆',   // short line at the bottom
   },
 };

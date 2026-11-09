@@ -27,9 +27,12 @@ import { Presenter } from './util/present.js';
 import { ModeRepository, selectMode } from './share/repository.js';
 import { CardEditor } from './share/editor.js';
 import { getPath } from './share/content-core.js';
+import { startPreview, silentAudio, silentTube } from './share/embed.js';
 import { loadLicensedFonts } from './licensedFonts.js';
 
 const params = new URLSearchParams(location.search);
+const EMBED = params.has('embed') && window.parent !== window;   // the step editor's live preview (share/embed.js)
+if (EMBED) document.documentElement.classList.add('embed');
 // every letter the textures and the story picture will need
 const FONT_SAMPLE = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ${JSON.stringify(content)}`.slice(0, 4000);
 const DEBUG = params.has('debug');
@@ -69,7 +72,7 @@ async function boot() {
     loadAll(setProgress),
     loadLicensedFonts(),
     ...["400 30px 'Cousine'", "700 30px 'Cousine'", "700 30px 'Oswald'", "600 30px 'Oswald'", "500 30px 'Oswald'", "400 30px 'Black Ops One'", "400 30px 'Rubik'", "500 30px 'Rubik'", "800 30px 'Rubik'", "500 30px 'Roboto Mono'", "700 30px 'Caveat'"]
-      .map((f) => document.fonts.load(f, FONT_SAMPLE).catch(() => {})),
+      .map((f) => Promise.race([document.fonts.load(f, FONT_SAMPLE).catch(() => {}), new Promise((res) => setTimeout(res, 6000))])),
   ]);
   if (!await contentReady) { loaderEl.remove(); return; }
   ui._fillIntro();
@@ -98,7 +101,7 @@ async function boot() {
     sniper: new Sniper(scene, { rest: yard.o.sniperRest, target: SNIPER_TARGET }),
     confetti, sparkles,
   };
-  const audio = new AudioEngine();
+  const audio = EMBED ? silentAudio() : new AudioEngine();
   const fwColor = new THREE.Color(1, 0.8, 0.6);
   const fireworks = new Fireworks(scene, camera, {
     onBurst: ({ position, color, distance, type }) => {
@@ -126,13 +129,16 @@ async function boot() {
   const director = new Director(camera, R.dof);
   let captureReq = null;
   const capture = (pose, fov = 50, size = 1024) => new Promise((resolve) => { captureReq = { pose, fov, size, resolve }; });
-  const tube = new TubePlayer({ onEnd: () => story.stopSong(), onFail: () => ui.toast('This YouTube song cannot be played here.') });
+  const tube = EMBED ? silentTube() : new TubePlayer({ onEnd: () => story.stopSong(), onFail: () => { ui.toast('This YouTube song can’t play on this device.'); story.songFailed(); } });
   story = new Story({ director, ui, audio, o, content, presenter, capture, tube, mediaURL: url, yard });
+  // the song in the background, at 40%; it never plays over the radio's song or the call (story.js)
+  // (the radio's player is made when its chapter opens, and goes when it closes: two players at once are heavy on a phone)
+  story.bgTube = EMBED ? silentTube() : new TubePlayer({ volume: 40, loop: true, onFail: () => { story.bgOn = false; } });
   // edits repaint the 3D things that show them (dossier, the name on the wall, polaroids, timer, the wish card)
   editor.story = story;
   editor.letterBlank = (b) => o.letter.setBlank(b);
   editor.calendarBlank = () => {};
-  editor.apply = (paths) => {
+  const apply = (paths) => {
     let letter = false;
     for (const p of paths) {
       if (p === 'name') { letter = true; o.spray.setName(content.name); o.mvp.setName(content.name); o.photos.setDetails(content.name, content.date.iso); }
@@ -148,10 +154,19 @@ async function boot() {
     if (letter) o.letter.setContent(content);
     story._storyFile = null;
   };
+  editor.apply = apply;
+  // the step editor's preview runs a base of its own: while it is open this page lets go of its 3D and its sound
+  // (two 3D scenes at once are too much for a phone; closing the editor reloads the page)
+  editor.release3d = () => {
+    story.stopSong(); story.bgTube.stop(); audio.setMuted?.(true);
+    R.renderer.setAnimationLoop(null);
+    try { R.renderer.dispose(); R.renderer.forceContextLoss(); } catch { /* already gone */ }
+  };
   ui.setupNav(story.chapters, { onPrev: () => story.prev(), onNext: () => story.next(), onJump: (i) => story.goTo(i) });
   ui.el.sound.addEventListener('click', () => {
     audio.setMuted(!audio.muted);
     tube.setMuted(audio.muted);
+    story.bgTube.setMuted(audio.muted);
     ui.el.sound.textContent = audio.muted ? '🔇' : '🔊';
     ui.el.sound.setAttribute('aria-pressed', String(audio.muted));
     ui.el.sound.setAttribute('aria-label', audio.muted ? 'Unmute' : 'Mute');
@@ -291,7 +306,10 @@ async function boot() {
   // ── reveal ──
   loaderEl.classList.add('done');
   setTimeout(() => loaderEl.remove(), 1000);
+  if (EMBED) { startPreview({ R, story, ui, o, content, apply, director, camera, capture }); return; }
+  story.bgTube.prepare(content.song.bg);   // the 3D is loaded by now, and a tap on the intro's button can start it
   ui.showIntro(async () => {
+    story.startBackground();   // right in the tap: phones allow sound to start only there
     try { await audio.init(); } catch (e) { console.warn('audio init failed', e); }
     ui.hideIntro();
     audio.sparkle();

@@ -575,3 +575,8 @@ body.moving #nav, body.moving #chapter, body.moving #media-spots { opacity: 0 !i
 .letter-edit .le-greeting { font-family: inherit !important; font-size: calc(16 * var(--u)) !important; font-weight: 700 !important; text-indent: 0; margin-bottom: calc(12 * var(--u)) !important; }
 .letter-edit .le-sign, .letter-edit .le-from { text-align: left !important; text-indent: 0; padding: 0 !important; margin: 0 0 0 calc(260 * var(--u)) !important; font-family: inherit !important; font-size: calc(15 * var(--u)) !important; color: #1f1b16 !important; font-weight: 700 !important; }
 .letter-edit .le-sign { margin-top: calc(8 * var(--u)) !important; }
+
+/* the step editor's live preview (?embed=1): the card as they will see it, without the owner's controls, the sound
+   buttons, messages and hints (nothing in it can be tapped) */
+html.embed #owner-bar, html.embed #editor-toolbar, html.embed #toast, html.embed #topbar, html.embed #mode-gate,
+html.embed #ui-show, html.embed .hint { display: none !important; }

@@ -53,7 +53,7 @@ function backdrop(ctx, bg) {
 export async function drawStoryImage({ photo, bg = null, content, base = '' }) {
   const s = content.share || {};
   const date = new Date(`${content.date.iso}T12:00:00`);
-  const texts = [s.brand, s.line, content.name, content.from, enDate(date), 'HAPPY BIRTHDAY'].filter(Boolean).join(' ');
+  const texts = [s.brand, s.title, s.line, content.name, content.from, enDate(date)].filter(Boolean).join(' ');
   await Promise.all([`400 100px ${F.stencil}`, `700 100px ${F.hud}`, `500 40px ${F.hud}`, `500 40px ${F.body}`, `800 100px ${F.body}`, `700 40px ${F.type}`].map((f) => document.fonts.load(f, texts).catch(() => {})));
   await document.fonts.ready;
   const logo = s.logo ? await loadImage(`${base}${s.logo}`).catch(() => null) : null;
@@ -67,9 +67,9 @@ export async function drawStoryImage({ photo, bg = null, content, base = '' }) {
   // logo and the greeting up top
   if (logo && logo.height) { const lh = 62, lw = (logo.width / logo.height) * lh; ctx.drawImage(logo, (W - lw) / 2, 78, lw, lh); }
   else { fit(ctx, s.brand || '', 700, 44, F.hud, W - 200); ctx.fillStyle = C.cream; ctx.fillText(s.brand || '', W / 2, 122); }
-  ctx.font = `600 54px ${F.hud}`; ctx.fillStyle = C.cream;
+  fit(ctx, s.title || '', 600, 54, F.hud, W - 160); ctx.fillStyle = C.cream;
   ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 18;
-  ctx.fillText('HAPPY BIRTHDAY', W / 2, 226);
+  ctx.fillText(s.title || '', W / 2, 226);
   ctx.shadowBlur = 0;
 
   // the board, hanging a touch askew

@@ -85,6 +85,19 @@ async function prune(bucket, scope, content) {
   for (const key of await listKeys(bucket, `media/${scope}/`)) if (!keep.has(key)) await bucket.delete(key);
 }
 
+// Can this YouTube song play inside the card? Its owner may have closed it to other sites. YouTube's own oEmbed answers
+// 401/403 for a song closed to embedding and 400/404 for one that is missing or private; anything else: can't tell.
+async function youtubeCheck(id, fetchImpl) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), 8000), day = { 'Cache-Control': 'public, max-age=86400' };
+  try {
+    const r = await fetchImpl(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`, { signal: c.signal });
+    if (r.ok) { const d = await r.json().catch(() => ({})); return json({ ok: true, title: String(d.title || '').slice(0, 200) }, 200, day); }
+    if (r.status === 401 || r.status === 403) return json({ ok: false, reason: 'blocked' }, 200, day);
+    if (r.status === 400 || r.status === 404) return json({ ok: false, reason: 'missing' }, 200, day);
+  } catch { /* no answer */ } finally { clearTimeout(t); }
+  return json({ ok: true });   // can't tell: don't stop them
+}
+
 export function createApi({ now = () => Date.now(), randomID = createShareID, fetchImpl = (...a) => fetch(...a) } = {}) {
   // one thing at a time per record (a save and a "finish" arriving together)
   const turns = new Map();
@@ -105,6 +118,8 @@ export function createApi({ now = () => Date.now(), randomID = createShareID, fe
   return { async fetch(request, env) {
     const url = new URL(request.url), path = url.pathname, time = now(), bucket = env.SHARES;
     try {
+      const yt = /^\/api\/yt-check\/([A-Za-z0-9_-]{11})$/.exec(path);   // (for the editor's song boxes)
+      if (yt) return request.method === 'GET' ? await youtubeCheck(yt[1], fetchImpl) : json({ error: 'Method not allowed.' }, 405);
       if (!bucket) throw new Error('Card storage unavailable');
       const media = /^\/api\/media\/([A-Za-z0-9_-]{16,64}|studio)\/([^/]+)$/.exec(path);
       if (media) {

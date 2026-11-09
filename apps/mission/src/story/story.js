@@ -8,7 +8,7 @@ import { monthDay } from '../util/textures.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
-const SCOPE_FOV = 40;                       // the scope's (zoomed) view
+export const SCOPE_FOV = 40;                       // the scope's (zoomed) view
 const portraitScreen = () => innerWidth / innerHeight < 1.1;
 
 /** A shot that looks at `at` from `dist` metres along the horizontal normal `n`, raised by `up`. */
@@ -137,7 +137,7 @@ export class Story {
         },
         label: () => ({ at: o.radio.focusPoint, r: 0.42, place: 'side', placePortrait: 'below' }),
         onHit: () => this.toggleSong(),
-        leave: () => { this.stopSong(); this.tube.show(false); },
+        leave: () => { this.stopSong(); this.tube.show(false); this.tube.destroy(); },
       },
       {
         id: 'candles', navTitle: 'Candles',
@@ -198,6 +198,20 @@ export class Story {
   }
 
   refreshCard() { const card = this.current?.enter(); if (card) this.ui.showCard(card, { reveal: true }); }
+
+  /** The song in the background (quiet, set on the link): starts with the first tap, waits while the radio or the call plays. */
+  startBackground() {
+    this.bgOn = !!this.bgTube?.available;
+    if (this.bgOn) this.bgTube.play();
+  }
+
+  /** The radio's YouTube song can't play on this device: the radio's own tune plays instead. */
+  songFailed() {
+    const radio = this.o.radio, token = this._songToken;
+    if (!radio.playing || this._songKind !== 'music') return;
+    radio.autoplay(false);
+    this.audio.playConcert((m, d) => { if (token === this._songToken && radio.playing) radio.press(m, d); });
+  }
 
   // ── the dossier ──────────────────────────────────────
   _letterCard() {
@@ -431,6 +445,7 @@ export class Story {
   toggleSong(kind = this.content.song.voice ? 'voice' : 'music') {
     const radio = this.o.radio, song = this.content.song;
     if (radio.playing) { const same = this._songKind === kind; this.stopSong(); if (same) return; }
+    this.bgTube?.stop();   // one song at a time: the background waits for the radio
     this._songKind = kind;
     const token = (this._songToken = (this._songToken || 0) + 1);
     const still = () => token === this._songToken && radio.playing;
@@ -450,6 +465,7 @@ export class Story {
     this.audio.stopConcert();
     this.audio.stopVoice();
     this.tube.stop();
+    if (this.bgOn) this.bgTube.play();   // and comes back after it
     this._songLabel();
   }
 
@@ -638,7 +654,7 @@ export class Story {
     this._photo = { shot, bg };
     this._storyFile = null;
     drawStoryImage({ photo: shot, bg, content: this.content, base: import.meta.env.BASE_URL })
-      .then((cv) => canvasToFile(cv, `torson-odor-${Date.now()}.png`))
+      .then((cv) => canvasToFile(cv, `happy-birthday-${Date.now()}.png`))
       .then((file) => { if (token === this._capToken) this._storyFile = file; })
       .catch((err) => console.warn('story image failed', err));
     // out of the scope as the bolt is worked, then the MVP board floats in
@@ -673,7 +689,7 @@ export class Story {
     if (!file) {
       this.ui.toast('Preparing the picture…');
       const cv = await drawStoryImage({ photo: this._photo.shot, bg: this._photo.bg, content: this.content, base: import.meta.env.BASE_URL });
-      file = await canvasToFile(cv, `torson-odor-${Date.now()}.png`);
+      file = await canvasToFile(cv, `happy-birthday-${Date.now()}.png`);
       this._storyFile = file;
     }
     const r = await shareOrDownload(file, { title: `${this.content.finale.title}, ${this.content.name}!` });
