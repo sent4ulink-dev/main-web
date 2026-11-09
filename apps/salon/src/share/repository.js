@@ -25,7 +25,9 @@ export class ModeRepository {
     let response; const started = Date.now();
     for (let attempt = 0; ; attempt++) {
       try {
-        response = await this.fetcher(path, { method, cache: 'no-store', headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+        const stop = new AbortController(), timer = patient ? setTimeout(() => stop.abort(), 20000) : 0;   // a request that never answers counts as failed
+        response = await this.fetcher(path, { method, signal: stop.signal, cache: 'no-store', headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+        clearTimeout(timer);
         if (!patient || !(response.status >= 500 || response.status === 408 || response.status === 429) || Date.now() - started > 30000) break;
       } catch { if (!patient || Date.now() - started > 30000) throw new RequestError('Connection error. Check your internet and try again.'); }
       await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, 6000)));

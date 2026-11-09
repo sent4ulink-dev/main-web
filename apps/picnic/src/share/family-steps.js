@@ -49,7 +49,8 @@ export const dateStep = (card) => ({
     fields: [
       { type: 'date', label: 'Date', get: (c) => c.date.iso, set: (c, v) => { if (v) c.date.iso = v; } },
       { type: 'text', path: 'date.label', label: 'Name of the day', max: 80 },
-      { type: 'textarea', path: 'date.note', label: 'A few more words', max: 200, rows: 2 },
+      // (only some cards show a note under the date)
+      ...(card.dateNote ? [{ type: 'textarea', path: 'date.note', label: 'A few more words', max: 200, rows: 2 }] : []),
     ],
   }],
   preview: card.date,
@@ -59,7 +60,7 @@ export const songStep = (card) => ({
   id: 'song', pill: 'Song', title: 'Add a song and your voice', hint: 'The songs never play over each other: when one plays, the other pauses and picks up again after.',
   cards: [
     { title: 'Background song', hint: 'Plays softly (40%) from the moment the card opens. Optional.', fields: [{ type: 'youtube', path: 'song.bg' }] },
-    { title: card.instrument.title, hint: card.instrument.hint, fields: [{ type: 'youtube', path: 'song.youtube' }] },
+    { title: card.instrument.title, hint: card.instrument.hint, fields: [{ type: 'youtube', path: 'song.youtube' }, { type: 'textarea', path: 'song.note', label: 'Words with the song', max: 200, rows: 2 }] },
     { title: 'Your voice', hint: 'Record a greeting of up to 30 seconds in your own voice. A quiet room sounds clearest.', fields: [{ type: 'voice', path: 'song.voice' }] },
   ],
   preview: card.song,

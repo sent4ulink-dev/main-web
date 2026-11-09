@@ -1,6 +1,6 @@
 // "Save image": the painted moment as a phone-story picture (1080×1920 PNG), drawn in the browser.
 // Logo at the top, the name in calligraphy, the painting in a gilded frame, the day on a brass plaque, who it is
-// from and a short Mongolian line at the bottom — in the salon's own colours and fonts. On phones it opens the
+// from and a short line at the bottom — in the salon's own colours and fonts. On phones it opens the
 // share sheet; otherwise it downloads.
 import { enDate } from '../util/textures.js';
 
@@ -87,7 +87,7 @@ function giltFrame(ctx, x, y, w, h, b = 58) {
 export async function drawStoryImage({ photo, content, base = '' }) {
   const s = content.share || {};
   const date = new Date(`${content.date.iso}T12:00:00`);
-  const texts = [s.brand, s.line, content.name, content.from, enDate(date), 'Happy birthday'].filter(Boolean).join(' ');
+  const texts = [s.brand, s.title, s.line, content.name, content.from, enDate(date)].filter(Boolean).join(' ');
   await Promise.all([`400 150px ${F.script}`, `italic 600 56px ${F.serif}`, `700 40px ${F.serif}`].map((f) => document.fonts.load(f, texts).catch(() => {})));
   await document.fonts.ready;
   const logo = s.logo ? await loadImage(`${base}${s.logo}`).catch(() => null) : null;
@@ -103,8 +103,7 @@ export async function drawStoryImage({ photo, content, base = '' }) {
 
   // headline: the greeting in Garamond italic, the name in gilded calligraphy
   ctx.textAlign = 'center';
-  ctx.font = `italic 600 56px ${F.serif}`; ctx.fillStyle = C.cream;
-  ctx.fillText('Happy birthday,', W / 2, 290);
+  if (s.title) { fit(ctx, s.title, 'italic 600', 56, F.serif, W - 180); ctx.fillStyle = C.cream; ctx.fillText(s.title, W / 2, 290); }
   const ns = fit(ctx, content.name, 400, 150, F.script, W - 180);
   ctx.fillStyle = goldGradient(ctx, 0, 300, 0, 300 + ns);
   ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;

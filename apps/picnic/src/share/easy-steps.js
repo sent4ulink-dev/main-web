@@ -26,7 +26,6 @@ export function makeSteps({ picture }) {
     more: [
       { type: 'text', path: 'magic.reveal', label: 'Title in the stars', max: 80 },
       { type: 'textarea', path: 'magic.note', label: 'Words in the stars', max: 200, rows: 2 },
-      { type: 'textarea', path: 'intro.subtitle', label: 'Opening words', max: 300, rows: 2 },
     ],
     magic: { scene: 'magic', sub: 'stars', crop: crop(24, 50) },
     finale: { scene: 'finale', crop: crop(4, 60) },

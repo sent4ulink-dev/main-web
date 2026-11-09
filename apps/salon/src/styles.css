@@ -508,3 +508,8 @@ body.moving #nav, body.moving #chapter, body.moving #media-spots { opacity: 0 !i
 .display, .big-date, .loader-pct { font-weight: 400 !important; }
 /* Bad Script's capitals rise above the line: give gradient-clipped titles room so nothing is cut off */
 .display { line-height: 1.32 !important; padding-block: 0.1em 0.04em; }
+
+/* the step editor's live preview (?embed=1): the card as they will see it, without the owner's controls, the sound
+   buttons, messages and hints (nothing in it can be tapped) */
+html.embed #owner-bar, html.embed #editor-toolbar, html.embed #toast, html.embed #topbar, html.embed #mode-gate,
+html.embed #ui-show, html.embed .hint { display: none !important; }

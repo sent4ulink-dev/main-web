@@ -56,6 +56,7 @@ export const content = {
     note: 'The instruments play by themselves, just for you.',
     youtube: '',            // a YouTube link played as background music (empty: the fortepiano concert)
     voice: '',              // an uploaded voice message (max 30 s)
+    bg: '',                 // a YouTube song played softly (40%) in the background from the start (empty: none)
   },
 
   finale: {
@@ -67,6 +68,7 @@ export const content = {
   share: {
     logo: '',                                  // a logo image for the top of the story image (empty: the brand text is drawn)
     brand: 'sent4u',               // text logo used when no logo image is set
+    title: 'Happy birthday,',                  // the headline above the name
     line: 'This evening will last forever, like music ✨',      // short line at the bottom
   },
 };

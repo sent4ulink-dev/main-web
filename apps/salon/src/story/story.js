@@ -9,7 +9,7 @@ import { monthDay } from '../util/textures.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
-const PAINT_FOV = 56;   // the painter's view
+export const PAINT_FOV = 56;   // the painter's view
 
 /**
  * The evening in Mozart's and Beethoven's Vienna, chapter by chapter: a letter on a silver salver, the quill
@@ -115,7 +115,7 @@ export class Story {
         },
         label: () => ({ at: o.ensemble.focusPoint, r: 0.9, place: 'side', placePortrait: 'below' }),
         onHit: () => this.toggleSong(),
-        leave: () => { this.stopSong(); this.tube.show(false); },
+        leave: () => { this.stopSong(); this.tube.show(false); this.tube.destroy(); },
       },
       {
         id: 'candles', navTitle: 'Candles',
@@ -178,6 +178,20 @@ export class Story {
 
   /** Show the current chapter's text again (after an edit changed what it holds). */
   refreshCard() { const card = this.current?.enter(); if (card) this.ui.showCard(card, { reveal: true }); }
+
+  /** The song in the background (quiet, set on the link): starts with the first tap, waits while the concert or the voice plays. */
+  startBackground() {
+    this.bgOn = !!this.bgTube?.available;
+    if (this.bgOn) this.bgTube.play();
+  }
+
+  /** The concert's YouTube song can't play on this device: the fortepiano plays instead. */
+  songFailed() {
+    const ens = this.o.ensemble, token = this._songToken;
+    if (!ens.playing || this._songKind !== 'music') return;
+    ens.autoplay(false);
+    this.audio.playConcert((m, d) => { if (token === this._songToken && ens.playing) ens.press(m, d); });
+  }
 
   // ── the letter ───────────────────────────────────────
   _letterCard() {
@@ -339,6 +353,7 @@ export class Story {
   toggleSong(kind = this.content.song.voice ? 'voice' : 'music') {
     const ens = this.o.ensemble, song = this.content.song;
     if (ens.playing) { const same = this._songKind === kind; this.stopSong(); if (same) return; }
+    this.bgTube?.stop();   // one song at a time: the background waits for the concert
     this._songKind = kind;
     const token = (this._songToken = (this._songToken || 0) + 1);
     const still = () => token === this._songToken && ens.playing;
@@ -362,6 +377,7 @@ export class Story {
     this.audio.stopConcert();
     this.audio.stopVoice();
     this.tube.stop();
+    if (this.bgOn) this.bgTube.play();   // and comes back after it
     this._songLabel();
     if (this.current?.id === 'music') this.director.moveTo(this._shot(this.current), 2.0);
   }
@@ -494,7 +510,7 @@ export class Story {
     this._photo = { shot };
     this._storyFile = null;
     drawStoryImage({ photo: shot, content: this.content, base: import.meta.env.BASE_URL })
-      .then((cv) => canvasToFile(cv, `torson-odor-${Date.now()}.png`))
+      .then((cv) => canvasToFile(cv, `happy-birthday-${Date.now()}.png`))
       .then((file) => { if (token === this._capToken) this._storyFile = file; })
       .catch((e) => console.warn('story image failed', e));
     // 2 — to the easel: the brush paints the canvas, stroke by stroke
@@ -533,7 +549,7 @@ export class Story {
     if (!file) {
       this.ui.toast('Preparing the picture…');
       const cv = await drawStoryImage({ photo: this._photo.shot, content: this.content, base: import.meta.env.BASE_URL });
-      file = await canvasToFile(cv, `torson-odor-${Date.now()}.png`);
+      file = await canvasToFile(cv, `happy-birthday-${Date.now()}.png`);
       this._storyFile = file;
     }
     const r = await shareOrDownload(file, { title: `${this.content.finale.title}, ${this.content.name}!` });

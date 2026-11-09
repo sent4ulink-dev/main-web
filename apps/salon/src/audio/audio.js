@@ -136,7 +136,7 @@ export class AudioEngine {
     el.preload = 'auto'; el.playsInline = true; el.src = url;
     this.voiceEl = el;
     try { if (this.ctx) this.ctx.createMediaElementSource(el).connect(this.master); } catch { /* plays directly */ }
-    this.duckAmbience(0.6, 0.8);
+    this.duckAmbience(1, 0.3);   // the room goes quiet under a voice message, so the voice stays clear
     const ended = new Promise((resolve) => { el.onended = resolve; el.onerror = resolve; el._stop = resolve; });
     el.play().catch(() => el._stop());
     return ended.then(() => { if (this.voiceEl === el) { this.voiceEl = null; this.duckAmbience(0, 2); } });
