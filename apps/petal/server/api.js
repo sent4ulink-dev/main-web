@@ -191,12 +191,37 @@ async function soldByStore(id, env, fetchImpl) {
   }
 }
 
+// Can this YouTube song play inside the card (the step editor's song box)? Its owner may have closed it to other sites.
+// YouTube's own oEmbed answers 401/403 for a song closed to embedding and 400/404 for one that is missing or private;
+// anything else: can't tell, so it isn't stopped.
+async function youtubeCheck(id, fetchImpl) {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 8000);
+  const day = { "cache-control": "public, max-age=86400" };
+  try {
+    const r = await fetchImpl(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`, { signal: stop.signal });
+    if (r.ok) {
+      const d = await r.json().catch(() => ({}));
+      return json({ ok: true, title: String(d.title || "").slice(0, 200) }, 200, day);
+    }
+    if (r.status === 401 || r.status === 403) return json({ ok: false, reason: "blocked" }, 200, day);
+    if (r.status === 400 || r.status === 404) return json({ ok: false, reason: "missing" }, 200, day);
+  } catch {
+    // no answer
+  } finally {
+    clearTimeout(timer);
+  }
+  return json({ ok: true });
+}
+
 export async function handleApi(request, env = {}, { now = Date.now(), fetchImpl = fetch } = {}) {
   const url = new URL(request.url);
   const parts = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean);
   const method = request.method;
   const bucket = env.SHARES;
   const password = env.STUDIO_PASSWORD || "";
+  const yt = /^\/api\/yt-check\/([A-Za-z0-9_-]{11})$/.exec(url.pathname);
+  if (yt) return method === "GET" ? youtubeCheck(yt[1], fetchImpl) : json({ error: "method_not_allowed" }, 405);
   if (!bucket) return json({ error: "not_configured" }, 503);
   try {
     // The studio: is it locked, and how many links so far.

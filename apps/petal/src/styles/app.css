@@ -752,3 +752,7 @@ body[data-state="intro"] .foot {
 }
 .who-choice:hover, .who-choice:focus-visible { border-color: #ff8fb8; background: #fff5f9; }
 .who-date { display: flex; gap: 8px; align-items: center; font: 14px "Nunito", sans-serif; color: #8b6a58; }
+
+/* The step editor's live preview (?embed=1): the island as it will be seen, without its buttons, badges, guide and
+   hints (nothing in it can be tapped). */
+html.embed .hud, html.embed .foot, html.embed #walk-hint, html.embed #steps, html.embed #yes-heart, html.embed #no-heart { display: none !important; }

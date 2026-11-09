@@ -144,6 +144,14 @@ export async function createGrove(
   const playData = await fetch("/island/play.json?v=26").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const layout = createLayout(playData);
   const CAMERA_VIEWS = cameraViews(layout);
+  // The step editor's song step looks at the Music Isle: its gramophone and dance floor, from the path's side.
+  if (playData?.music) {
+    const [x, y, z] = playData.music.floor;
+    CAMERA_VIEWS.music = {
+      desktop: { position: [x + 1.2, y + 4.4, z + 9.5], target: [x, y + 0.5, z - 1.6], fov: 46 },
+      phone: { position: [x + 0.6, y + 6.8, z + 12.5], target: [x, y + 0.3, z - 1.8], fov: 56 },
+    };
+  }
   const island = await createCuteIsland(scene, () => {}, { quality, content, selections, layout });
   // A little lamp over every picture on the boards, lit after dark.
   const boardLamps = createBoardLamps({ scene, slots: island.slots });
@@ -1019,6 +1027,20 @@ export async function createGrove(
     // Where she walks just now (for resume).
     walkSpot: () => ({ position: walker.position.toArray(), heading: walker.heading, yaw: walker.yaw }),
     chooseCharacter() { game?.chooseCharacter(); },
+    // The step editor's live preview: who the recipient plays, and the Music Isle for the song step.
+    setCharacter: (who) => walker.setCharacter(who),
+    showMusic() {
+      if (!CAMERA_VIEWS.music) return;
+      clearTimeout(yesTimer);
+      putAway();
+      if (state === "walking") {
+        walker.stop();
+        game?.show(false);
+        island.setDetailDistance(detailCap);
+      }
+      setState("wandering");
+      moveTo("music", lowPower ? 1.2 : 1.6, "exploring");
+    },
     setSelections(next) {
       selectionsNow = next;
       island.setSelections(next);

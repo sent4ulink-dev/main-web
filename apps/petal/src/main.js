@@ -27,6 +27,9 @@ const DEMO_KEY = "petal-isle-demo";
 const demo = ["test", "test-petal"].includes(new URLSearchParams(location.search).get("share"));
 const shareId = demo ? "test" : shareIdFrom();
 const mode = demo ? "demo" : shareId ? "link" : new URLSearchParams(location.hash.slice(1)).has("c") ? "old" : "studio";
+// The step editor's live preview (?embed=1, in its frame): the island itself, silent, with nothing to tap (app/easy/embed.js).
+const EMBED = new URLSearchParams(location.search).has("embed") && window.parent !== window;
+if (EMBED) document.documentElement.classList.add("embed");
 function demoWords() {
   try {
     const saved = JSON.parse(localStorage.getItem(DEMO_KEY) || "null");
@@ -351,7 +354,24 @@ function updateLinkControls() {
   if (mode === "demo") cornerBadge.textContent = "✎ Example — try editing";
   else if (editable) cornerBadge.textContent = `✎ Editing time left: ${editTimeLeft(share.editUntil - Date.now())}`;
 }
-editButton.addEventListener("click", () => startEditing());
+// A link and the demo are edited step by step, with the island running live beside the words (app/easy/); while
+// that is open this page lets go of its own island and sound (two at once are too much for a phone), and closing
+// it reloads the page with the new words. A link just made still opens in place (startEditing).
+editButton.addEventListener("click", async () => {
+  if (startingEdit || !canEdit()) return;
+  startingEdit = true;
+  const { openCardEditor } = await import("./app/easy/open-editor.js");
+  startingEdit = false;
+  openCardEditor({ demo, shareId, words: () => content, saveDemo, onOpen: letGo });
+});
+function letGo() {
+  clearTimeout(toastTimer);
+  jukebox.dispose();
+  ambience.dispose();
+  world?.dispose();
+  world = null;
+  try { $("#world").getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* already gone */ }
+}
 
 // While editing, every change is saved a moment later (Save saves at once).
 let autosave = null;
@@ -701,7 +721,7 @@ Promise.all([import("./world/stage.js"), loadContent(), shareId && !demo ? loadS
       content = mergeContent(loaded, shared.content);
     } else content = loaded;
     applyIntro();
-    jukebox.setSong(currentSong());
+    if (!EMBED) jukebox.setSong(currentSong());
     world = await createGrove($("#world"), {
       content,
       settings,
@@ -763,6 +783,11 @@ Promise.all([import("./world/stage.js"), loadContent(), shareId && !demo ? loadS
     }, 500);
     if (import.meta.hot) import.meta.hot.dispose(() => clearInterval(scapeTimer));
     updateState("intro");
+    if (EMBED) {
+      const { startPreview } = await import("./app/easy/embed.js");
+      startPreview({ world, words: () => content, setWords: (next) => { content = next; }, applyIntro, partClouds, message: $("#message") });
+      return;
+    }
     if (mode === "studio") openStudio();
     if (mode === "demo") updateLinkControls();
     if (mode === "link") {
