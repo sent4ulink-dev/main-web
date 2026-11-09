@@ -1,6 +1,7 @@
 import {InlineEditor} from './inline-editor.js';
 import {ModeRepository,selectMode} from './mode-repository.js';
 import {URLModesUI} from './url-modes.js';
+import {startSong} from './song.js';
 const app = document.querySelector('#app');
 const ghost = `<g class="ghost-float"><path d="M214 225c0-21 12-34 29-34s29 13 29 34c0 17 3 28 10 37 4 6-3 11-11 7-3 10-13 11-20 5-7 7-17 5-20 0-10 7-21 2-18-6-11 2-15-4-9-10 7-9 10-19 10-33Z" fill="#fff0db"/>
 <g class="ghost-eyes">
@@ -141,7 +142,20 @@ function salute(){
 const pause=()=>{clearTimeout(sceneTimer);clearTimeout(monsterTimer);clearTimeout(toastTimer);transitioning=false;window.spookySound?.stopScream();};
 const repository=new ModeRepository(selectMode(location.search));
 let modesUI;
-const editor=new InlineEditor({app,show,getScene:()=>scene,pause,repository,start:kind=>{show(kind==='studio'?'quest':'loading');if(kind==='studio')editor.enable();},onIssue:error=>modesUI.issue(error)});
+// The step editor's live preview (?embed=1, in its frame): the card itself, silent, with nothing to tap (easy/embed.js).
+const EMBED=new URLSearchParams(location.search).has('embed')&&window.parent!==window;
+if(EMBED)document.documentElement.classList.add('embed');
+let songStarted=false;
+const editor=new InlineEditor({app,show,getScene:()=>scene,pause,repository,start:kind=>{
+  if(EMBED){show('quest');import('./easy/embed.js').then(({startPreview})=>startPreview({editor,show,getScene:()=>scene}));return;}
+  show(kind==='studio'?'quest':'loading');if(kind==='studio')editor.enable();
+  // the card's song (a YouTube link), from the first tap
+  if(!songStarted){songStarted=true;startSong(editor.content.texts['song:0']);}
+},onIssue:error=>modesUI.issue(error)});
+// A link and the demo are edited step by step, with the card itself running live beside the words (easy/); the
+// private studio keeps editing in place.
+const editInPlace=editor.enable.bind(editor);
+editor.enable=()=>{if(repository.mode.kind==='studio')return editInPlace();editor.checkDeadline();if(!editor.canEdit||editor.finished||editor.loading)return;import('./easy/open-editor.js').then(({openCardEditor})=>openCardEditor({editor,repository,pause}));};
 modesUI=new URLModesUI({app,editor,repository,pause});
 plantMoonlitHills();
 modesUI.start();

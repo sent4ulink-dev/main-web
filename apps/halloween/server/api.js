@@ -42,6 +42,16 @@ function closed(record,now){return json({error:record.finalized?'Editing has per
 export function starterContent(now){const date=new Date(now);return {plan:{...defaultPlan,date:`October 31, ${date.getUTCFullYear()+(date.getUTCMonth()>9?1:0)}`},texts:{}};}
 const newLink=(content,now)=>({content,createdAt:now,editingDeadline:null,finalized:false,revision:0});
 
+// Can this YouTube song play inside the card (the step editor's song box)? Its owner may have closed it to other sites.
+// YouTube's own oEmbed answers 401/403 for a song closed to embedding and 400/404 for one that is missing or private;
+// anything else: can't tell, so it isn't stopped.
+async function youtubeCheck(id,fetchImpl){const stop=new AbortController(),timer=setTimeout(()=>stop.abort(),8000),day={'Cache-Control':'public, max-age=86400'};
+  try{const r=await fetchImpl(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`,{signal:stop.signal});
+    if(r.ok){const d=await r.json().catch(()=>({}));return json({ok:true,title:String(d.title||'').slice(0,200)},200,day);}
+    if(r.status===401||r.status===403)return json({ok:false,reason:'blocked'},200,day);
+    if(r.status===400||r.status===404)return json({ok:false,reason:'missing'},200,day);
+  }catch{/* no answer */}finally{clearTimeout(timer);}
+  return json({ok:true});}
 export function createApi({now=()=>Date.now(),randomID=createShareID,fetchImpl=(...args)=>fetch(...args)}={}){
   // One thing at a time for each record: a save and a "finish" that arrive
   // together must not both read the invitation and both write it back.
@@ -56,6 +66,8 @@ export function createApi({now=()=>Date.now(),randomID=createShareID,fetchImpl=(
     catch(error){console.warn(`Checking ${id} with the orders server failed:`,error.message);return {};}finally{clearTimeout(timer);}}
   return {async fetch(request,env){const url=new URL(request.url),path=url.pathname,time=now(),bucket=env.SHARES;
   try{
+    const yt=/^\/api\/yt-check\/([A-Za-z0-9_-]{11})$/.exec(path);   // (for the step editor's song box)
+    if(yt)return request.method==='GET'?await youtubeCheck(yt[1],fetchImpl):json({error:'Method not allowed.'},405);
     if(!bucket)throw new Error('Invitation storage unavailable');
     const studio=path.startsWith('/api/studio/');const linkMatch=/^\/api\/invitations\/([^/]+)(\/finish|\/ensure)?$/.exec(path);
     if(!studio&&!linkMatch)return json({error:'Not found.'},404);
