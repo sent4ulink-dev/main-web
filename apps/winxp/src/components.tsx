@@ -336,13 +336,18 @@ export function Game({
   muted,
   onCount,
   editExtras,
+  won = false,
 }: {
   content: Content;
   muted: boolean;
   onCount: (n: number) => void;
   editExtras: ReactNode;
+  /** The step editor's live preview: start with all five hearts found (the game's end). */
+  won?: boolean;
 }) {
-  const [board, setBoard] = useState(emptyBoard),
+  const [board, setBoard] = useState(() =>
+      won ? { hearts: [7, 10, 20, 25, 32], wrong: [], revealed: [7, 10, 20, 25, 32], started: true } : emptyBoard(),
+    ),
     [elapsed, setElapsed] = useState(0),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");

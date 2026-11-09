@@ -53,6 +53,29 @@ function reply(body: unknown, status: number, cors: Record<string, string>, extr
   return new Response(JSON.stringify(body), { status, headers: { ...JSON_TYPE, ...cors, ...extra } });
 }
 
+// Can this YouTube song play inside the card (the step editor's song box)? Its owner may have closed it to other
+// sites. YouTube's own oEmbed answers 401/403 for a song closed to embedding and 400/404 for one that is missing or
+// private; anything else: can't tell, so it isn't stopped.
+async function youtubeCheck(id: string, cors: Record<string, string>) {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 8000);
+  const day = { "Cache-Control": "public, max-age=86400" };
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`, { signal: stop.signal });
+    if (r.ok) {
+      const d = (await r.json().catch(() => ({}))) as { title?: string };
+      return reply({ ok: true, title: String(d.title || "").slice(0, 200) }, 200, cors, day);
+    }
+    if (r.status === 401 || r.status === 403) return reply({ ok: false, reason: "blocked" }, 200, cors, day);
+    if (r.status === 400 || r.status === 404) return reply({ ok: false, reason: "missing" }, 200, cors, day);
+  } catch {
+    // no answer
+  } finally {
+    clearTimeout(timer);
+  }
+  return reply({ ok: true }, 200, cors);
+}
+
 function allowedOrigins(env: Env): string[] {
   return String(env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
@@ -209,6 +232,9 @@ export default {
           return reply({ status: result.share!.finalized ? "finalized" : "expired" }, result.share!.finalized ? 409 : 410, cors);
         return reply({ status: "ok", share: result.share }, 200, cors);
       }
+
+      const yt = url.pathname.match(/^\/yt-check\/([A-Za-z0-9_-]{11})$/);
+      if (yt && request.method === "GET") return youtubeCheck(yt[1], cors);
 
       if (url.pathname === "/photos" && request.method === "POST") {
         const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";

@@ -30,7 +30,12 @@ import { usePlanTools } from "./webmcp";
 import { MusicPlayer, PixelHeart } from "./RetroDesktop";
 import { apps, useDesktopWindows, type AppId } from "./desktopWindows";
 import { emoticonIds, emoticons, emoticonUrl } from "../shared/emoticons";
+import { previewFlow, type PreviewScene } from "./easy/preview";
 const demoKey = "heart-desktop-demo-v1";
+// The step editor's live preview (?embed=1, in its frame): the desktop itself, silent, on the screen the step being
+// edited is about (easy/preview.ts), with nothing to tap.
+const EMBED = new URLSearchParams(window.location.search).has("embed") && window.parent !== window;
+if (EMBED) document.documentElement.classList.add("embed");
 const loveAssistantMessages = [
   "Your smile has been set as my favorite wallpaper. ♡",
   "No errors found — just butterflies.",
@@ -63,7 +68,7 @@ export default function App({
   // server the moment it's paid for. A bare visit (no ?share=) has nothing to show.
   const notFound = context.mode === "real" && context.id === null;
   const [content, setContent] = useState<Content>(() => loadDraft(context)),
-    [flow, dispatch] = useReducer(transition, undefined, initialFlow),
+    [realFlow, dispatch] = useReducer(transition, undefined, initialFlow),
     [share, setShare] = useState<Share | null>(null),
     [loading, setLoading] = useState(context.mode === "real" && !notFound),
     [loadError, setLoadError] = useState("");
@@ -75,7 +80,7 @@ export default function App({
     [finish, setFinish] = useState(false),
     [now, setNow] = useState(Date.now()),
     [muted, setMuted] = useState(
-      () => localStorage.getItem("heart-muted") === "true",
+      () => EMBED || localStorage.getItem("heart-muted") === "true",
     ),
     [imageBusy, setImageBusy] = useState(false),
     [imageStatus, setImageStatus] = useState<
@@ -85,6 +90,8 @@ export default function App({
     [readLength, setReadLength] = useState(0),
     [loveAssistant, setLoveAssistant] = useState(false),
     [loveMessage, setLoveMessage] = useState(0);
+  const [preview, setPreview] = useState<PreviewScene>({ scene: "invitation", sub: null });
+  const flow = EMBED ? previewFlow(preview, content, realFlow) : realFlow;
   const operation = useRef(false),
     imageOperation = useRef(false),
     demoUntil = useRef(Date.now() + 5 * 86400000),
@@ -125,6 +132,27 @@ export default function App({
     }
     previousScene.current = scene;
   }, [scene, editing, storyApp, openWindow, hideWindow]);
+  useEffect(() => {
+    if (!EMBED) return;
+    (window as unknown as { __ez: unknown }).__ez = {
+      show: (s: string, sub?: number | null) => setPreview({ scene: s, sub: Number.isInteger(sub) ? (sub as number) : null }),
+      setContent: (c: Content) => setContent(c),
+      reframe() {},
+      dpr() {},
+    };
+  }, []);
+  useEffect(() => {
+    if (!EMBED) return;
+    const stories = ["invitation", "mail", "plan"] as AppId[];
+    if (preview.scene === "music") {
+      for (const id of stories) hideWindow(id);
+      openWindow("music");
+      return;
+    }
+    hideWindow("music");
+    openWindow(storyApp);
+    for (const id of stories) if (id !== storyApp) hideWindow(id);
+  }, [preview, storyApp, openWindow, hideWindow]);
   const launch = (id: AppId) => {
     sound("open", muted);
     openWindow(id);
@@ -235,7 +263,7 @@ export default function App({
   useEffect(() => {
     setReadLength(0);
     if (scene !== "message") return;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (EMBED || matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setReadLength(message.length);
       return;
     }
@@ -551,6 +579,8 @@ export default function App({
         <div className="scene-body game-body">
           <p>{E("gameInstructions")}</p>
           <Game
+            key={EMBED && flow.hearts === 5 ? "won" : "play"}
+            won={EMBED && flow.hearts === 5}
             content={content}
             muted={muted}
             onCount={(count) => dispatch({ type: "hearts", count })}
@@ -1300,8 +1330,9 @@ export default function App({
             <>
               <button
                 onClick={() => {
-                  setEditing(true);
-                  setEditScene(Math.max(1, scenes.indexOf(flow.scene)));
+                  // edited step by step, with the desktop running live beside the words (easy/)
+                  setStartMenu(false);
+                  void import("./easy/open-editor.js").then(({ openCardEditor }) => openCardEditor({ mode: context.mode, id: context.id }));
                 }}
               >
                 Edit Invitation

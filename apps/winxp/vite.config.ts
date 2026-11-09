@@ -8,6 +8,7 @@ export default defineConfig({
     proxy: {
       "/shares": target,
       "/photos": target,
+      "/yt-check": target,
     },
   },
 });
