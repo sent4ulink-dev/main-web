@@ -93,6 +93,11 @@ export const steps = [
     cards: [{ fields: [
       { type: 'textarea', path: 'finalHeading', label: 'Last title', max: 120, rows: 2 },
       { type: 'textarea', path: 'finalClosing', label: 'Last words', max: 240, rows: 2 },
+      // (the messenger picture beside the last words: the same six the card has, shared/emoticons.ts)
+      { type: 'choice', path: 'finalEmoticon', label: 'The emoticon', options: [
+        { value: 'smile', label: '🙂 Smile' }, { value: 'wink', label: '😉 Wink' }, { value: 'love', label: '😍 In love' },
+        { value: 'kiss', label: '😘 Kiss' }, { value: 'cool', label: '😎 Cool' }, { value: 'blush', label: '😊 Blush' },
+      ] },
     ] }],
   },
 ];

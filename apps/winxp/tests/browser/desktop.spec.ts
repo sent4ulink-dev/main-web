@@ -1,12 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
+import { field, goToStep, openStepEditor, preview, saveAndSee } from "./stepEditor";
 
 const invite = "Open An invitation for you ♡";
-async function enterEditor(page: Page) {
-  await page.getByRole("button", { name: "♥ start", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Edit Invitation", exact: true })
-    .click();
-}
 async function fits(page: Page) {
   const bounds = await page
     .locator(".managed-app:visible")
@@ -139,7 +134,7 @@ for (const size of [
   });
 }
 
-test("music and note editors save, disappear, and restore persisted content", async ({
+test("the song and the desktop note set in the editor show in the music player and Notepad", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -151,20 +146,36 @@ test("music and note editors save, disappear, and restore persisted content", as
     }),
   );
   await page.goto("/?share=test");
-  await enterEditor(page);
+  await openStepEditor(page);
+  await goToStep(page, 5);
+  await page.locator('.ez-scroll input[type="url"]').fill("https://youtu.be/dQw4w9WgXcQ");
+  await field(page, "Song title").fill("Our test song");
+  // the preview opens the music player on the desktop, with the song's title
+  await expect(preview(page).locator('[data-app="music"]')).toContainText("Our test song");
+  await goToStep(page, 0);
+  await page.locator(".ez-scroll .ez-more summary").click();
+  await field(page, "The note on the desktop", "textarea").fill(
+    "Good food\nGreat conversation\nYou ♡",
+  );
+  await saveAndSee(page);
+  await expect(page.locator(".ez")).toHaveCount(0);
   await page
-    .locator('[data-app="invitation"]')
-    .getByRole("button", { name: "Minimize window" })
+    .getByRole("button", { name: "Open Notes — Notepad", exact: true })
+    .dblclick();
+  await expect(page.locator(".notes-paper")).toHaveJSProperty(
+    "innerText",
+    "Good food\nGreat conversation\nYou ♡",
+  );
+  await expect(page.locator(".notes-paper .editable")).toHaveCount(0);
+  await fits(page);
+  await page
+    .locator('[data-app="notes"]')
+    .getByRole("button", { name: "Close window" })
     .click();
   await page
     .getByRole("button", { name: "Open Windows Media Player", exact: true })
     .dblclick();
   const music = page.locator('[data-app="music"]');
-  await page
-    .getByLabel("YouTube song link")
-    .fill("https://youtu.be/dQw4w9WgXcQ");
-  await music.getByRole("button", { name: "Save & Play", exact: true }).click();
-  await expect(page.getByLabel("YouTube song link")).toHaveCount(0);
   await expect(music.locator("iframe")).toHaveAttribute(
     "src",
     /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?/,
@@ -173,55 +184,10 @@ test("music and note editors save, disappear, and restore persisted content", as
     "referrerpolicy",
     "strict-origin-when-cross-origin",
   );
-  await expect(music.locator(".wmp-sidebar")).toBeVisible();
-  expect(
-    (await music.locator("iframe").boundingBox())?.width,
-  ).toBeLessThanOrEqual(1);
-  await fits(page);
-  await expect(music).toBeVisible();
-  await music.getByRole("button", { name: "Close window" }).click();
-  await enterEditor(page);
-  await page
-    .locator('[data-app="invitation"]')
-    .getByRole("button", { name: "Minimize window" })
-    .click();
-  await page
-    .getByRole("button", { name: "Open Notes — Notepad", exact: true })
-    .dblclick();
-  await page
-    .getByRole("textbox", { name: "Edit Note text", exact: true })
-    .fill("Good food\nGreat conversation\nYou ♡");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator(".studio-bar")).toHaveCount(0);
-  await expect(page.locator(".notes-paper .editable")).toHaveCount(0);
-  await expect(page.locator(".notes-paper")).toHaveJSProperty(
-    "innerText",
-    "Good food\nGreat conversation\nYou ♡",
-  );
-  await fits(page);
-  await page.reload();
-  await page
-    .getByRole("button", { name: "Open Notes — Notepad", exact: true })
-    .dblclick();
-  await expect(page.locator(".notes-paper")).toHaveJSProperty(
-    "innerText",
-    "Good food\nGreat conversation\nYou ♡",
-  );
-  await page
-    .locator('[data-app="notes"]')
-    .getByRole("button", { name: "Close window" })
-    .click();
-  await page
-    .getByRole("button", { name: "Open Windows Media Player", exact: true })
-    .dblclick();
-  await expect(music.locator("iframe")).toHaveAttribute(
-    "src",
-    /embed\/dQw4w9WgXcQ\?/,
-  );
+  await expect(music).toContainText("Our test song");
   await expect(page.getByLabel("YouTube song link")).toHaveCount(0);
+  await fits(page);
 });
-
 test("touch double-tap opens an app while a single tap selects it", async ({
   browser,
 }) => {

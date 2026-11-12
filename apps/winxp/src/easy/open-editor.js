@@ -3,7 +3,7 @@
 import { openEasyEditor } from './easy-editor.js';
 import { LivePreview } from './live-preview.js';
 import { steps, title, forEditing, forSaving } from './easy-steps.js';
-import { api, apiBase } from '../api';
+import { api, apiBase, ApiError } from '../api';
 import { contentSchema, freshContent } from '../../shared/content';
 import { youtubeId } from '../../shared/youtube';
 import { canEdit } from '../../shared/flow';
@@ -17,7 +17,9 @@ function demoContent() {
   } catch { /* the sample's words */ }
   return freshContent();
 }
-const failed = (e) => new Error(e?.status === 'finalized' || e?.status === 'expired' ? 'This link can no longer be edited.' : 'Couldn’t save. Check your internet and try again.');
+// (the server's own words when it gave a reason; a dropped connection says so plainly)
+const failed = (e) => new Error(e?.status === 'finalized' || e?.status === 'expired' ? 'This link can no longer be edited.'
+  : e instanceof ApiError && e.message ? e.message : 'Couldn’t save. Check your internet and try again.');
 
 export function openCardEditor({ mode, id }) {
   const demo = mode === 'demo';

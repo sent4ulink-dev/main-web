@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { mintShare } from "./mint";
+import { field, openStepEditor, saveAndSee } from "./stepEditor";
 
 test("real Save persists edits; finalization locks the invitation for good", async ({
   page,
@@ -10,21 +11,19 @@ test("real Save persists edits; finalization locks the invitation for good", asy
   await page
     .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
-  await page.getByRole("button", { name: "♥ start", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Edit Invitation", exact: true })
-    .click();
-  await page
-    .getByRole("textbox", { name: "Edit invitation", exact: true })
-    .fill("Saved on the server");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await openStepEditor(page);
+  await field(page, "Question", "textarea").fill("Saved on the server");
+  await saveAndSee(page);
   const record = await (
     await request.get(`http://127.0.0.1:3002/shares/${id}`)
   ).json();
   expect(record.share.content.invitation).toBe("Saved on the server");
   expect(record.share.editUntil - record.share.createdAt).toBe(5 * 86400000);
   expect(record.share.finalized).toBe(false);
-  await expect(page.locator(".studio-bar")).toHaveCount(0);
+  await expect(page.locator(".ez")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
+    .dblclick();
   await expect(page.locator(".invitation-body h1")).toHaveText(
     "Saved on the server",
   );
@@ -62,22 +61,25 @@ test("failed save keeps the editor open and shows the server's error", async ({
 }) => {
   const id = await mintShare(request);
   await page.goto(`/?share=${id}`);
-  await page.getByRole("button", { name: "♥ start", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Edit Invitation", exact: true })
-    .click();
+  await openStepEditor(page);
   await page.route(`**/shares/${id}`, (route) =>
-    route.fulfill({
-      status: 503,
-      contentType: "application/json",
-      body: JSON.stringify({ status: "error", message: "Connection failed" }),
-    }),
+    route.request().method() === "PUT"
+      ? route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ status: "error", message: "Connection failed" }),
+        })
+      : route.continue(),
   );
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".status-error")).toContainText(
-    "Connection failed",
-  );
-  await expect(page.locator(".studio-bar")).toBeVisible();
+  await field(page, "Question", "textarea").fill("Never reaches the server");
+  await page.locator(".ez-pill").last().click();
+  await page.locator('.ez-nav [data-nav="done"]').click();
+  await expect(page.locator(".ez-status")).toContainText("Connection failed");
+  await expect(page.locator(".ez")).toBeVisible();
+  expect(
+    (await (await request.get(`http://127.0.0.1:3002/shares/${id}`)).json())
+      .share.content.invitation,
+  ).not.toBe("Never reaches the server");
 });
 
 test("URL changes isolate modes; missing and disconnected invitations stay unavailable", async ({

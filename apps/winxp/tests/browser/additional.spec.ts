@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { editorFits, goToStep, openStepEditor } from "./stepEditor";
 test("expired demo edit countdown disappears and the start menu still allows editing", async ({
   page,
 }) => {
@@ -9,7 +10,7 @@ test("expired demo edit countdown disappears and the start menu still allows edi
     .dblclick();
   await expect(page.locator(".scene-invitation")).toBeVisible();
   await page.clock.fastForward(5 * 86400000 + 1000);
-  await expect(page.locator(".studio-bar")).toHaveCount(0);
+  await expect(page.locator(".ez")).toHaveCount(0);
   await page.getByRole("button", { name: "♥ start", exact: true }).click();
   await expect(page.locator(".start-menu header small")).toHaveText(
     "Editing time ended",
@@ -20,7 +21,7 @@ test("expired demo edit countdown disappears and the start menu still allows edi
     "Reset demonstration",
   ]);
 });
-test("touch editor remains inline and usable across all screens at 320px", async ({
+test("touch editor fits and can be typed in on every step at 320px", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
@@ -29,32 +30,26 @@ test("touch editor remains inline and usable across all screens at 320px", async
     .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(page.locator(".scene-invitation")).toBeVisible();
-  await page.getByRole("button", { name: "♥ start", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Edit Invitation", exact: true })
-    .click();
-  for (let scene = 1; scene < 11; scene++) {
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-    const toolbar = await page.locator(".studio-bar").boundingBox(),
-      window = await page.locator(".main-window").boundingBox();
-    expect(window!.y).toBeGreaterThanOrEqual(toolbar!.y + toolbar!.height);
-    const field = page.locator(".main-window .editable").first();
-    await field.click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(field).toHaveAttribute("contenteditable", "true");
-    const before = await field.boundingBox();
-    await field.press("End");
-    await field.pressSequentially(" ♡");
-    const after = await field.boundingBox();
+  await openStepEditor(page);
+  for (let step = 0; step < 8; step++) {
+    await goToStep(page, step);
+    await editorFits(page);
+    const box = page
+      .locator(".ez-scroll .ez-f")
+      .locator("input:not([type=file]), textarea")
+      .first();
+    await box.click();
+    await expect(page.getByRole("dialog", { name: "Edit the card" })).toBeVisible();
+    const before = await box.boundingBox();
+    // (to the very end of the words: in a wrapped box the End key only reaches the end of the line)
+    await box.evaluate((element: HTMLInputElement | HTMLTextAreaElement) => {
+      if (element.type !== "url") element.setSelectionRange(element.value.length, element.value.length);
+    });
+    await box.pressSequentially(" ♡");
+    await expect(box).toHaveValue(/♡$/);
+    const after = await box.boundingBox();
     expect(after!.x).toBeCloseTo(before!.x, 0);
-    if (scene < 10)
-      await page
-        .getByRole("button", { name: "Next Screen", exact: true })
-        .click();
+    expect(after!.x + after!.width).toBeLessThanOrEqual(321);
   }
 });
 test("backend photo endpoint accepts the actual Canvas PNG and serves the same bytes", async ({

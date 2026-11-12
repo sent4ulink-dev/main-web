@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs/promises";
 import { freshContent } from "../../shared/content";
 import { mintShare } from "./mint";
+import { editorFits, field, goToStep, openStepEditor, preview, saveAndSee } from "./stepEditor";
 async function noOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -31,8 +32,11 @@ async function enterEditor(page: Page) {
   await page
     .getByRole("button", { name: "Edit Invitation", exact: true })
     .click();
+  // the step editor, with the desktop running live beside it
+  await expect(page.locator(".ez-live.ready")).toBeVisible({ timeout: 60000 });
 }
-async function play(page: Page, url = "/?share=test") {
+// From the desktop to the calendar: the invitation, the No/Yes buttons, the game and an activity.
+async function playToCalendar(page: Page, url = "/?share=test") {
   await page.goto(url);
   await page
     .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
@@ -84,6 +88,9 @@ async function play(page: Page, url = "/?share=test") {
     .getByRole("button", { name: "Confirm →", exact: true })
     .click();
   await expect(page.locator(".calendar")).toBeVisible();
+}
+async function play(page: Page, url = "/?share=test") {
+  await playToCalendar(page, url);
   await page.getByRole("button", { name: "Next month", exact: true }).click();
   await page.locator(".calendar-grid button").first().click();
   await page.locator("select").selectOption("18:30");
@@ -197,12 +204,10 @@ for (const [width, height] of sizes)
       page.getByRole("button", { name: "✓ Ready · Share again" }),
     ).toBeVisible();
     await noOverflow(page);
-    await expect(page.locator(".studio-bar")).toHaveCount(0);
+    await expect(page.locator(".ez")).toHaveCount(0);
     await enterEditor(page);
-    const bar = await page.locator(".studio-bar").boundingBox(),
-      window = await page.locator(".main-window").boundingBox();
-    expect(window!.y).toBeGreaterThan(bar!.y + bar!.height);
-    await noOverflow(page);
+    await editorFits(page);
+    await expect(preview(page).locator(".scene-invitation")).toBeVisible();
     await page.screenshot({
       path: `artifacts/screenshots/editor-${width}.png`,
       fullPage: true,
@@ -210,62 +215,49 @@ for (const [width, height] of sizes)
     expect(backend).toEqual([]);
     expect(errors).toEqual([]);
   });
-test("emoticons save inline, survive reload, and appear in the confirmed card", async ({
+test("the emoticon is chosen in the editor, survives reload, and appears in the confirmed card", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/?share=test");
   await expect(page.locator(".xp-startup")).toBeHidden();
   await enterEditor(page);
-  for (let i = 1; i < 10; i++)
-    await page
-      .getByRole("button", { name: "Next Screen", exact: true })
-      .click();
-  const picker = page.getByRole("group", { name: "Choose an emoticon" });
-  await expect(picker.getByRole("button")).toHaveCount(6);
-  for (const label of ["Smile", "Wink", "In love", "Kiss", "Cool", "Blush"]) {
-    await picker
-      .getByRole("button", { name: `Choose ${label}`, exact: true })
-      .click();
-    await expect(page.locator(".messenger-avatar img")).toHaveAttribute(
-      "alt",
-      label,
-    );
+  await goToStep(page, 7);
+  const choice = (value: string) =>
+    page.locator(`.ez-scroll [data-ch][data-v="${value}"]`);
+  await expect(page.locator(".ez-scroll [data-ch]")).toHaveCount(6);
+  for (const [value, label] of [
+    ["smile", "Smile"],
+    ["wink", "Wink"],
+    ["love", "In love"],
+    ["kiss", "Kiss"],
+    ["cool", "Cool"],
+    ["blush", "Blush"],
+  ]) {
+    await choice(value).click();
+    await expect(choice(value)).toHaveClass(/\bon\b/);
+    await expect(
+      preview(page).locator(".messenger-avatar img"),
+    ).toHaveAttribute("alt", label);
   }
-  await picker
-    .getByRole("button", { name: "Choose Wink", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await choice("wink").click();
   await page.screenshot({
     path: "artifacts/screenshots/emoticon-editor-320.png",
   });
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".studio-bar")).toHaveCount(0);
+  await saveAndSee(page);
   await play(page);
   await expect(page.locator(".messenger-avatar img")).toHaveAttribute(
     "alt",
     "Wink",
   );
-  await expect(picker).toHaveCount(0);
   await enterEditor(page);
-  await expect(
-    picker.getByRole("button", { name: "Choose Wink", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await picker
-    .getByRole("button", { name: "Choose Cool", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".studio-bar")).toHaveCount(0);
-  await expect(picker).toHaveCount(0);
-  await expect(page.locator(".messenger-avatar img")).toHaveAttribute(
-    "alt",
-    "Cool",
-  );
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await goToStep(page, 7);
+  await expect(choice("wink")).toHaveClass(/\bon\b/);
+  await choice("cool").click();
+  await saveAndSee(page);
   await enterEditor(page);
-  await expect(
-    picker.getByRole("button", { name: "Choose Cool", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await goToStep(page, 7);
+  await expect(choice("cool")).toHaveClass(/\bon\b/);
 });
 test("demo edits persist locally and reset restores defaults", async ({
   page,
@@ -280,60 +272,26 @@ test("demo edits persist locally and reset restores defaults", async ({
     .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
     .dblclick();
   await expect(page.locator(".scene-invitation")).toBeVisible();
-  const beforeEdit = await page
-    .locator(".invitation-body h1 > span")
-    .evaluate((element) => {
-      const style = getComputedStyle(element);
-      const box = element.getBoundingClientRect();
-      return {
-        x: box.x,
-        font: style.font,
-        color: style.color,
-        textAlign: style.textAlign,
-      };
-    });
   await enterEditor(page);
-  await expect(page.locator(".studio-bar button")).toHaveCount(4);
-  for (const label of [
-    "Save",
-    "Previous Screen",
-    "Next Screen",
-    "Permanently finish editing",
-  ])
-    await expect(
-      page.getByRole("button", { name: label, exact: true }),
-    ).toBeVisible();
-  const inlineEditor = page.getByRole("textbox", {
-    name: "Edit invitation",
-    exact: true,
-  });
-  const duringEdit = await inlineEditor.evaluate((element) => {
-    const style = getComputedStyle(element);
-    const box = element.getBoundingClientRect();
-    return {
-      x: box.x,
-      font: style.font,
-      color: style.color,
-      textAlign: style.textAlign,
-    };
-  });
-  expect(duringEdit).toEqual(beforeEdit);
+  const question = field(page, "Question", "textarea");
+  await expect(question).toHaveValue("Will you\ngo on a date with me?");
+  await question.fill("A date with you?");
+  // the desktop in the preview follows as it is typed
+  await expect(preview(page).locator(".invitation-body h1")).toHaveText(
+    "A date with you?",
+  );
+  await saveAndSee(page);
+  await expect(page.locator(".ez")).toHaveCount(0);
   await page
-    .getByRole("textbox", { name: "Edit invitation", exact: true })
-    .fill("A date with you?");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".studio-bar")).toHaveCount(0);
-  await expect(
-    page.getByRole("textbox", { name: "Edit invitation", exact: true }),
-  ).toHaveCount(0);
+    .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
+    .dblclick();
   await expect(page.locator(".invitation-body h1")).toHaveText(
     "A date with you?",
   );
   await enterEditor(page);
-  await expect(
-    page.getByRole("textbox", { name: "Edit invitation", exact: true }),
-  ).toHaveText("A date with you?");
+  await expect(field(page, "Question", "textarea")).toHaveValue(
+    "A date with you?",
+  );
   await page.reload();
   await page
     .getByRole("button", { name: "Open An invitation for you ♡", exact: true })
@@ -360,31 +318,29 @@ test("finalizing a real invitation locks it for good; anyone with the link can s
   const id = await mintShare(request);
   const link = `/?share=${id}`;
   await page.goto(link);
-  await page.getByRole("button", { name: "♥ start", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Edit Invitation", exact: true })
-    .click();
-  await expect(page.locator(".studio-bar button")).toHaveText([
-    "Save",
-    "‹ Previous screen",
-    "Next screen ›",
-    "Permanently finish editing",
-  ]);
-  await page
-    .getByRole("button", {
-      name: "Permanently finish editing",
-      exact: true,
-    })
-    .click();
-  await expect(page.getByRole("dialog")).toContainText(
-    "You will not be able to edit this invitation again.",
+  await openStepEditor(page);
+  await goToStep(page, 7);
+  await expect(page.locator(".ez-scroll")).toContainText(
+    "You can edit this link until",
   );
-  await page
-    .getByRole("button", { name: "Yes, Finish Permanently", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator(".studio-bar")).toHaveCount(0);
-  await page.reload();
+  await expect(page.locator(".ez-copy input")).toHaveValue(
+    new RegExp(`\\?share=${id}$`),
+  );
+  await page.locator('.ez-scroll [data-end="finish"]').click();
+  await expect(page.locator(".ez-sheet")).toContainText(
+    "it can’t be edited again",
+  );
+  await page.locator('.ez-sheet [data-s="no"]').click();
+  await expect(page.locator(".ez-sheet")).toHaveCount(0);
+  expect(
+    (await (await request.get(`http://127.0.0.1:3002/shares/${id}`)).json())
+      .share.finalized,
+  ).toBe(false);
+  await page.locator('.ez-scroll [data-end="finish"]').click();
+  await Promise.all([
+    page.waitForNavigation(),
+    page.locator('.ez-sheet [data-s="yes"]').click(),
+  ]);
   await page.getByRole("button", { name: "♥ start", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Edit Invitation", exact: true }),
@@ -403,16 +359,14 @@ test("finalizing a real invitation locks it for good; anyone with the link can s
     ).status(),
   ).toBe(409);
 });
-test("date navigation crosses year boundaries, back preserves selections, changing activity clears place", async ({
+test("date navigation crosses year boundaries and keeps the chosen time", async ({
   page,
 }) => {
-  await play(page);
-  await enterEditor(page);
-  for (let i = 0; i < 4; i++)
-    await page
-      .getByRole("button", { name: "Previous Screen", exact: true })
-      .click();
-  await expect(page.locator(".calendar")).toBeVisible();
+  await playToCalendar(page);
+  // (the first days of this month may be past already)
+  await page.getByRole("button", { name: "Next month", exact: true }).click();
+  await page.locator(".calendar-grid button").first().click();
+  await page.locator("select").selectOption("18:30");
   const value = await page.locator("select").inputValue();
   const original = await page.locator(".calendar-head strong").innerText();
   for (let i = 0; i < 12; i++)
@@ -507,12 +461,22 @@ test("canvas is deterministic, uses plan text, has PNG signature, and missing as
   await expect(page.getByRole("alert")).toContainText(
     "Wallpaper could not be loaded",
   );
+  // words changed in the editor afterwards don't change the plan already confirmed on this page
   await enterEditor(page);
-  await page
-    .getByRole("textbox", { name: "Edit finalTitle", exact: true })
-    .fill("A title for the next invitation");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await goToStep(page, 7);
+  await field(page, "Last title", "textarea").fill("A title for the next invitation");
+  await expect(
+    preview(page).locator(".scene-final"),
+  ).toContainText("A title for the next invitation");
+  await expect(page.locator(".main-window .window-title")).toHaveText(
+    confirmedTitle,
+  );
   expect(confirmedTitle).not.toBe("A title for the next invitation");
+  expect(
+    await page
+      .getByRole("link", { name: "✉ Send by Message" })
+      .getAttribute("href"),
+  ).toBe(confirmedSms);
   expect(confirmedSms).toContain("sms:");
 });
 
