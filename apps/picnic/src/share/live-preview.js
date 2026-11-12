@@ -3,6 +3,13 @@
 // scaled down to fit the dock; on a small dock it zooms in on the part the step is about. It is a look, not a
 // place to tap: the editor drives it (embed.js is the card's side).
 const DEVICES = { phone: { w: 390, h: 844 }, computer: { w: 1280, h: 800 } };
+// The card in the frame is drawn at one modest sharpness and its lightest quality, both set before it starts and never
+// changed while it runs. A 3D card re-sized while it runs throws away its large drawing buffers and makes new ones; a
+// phone's keyboard opening and closing re-sized it every time, and phones (iPhones above all, which are slow to give
+// that memory back) ran out of memory: the page reloaded, then crashed. The frame is shown scaled down, so 1 pixel per
+// point is as sharp as it looks anyway. (Cards without these settings ignore them.)
+const PREVIEW = { dpr: '1', q: '0' };
+const lite = (src) => { const u = new URL(src, location.href); for (const [k, v] of Object.entries(PREVIEW)) u.searchParams.set(k, v); return u.href; };
 
 export class LivePreview {
   constructor({ src, device = innerWidth < 900 ? 'phone' : 'computer' }) {
@@ -11,9 +18,9 @@ export class LivePreview {
     this.el.className = 'ez-live';
     this.el.innerHTML = '<iframe title="Live preview of the card" tabindex="-1" aria-hidden="true"></iframe><div class="ez-live-wait">Setting up the picnic for the preview…</div>';
     this.frame = this.el.querySelector('iframe');
-    this.api = null; this.want = null; this.content = null; this._dpr = 0;
+    this.api = null; this.want = null; this.content = null;
     this._size();
-    this.frame.src = src;
+    this.frame.src = lite(src);
     this._waitForCard();
   }
 
@@ -27,7 +34,6 @@ export class LivePreview {
         this.api = api; this.el.classList.add('ready');
         if (this.content) api.setContent(this.content);
         if (this.want) api.show(this.want.scene, this.want.sub);
-        this._applyDpr();
         return;
       }
       if (Date.now() - t0 > 120000) { this.el.querySelector('.ez-live-wait').textContent = 'The preview couldn’t start. Your words are still saved.'; return; }
@@ -64,13 +70,6 @@ export class LivePreview {
     this.el.style.width = `${Math.round(rw * s)}px`; this.el.style.height = `${Math.round(rh * s)}px`;
     this.frame.style.transform = `translate(${(-D.w * r.x * s) / 100}px, ${(-D.h * r.y * s) / 100}px) scale(${s})`;
     this.scale = s;
-    this._applyDpr();
-  }
-  /** Drawn only as sharp as it is shown (a scaled-down frame needs fewer pixels: lighter on the phone). */
-  _applyDpr() {
-    if (!this.api || !this.scale) return;
-    const v = Math.round(Math.min(2, Math.max(0.75, this.scale * (devicePixelRatio || 1))) * 4) / 4;
-    if (v !== this._dpr) { this._dpr = v; this.api.dpr(v); }
   }
 
   dispose() { this.disposed = true; clearTimeout(this._t); this.api = null; this.frame.src = 'about:blank'; this.el.remove(); }

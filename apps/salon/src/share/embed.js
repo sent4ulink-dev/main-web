@@ -94,11 +94,19 @@ export function startPreview({ R, story, ui, o, content, apply, director, captur
   }
 
   /** "Save the picture", as it would come out now: the evening from the painter's place, with the words round it. */
+  // The 3D snapshot is taken again only when something it shows has changed: typing the picture's own words (share.*)
+  // just redraws them over the same snapshot. (Each snapshot briefly re-sizes the card's drawing buffers, which a phone
+  // can't afford after every pause in typing.)
+  let snap = null;
   async function picture() {
     story._ensureStars();   // (the name always hangs in the stars at the end)
-    const { pos, look } = story.painterPose;
-    const quat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, look, new THREE.Vector3(0, 1, 0)));
-    const shot = await capture({ pos: pos.clone(), quat }, PAINT_FOV, 1024);
+    const key = JSON.stringify({ ...content, share: null });
+    if (snap?.key !== key) {
+      const { pos, look } = story.painterPose;
+      const quat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, look, new THREE.Vector3(0, 1, 0)));
+      snap = { key, shot: await capture({ pos: pos.clone(), quat }, PAINT_FOV, 1024) };
+    }
+    const shot = snap.shot;
     const cv = await drawStoryImage({ photo: shot, content, base: import.meta.env.BASE_URL });
     return new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.85));
   }

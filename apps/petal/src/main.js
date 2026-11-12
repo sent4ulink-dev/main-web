@@ -757,6 +757,7 @@ Promise.all([import("./world/stage.js"), loadContent(), shareId && !demo ? loadS
       // Who you play is the invitation's own; it is chosen in edit mode only.
       character: content.character,
       chooseCharacter: () => Boolean(editMode),
+      preview: EMBED,
       makerTools,
       onCharacter: (who) => {
         content.character = who;

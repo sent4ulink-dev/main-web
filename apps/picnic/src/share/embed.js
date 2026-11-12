@@ -93,8 +93,14 @@ export function startPreview({ R, story, ui, o, content, apply, director, camera
   }
 
   /** "Save image", as it would come out now: the scene in view, with the words round it. */
+  // The 3D snapshot is taken again only when something it shows has changed: typing the picture's own words (share.*)
+  // just redraws them over the same snapshot. (Each snapshot briefly re-sizes the card's drawing buffers, which a phone
+  // can't afford after every pause in typing.)
+  let snap = null;
   async function picture() {
-    const shot = await capture({ pos: camera.position.clone(), quat: camera.quaternion.clone() }, camera.fov, 1024);
+    const key = JSON.stringify([{ ...content, share: null }, camera.position.toArray().map((v) => v.toFixed(2))]);
+    if (snap?.key !== key) snap = { key, shot: await capture({ pos: camera.position.clone(), quat: camera.quaternion.clone() }, camera.fov, 1024) };
+    const shot = snap.shot;
     const cv = await drawStoryImage({ photo: shot, content, base: import.meta.env.BASE_URL });
     return new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.85));
   }

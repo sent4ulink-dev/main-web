@@ -103,14 +103,23 @@ export function startPreview({ R, story, ui, o, content, apply, director, captur
   }
 
   /** The saved picture, as it would come out now: the last shot through the scope, on the courtyard at dusk. */
+  // The 3D snapshots are taken again only when something they show has changed: typing the picture's own words
+  // (share.*) just redraws them over the same snapshots. (Each snapshot briefly re-sizes the card's drawing buffers,
+  // which a phone can't afford after every pause in typing.)
+  let snap = null;
   async function picture() {
     if (o.spray.state !== 'done') o.spray.complete();   // (the name is always on the wall at the end)
-    const { pos, look } = o.sniper.eyePose(), up = V(0, 1, 0);
-    o.sniper.setVisible(false);
-    const shot = await capture({ pos: pos.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, look, up)) }, SCOPE_FOV, 1024);
-    o.sniper.setVisible(true);
-    const bp = V(2.3, 0.95, 4.4), bl = V(-1.9, 2.5, -5.2);   // (the same backdrop as story.js's captureMoment)
-    const bg = await capture({ pos: bp, quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(bp, bl, up)) }, 62, { w: 540, h: 960 });
+    const key = JSON.stringify({ ...content, share: null });
+    if (snap?.key !== key) {
+      const { pos, look } = o.sniper.eyePose(), up = V(0, 1, 0);
+      o.sniper.setVisible(false);
+      const shot = await capture({ pos: pos.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, look, up)) }, SCOPE_FOV, 1024);
+      o.sniper.setVisible(true);
+      const bp = V(2.3, 0.95, 4.4), bl = V(-1.9, 2.5, -5.2);   // (the same backdrop as story.js's captureMoment)
+      const bg = await capture({ pos: bp, quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(bp, bl, up)) }, 62, { w: 540, h: 960 });
+      snap = { key, shot, bg };
+    }
+    const { shot, bg } = snap;
     const cv = await drawStoryImage({ photo: shot, bg, content, base: import.meta.env.BASE_URL });
     return new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.85));
   }

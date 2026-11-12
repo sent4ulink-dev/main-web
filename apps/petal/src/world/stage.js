@@ -94,6 +94,7 @@ export async function createGrove(
     onDance = () => {}, // a dance on the Music Isle begins (from a tap)
     character = null, // who you play ("girl" or "boy"); null: as last time
     chooseCharacter = false, // may you choose who you play (edit mode only); a function when it changes
+    preview = false, // the step editor's live preview: drawn light and at one fixed sharpness (app/easy/live-preview.js)
     makerTools = () => true, // the island map: only while the invitation can still be edited
     onCharacter = () => {}, // you chose
     onPlanReady = () => {}, // the dance at the keepsake book is over: the plan is set
@@ -109,7 +110,8 @@ export async function createGrove(
   const lowPower = Boolean(mobile || coarsePhone || (navigator.deviceMemory && navigator.deviceMemory <= 4));
   // The most beautiful picture the device can hold (no setting for it): the
   // frame governor below steps down if it struggles.
-  const quality = detectTier({ phone: mobile || coarsePhone, memory: navigator.deviceMemory, cores: navigator.hardwareConcurrency });
+  // (the step editor's preview: the lightest tier, so a phone holding the editor too doesn't run out of memory)
+  const quality = preview ? "low" : detectTier({ phone: mobile || coarsePhone, memory: navigator.deviceMemory, cores: navigator.hardwareConcurrency });
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -119,7 +121,8 @@ export async function createGrove(
   });
   // Adaptive resolution: start sharp (a phone gets a 1080p-class picture; see
   // core/sharpness.js), then trade pixels for frame rate if needed.
-  const sharpest = () => sharpestRatio(quality, { dpr: devicePixelRatio || 1, width, height });
+  // (the preview keeps 1 pixel per point for good: re-sizing the drawing buffers while it runs is what ran phones out of memory)
+  const sharpest = () => (preview ? 1 : sharpestRatio(quality, { dpr: devicePixelRatio || 1, width, height }));
   let maxPixelRatio = sharpest();
   let pixelRatio = maxPixelRatio;
   renderer.setPixelRatio(pixelRatio);
@@ -858,7 +861,7 @@ export async function createGrove(
     renderer.setSize(width, height, false);
   }
   function governFrameRate(dt) {
-    if (document.hidden || dt > 0.6) return; // ignore tab switches, not slow frames
+    if (preview || document.hidden || dt > 0.6) return; // ignore tab switches, not slow frames (and never touch the preview)
     pace += (dt - pace) * (dt < pace ? 0.25 : 0.02);
     const budget = frameCap ? 1 / 26 : Math.max(1 / 50, pace * 1.5);
     if (dt > budget) { slowTime += dt; fastTime = 0; } else { fastTime += dt; slowTime = Math.max(0, slowTime - dt * 0.5); }

@@ -117,8 +117,18 @@ export function startPreview({ R, story, ui, o, content, apply, director, captur
   }
 
   /** The saved photo, as it would come out now: the view through the old camera (a ghost creeps in), on the poster. */
+  // The 3D snapshots are taken again only when something they show has changed: typing the photo's own words
+  // (share.*) just redraws them over the same snapshots. (Each snapshot briefly re-sizes the card's drawing buffers,
+  // which a phone can't afford after every pause in typing.)
+  let snap = null;
   async function picture() {
     if (!o.carving.carved) o.carving.complete();   // (the name is always carved at the end)
+    const key = JSON.stringify({ ...content, share: null });
+    if (snap?.key !== key) snap = { key, ...await snapshots() };
+    const cv = await drawStoryImage({ photo: snap.shot, bg: snap.bg, content, base: import.meta.env.BASE_URL });
+    return new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.85));
+  }
+  async function snapshots() {
     const cam = o.spirit, { pos, look } = cam.eyePose(), up = V(0, 1, 0);
     const pose = { pos: pos.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, look, up)) };
     cam.photobomb(true, pose);
@@ -133,8 +143,7 @@ export function startPreview({ R, story, ui, o, content, apply, director, captur
     story.posers.show(false);
     hidden.forEach((x) => { x.visible = true; });
     bg.moon = story.posterMoon(poster);
-    const cv = await drawStoryImage({ photo: shot, bg, content, base: import.meta.env.BASE_URL });
-    return new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.85));
+    return { shot, bg };
   }
 
   ui._fillIntro();
