@@ -405,7 +405,7 @@ function initMenu(){
 const REVIEWS_URL = 'assets/data/reviews.json';
 const PENDING_KEY = 'sent4u.reviews.pending';   // reviews this visitor sent, kept in their own browser until they appear in reviews.json
 const LAST_SENT_KEY = 'sent4u.reviews.lastSent';
-const REVIEW_TOOLS = { Send: '#7c5cff', Pixel: '#8fb84a', Pinky: '#ff2e7e', WinXP: '#3d8bff', 'Petal Isle': '#f08fb0', Picnic: '#e8843c', Heritage: '#b0314f', Salon: '#b0314f', Mission: '#d9a441', Halloween: '#8a5cff', 'Halloween Night': '#ff7a1a', Marketplace: '#5ce1ff' };   // Salon: Heritage's old name, for reviews written before the rename
+const REVIEW_TOOLS = { Send: '#7c5cff', Pixel: '#8fb84a', Pinky: '#ff2e7e', WinXP: '#3d8bff', 'Petal Isle': '#f08fb0', Picnic: '#e8843c', Heritage: '#b0314f', Salon: '#b0314f', Mission: '#d9a441', Halloween: '#8a5cff', 'Halloween Night': '#ff7a1a', Thanksgiving: '#d2691e', Marketplace: '#5ce1ff' };   // Salon: Heritage's old name, for reviews written before the rename
 
 const pendingStore = {
   read(){ try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; } },
@@ -1439,11 +1439,10 @@ function initSnake(){
 
 /* ---------------- The app: pinned phone driven by scroll ----------------
    One tall track with a sticky stage; scroll progress p (0..1) drives everything.
-     0   → .28   the phone rises between a split headline · tool pills burst out on dashed "signal" lines
-     .28 → 1     the pills dock along the bottom as the nav · the phone sways, its screen slides to the next
-                 tool, the backdrop colour and the giant word behind it change with each tool
-   A slide's length is its data-span (in units of a normal slide): the spotlight, Halloween Night, plays its five chapters on the
-   phone while the haunted hill behind it acts each one out (the gate opens, the letter flies in, the pumpkins light, the stones rise). */
+     0   → .28   the phone rises between a split headline · the card's chapters burst out of it as pills on dashed "signal" lines
+     .28 → 1     the pills dock along the bottom as the nav · the phone plays Thanksgiving chapter by chapter (the real card, one
+                 still per chapter) while the autumn farm behind it acts each one out: the farmhouse lights up and its door opens,
+                 the string lights come on, a turkey pops up and fans its tail, a football flies over, the camera flashes. */
 function initPhoneSection(){
   const track = document.getElementById('phoneTrack');
   if (!track) return;
@@ -1451,13 +1450,10 @@ function initPhoneSection(){
   const $$ = s => [...track.querySelectorAll(s)];
   const sticky = $('#phoneSticky'), phone = $('#phone'), intro = $('#phoneIntro'), ringCopy = $('#phoneRingCopy');
   const linksEl = $('#phoneLinks'), lines = $$('#phoneLinks line');
-  const idle = $('.pscreen.idle'), idleLogo = $('.idle-logo');
-  const glowWhite = $('.phone-glow:not(.phone-glow-pink)'), glowPink = $('.phone-glow-pink'), gridEl = $('.phone-grid');
-  const pills = $$('.tool-pill'), feats = $$('.pfeature'), screens = $$('.pscreen:not(.idle)'), words = $$('.phone-word');
-  const inner = feats.map(f => f.querySelector('.pf-inner'));
-  const N = feats.length;
-  const slideOf = t => feats.findIndex(f => f.classList.contains(t));
-  const iSpooky = slideOf('t-spooky'), iPixel = slideOf('t-pixel'), iPinky = slideOf('t-pinky');
+  const idle = $('.pscreen.idle'), idleLogo = $('.idle-logo'), glow = $('.phone-glow');
+  const pills = $$('.tool-pill'), feat = $('.pfeature'), screen = $('.pscreen.s-tg'), word = $('.phone-word');
+  const inner = feat.querySelector('.pf-inner'), shots = $$('.s-tg img');
+  const CH = pills.length;   // the card's chapters, a pill each
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
   const lerp = (a, b, t) => a + (b - a) * t;
   const smooth = t => t * t * (3 - 2 * t);
@@ -1469,10 +1465,8 @@ function initPhoneSection(){
   window.addEventListener('sent4u:lite', () => { flat = true; });
   const wordsBox = $('.phone-words');
 
-  // backdrop: one saturated tint per tool, blended as the phone swings between them
-  const TINTS = ['#3d2bd6', '#1a0d30', '#9bb477', '#0b0508', '#2a7bde'].map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))); // send · Halloween Night · Pixel · Pinky · WinXP
-  const STATUS_INK = ['#fff', '#fff', '#20351b', '#fff', '#fff']; // phone status-bar colour per screen
-  const BASE = [13, 10, 36], DARK = [8, 8, 12];
+  // backdrop: the intro's navy, turning to Thanksgiving's dusk plum as the card comes on
+  const BASE = [13, 10, 36], TINT = [42, 21, 56], DARK = [8, 8, 12];
   const mix = (a, b, t) => a.map((v, i) => Math.round(lerp(v, b[i], t)));
 
   // phone body: a stack of rounded-rect layers between the front and back faces
@@ -1496,206 +1490,150 @@ function initPhoneSection(){
     $('#phonePlanes').append(svg);
   }
 
-
-  // ---- Pixel screen: the scene is drawn on a 131×281 grid (1 cell = 2px), like the site's own pixel art ----
-  function buildPixelScene(svg){
-    const ink = [], paper = [], heart = [];
-    const px = (arr, x, y, w = 1, h = 1) => arr.push(`M${x} ${y}h${w}v${h}h${-w}z`);
-    let seed = 7; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
-    const HZ = 180, W = 131;
-
-    // sky: stars, two "+" sparkles, a crescent moon, a dithered cloud
-    [[6, 92], [124, 88], [8, 128], [122, 122], [100, 70], [18, 64], [116, 104]].forEach(([x, y]) => px(ink, x, y));
-    [[14, 100], [112, 76]].forEach(([x, y]) => { px(ink, x, y - 2, 1, 5); px(ink, x - 2, y, 5, 1); });
-    for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++){
-      if (x * x + y * y <= 42 && (x - 3) * (x - 3) + (y + 2) * (y + 2) > 36) px(ink, 108 + x, 50 + y);
-    }
-    for (let y = 0; y < 7; y++){
-      const half = Math.round(13 * Math.sqrt(1 - ((6 - y) / 7) ** 2));
-      for (let x = -half; x <= half; x++) if ((x + y) % 2 === 0) px(ink, 104 + x, 118 + y);
-    }
-
-    // dotted arc over the horizon, with a heart on top
-    const cx = 65, cy = 178, R = 24;
-    for (let a = 0; a <= Math.PI; a += 0.045){
-      const x = Math.round(cx + R * Math.cos(a)), y = Math.round(cy - R * Math.sin(a));
-      if (((x + y) & 1) === 0) px(ink, x, y);
-    }
-    ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'].forEach((row, r) => {
-      [...row].forEach((ch, c) => { if (ch === '#') px(heart, 62 + c, 146 + r); });
-    });
-
-    // skyline on the left (windows are paper-coloured holes), a hill with a tower on the right
-    [[0, 9, 46], [9, 7, 60], [16, 9, 34], [25, 6, 52], [31, 10, 40], [41, 7, 28]].forEach(([x, w, h]) => {
-      px(ink, x, HZ - h, w, h);
-      if (h > 44) px(ink, x + (w >> 1), HZ - h - 5, 1, 5);
-      for (let wx = x + 1; wx < x + w - 1; wx += 3) for (let wy = HZ - h + 3; wy < HZ - 4; wy += 4) px(paper, wx, wy, 1, 2);
-    });
-    const hillTop = x => HZ - Math.round(4 + 26 * Math.pow((x - 84) / 46, 1.4));
-    for (let x = 84; x < W; x++) px(ink, x, hillTop(x), 1, HZ - hillTop(x));
-    px(ink, 120, hillTop(120) - 14, 2, 14); px(ink, 118, hillTop(120) - 17, 6, 3);
-    for (let i = 0; i < 14; i++){ const x = 88 + Math.floor(rnd() * 40); px(paper, x, hillTop(x) + 3 + Math.floor(rnd() * 12), 1, 1); }
-
-    // horizon, water dashes, pier
-    px(ink, 0, HZ, W, 1);
-    for (let y = HZ + 5, r = 0; y <= 244; y += 5, r++){
-      let x = Math.floor(rnd() * 14);
-      while (x < W){
-        const len = 3 + Math.floor(rnd() * (6 + r * 0.3));
-        const busy = y > 208 && y < 240 && x + len > 34 && x < 96; // keep the pier and the cats readable
-        if (!busy) px(ink, x, y, Math.min(len, W - x), 1);
-        x += len + 6 + Math.floor(rnd() * 14);
-      }
-    }
-    px(ink, 12, 236, 107, 3); px(ink, 14, 226, 4, 22); px(ink, 113, 226, 4, 22);
-
-    // two cats on the pier: one outlined, one solid, tails curling outward
-    const CAT = ['..#........#..', '..##......##..', '..##########..', '.############.', '.############.', '.############.', '..##########..', '...########...',
-                 '..##########..', '.############.', '.############.', '##############', '##############', '##############', '##############', '.############.', '..##########..'];
-    const isCat = (r, c) => CAT[r] && CAT[r][c] === '#';
-    const cat = (ox, oy, outline) => CAT.forEach((row, r) => [...row].forEach((ch, c) => {
-      if (ch !== '#') return;
-      if (!outline || !(isCat(r - 1, c) && isCat(r + 1, c) && isCat(r, c - 1) && isCat(r, c + 1))) px(ink, ox + c, oy + r);
-    }));
-    cat(44, 219, true); cat(64, 219, false);
-    [[78, 233], [79, 233], [80, 232], [80, 231], [80, 230], [79, 229]].forEach(([x, y]) => px(ink, x, y));
-    [[43, 233], [42, 233], [41, 232], [41, 231], [41, 230], [42, 229]].forEach(([x, y]) => px(ink, x, y));
-
-    svg.querySelector('.px-ink').setAttribute('d', ink.join(''));
-    svg.querySelector('.px-paper').setAttribute('d', paper.join(''));
-    svg.querySelector('.px-heart').setAttribute('d', heart.join(''));
-  }
-  const pxScene = $('.px-scene');
-  if (pxScene) buildPixelScene(pxScene);
-
-  // ---- Halloween Night: the haunted hill behind the phone, drawn from the card's own things ----
-  const spooky = document.getElementById('phoneSpooky');
-  const spBats = [], spSparks = [];
-  function buildSpookyScene(root){
-    let seed = 31; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  // ---- Thanksgiving: the autumn farm behind the phone, drawn from the card's own things ----
+  const tg = document.getElementById('phoneTg');
+  const leaves = [], burst = [];
+  const LEAF_COLORS = ['#e8742a', '#c8401f', '#f2b33d', '#d2691e', '#a8321e'];
+  const MAPLE = '<path d="M12 1.5l2 4.4 3.2-1.5-.6 4.4 4.4-.5-2.3 3.3 2.9 1.9-4.4 1.4 1.1 3.3-4.2-1.4-.4 6.7h-1.4l-.4-6.7-4.2 1.4 1.1-3.3-4.4-1.4 2.9-1.9-2.3-3.3 4.4.5-.6-4.4L10 5.9z"/>';
+  const OVAL = '<path d="M12 2C5 8 5 16 12 22c7-6 7-14 0-20z"/><path class="vein" d="M12 4v17"/>';
+  function buildTgScene(root){
+    let seed = 11; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
     // stars: two twinkling layers of box-shadow dots in the upper sky
-    const starsA = root.querySelector('.sp-stars'), starsB = starsA.cloneNode(); starsB.classList.add('b'); starsA.after(starsB);
+    const starsA = root.querySelector('.tg-stars'), starsB = starsA.cloneNode(); starsB.classList.add('b'); starsA.after(starsB);
     for (const layer of [starsA, starsB]){
-      layer.style.boxShadow = Array.from({ length: 34 }, () =>
-        `${(rnd() * 100).toFixed(1)}vw ${(rnd() * 58).toFixed(1)}vh 0 ${rnd() < 0.2 ? 1 : 0}px rgba(255,248,230,${(0.35 + rnd() * 0.6).toFixed(2)})`).join(',');
+      layer.style.boxShadow = Array.from({ length: 26 }, () =>
+        `${(rnd() * 100).toFixed(1)}vw ${(rnd() * 46).toFixed(1)}vh 0 ${rnd() < 0.2 ? 1 : 0}px rgba(255,236,210,${(0.3 + rnd() * 0.6).toFixed(2)})`).join(',');
     }
-    // a jack-o'-lantern; k = which --k<k> lights its face
-    const face = 'M-17 -30l6-9 6 9zM5 -30l6-9 6 9zM-3 -24l3-5 3 5zM-19 -15q19 12 38 0l-4 7-5-4-5 5-5-5-5 4-5-4z';
-    const pumpkin = (x, y, s, k, gid) => `<g transform="translate(${x} ${y}) scale(${s})">
-      <g style="opacity:calc(var(--k${k},0) * .95)"><circle class="sp-pk-glow" cx="0" cy="-24" r="66" fill="url(#${gid})"/></g>
-      <ellipse class="sp-pk-rib" cx="-17" cy="-24" rx="22" ry="24"/><ellipse class="sp-pk-rib" cx="17" cy="-24" rx="22" ry="24"/>
-      <ellipse class="sp-pk-body" cx="0" cy="-24" rx="21" ry="25"/><path class="sp-pk-stem" d="M-3 -47q2-9 9-12l2 3q-5 3-6 9z"/>
-      <path class="sp-pk-face" d="${face}"/><path class="sp-pk-lit" d="${face}" style="opacity:var(--k${k},0)"/></g>`;
-    const glowDef = gid => `<defs><radialGradient id="${gid}"><stop offset="0" stop-color="#ffb347" stop-opacity=".75"/><stop offset=".45" stop-color="#ff7a1a" stop-opacity=".28"/><stop offset="1" stop-color="#ff7a1a" stop-opacity="0"/></radialGradient></defs>`;
-
-    // left: the haunted house on its hill, a dead tree, the iron fence and the gate, two pumpkins
-    let bars = '';
-    for (let x = 300; x <= 700; x += 22){
-      if (x > 304 && x < 500) continue;   // the gate's gap
-      bars += `M${x} 384V306M${x - 5} 312l5-12 5 12`;
-    }
-    const leaf = (x0, x1) => { let d = `M${x0} 384V318M${x1} 384V318M${x0} 346H${x1}`; for (let x = x0 + 13; x < x1 - 4; x += 13) d += `M${x} 384V${306 + Math.abs(x - 410) * 0.18}`; return d; };
-    root.querySelector('.sp-left').innerHTML = glowDef('spPkL') + `
-      <path class="far" d="M0 232C110 190 240 178 360 214S580 250 700 292V420H0Z"/>
-      <g class="ink"><rect x="122" y="62" width="14" height="44"/><path d="M96 224V130l-12 2 88-64 88 64-12-2v94z"/><path d="M214 134V80h-8l26-46 26 46h-8v54z"/><path d="M62 222h236v8H62z"/></g>
-      <rect class="sp-win" x="116" y="150" width="18" height="24"/><rect class="sp-win g" x="148" y="150" width="18" height="24"/><rect class="sp-win" x="196" y="150" width="18" height="24"/>
-      <rect class="sp-win g" x="226" y="94" width="12" height="18"/><rect class="sp-win" x="116" y="186" width="18" height="20"/><path class="sp-win" d="M160 224v-26a11 11 0 0 1 22 0v26z"/>
-      <path class="ink" d="M24 236c5-40 4-76-4-110-12-6-26-8-40-4 14-4 28-4 38 0-4-20-12-34-24-46 14 10 24 24 28 40 2-22 10-38 24-50-10 16-16 34-15 54 10 30 12 70 6 116z"/>
-      <path class="sp-bars" d="${bars}M296 322H314M506 322H700M296 368H314M506 368H700"/>
-      <g class="ink"><rect x="313" y="282" width="18" height="104"/><rect x="489" y="282" width="18" height="104"/><circle cx="322" cy="276" r="11"/><circle cx="498" cy="276" r="11"/></g>
-      <g class="sp-gl"><path class="sp-bars" d="${leaf(333, 410)}M333 318Q371 296 410 306"/></g>
-      <g class="sp-gr"><path class="sp-bars" d="${leaf(410, 487)}M410 306Q449 296 487 318"/></g>
-      <path class="near" d="M0 376Q340 346 700 382V420H0Z"/>
-      ${pumpkin(84, 412, 1.15, 0, 'spPkL')}${pumpkin(196, 414, 0.78, 1, 'spPkL')}`;
-
-    // right: the crypt with its "31", a dead tree, the four gravestones of the date plan (they rise from the ground), two pumpkins
-    const PLAN = [['19:00', 'Pumpkin carving'], ['20:30', 'Horror movie'], ['22:00', 'Haunted walk'], ['23:30', 'Hot chocolate']];
-    const stones = PLAN.map(([time, what], i) => {
-      const x = 118 + i * 96;
-      return `<g style="transform:translateY(calc((1 - var(--r${i},0)) * 122px))">
-        <path class="sp-stone" d="M${x - 40} 366V296Q${x - 40} 258 ${x} 258Q${x + 40} 258 ${x + 40} 296V366Z"/>
-        <g style="opacity:calc(.25 + var(--r${i},0) * .75)"><text class="sp-time" x="${x}" y="300">${time}</text><text class="sp-what" x="${x}" y="320">${what}</text></g></g>`;
-    }).join('');
-    root.querySelector('.sp-right').innerHTML = glowDef('spPkR') + `
-      <defs><clipPath id="spGround"><rect x="0" y="0" width="700" height="366"/></clipPath></defs>
-      <path class="far" d="M0 300C150 258 320 246 470 270S640 236 700 226V420H0Z"/>
-      <g class="ink"><path d="M476 270V206h108v64z"/><path d="M466 210l64-36 64 36z"/></g><path class="sp-win g" d="M518 270v-26a12 12 0 0 1 24 0v26z"/>
-      <text class="sp-time" x="530" y="200" style="font-size:15px">31</text>
-      <path class="ink" d="M676 300c-6-60-4-120 6-170-16-14-40-20-64-18 22-6 44-4 62 4-10-24-26-40-46-52 24 10 42 28 52 50 6-26 20-46 40-58v40c-12 14-20 32-22 52 8 50 6 100-2 152z"/>
-      <path class="sp-bars" style="stroke-width:2" d="M612 118v26M640 96v20"/><rect class="sp-win" x="603" y="144" width="18" height="14"/><rect class="sp-win" x="632" y="116" width="16" height="12"/>
-      <g clip-path="url(#spGround)">${stones}</g>
-      <path class="near" d="M0 364Q360 348 700 368V420H0Z"/>
-      ${pumpkin(500, 414, 1.05, 2, 'spPkR')}${pumpkin(612, 416, 0.72, 3, 'spPkR')}`;
-
-    // bats: they cross the sky as the slide plays, and scatter at the finale
-    const BAT = '<path class="wl" d="M22 9c-4-6-10-8-21-6 4 2 6 5 6 8 3-2 6-1 8 2 1-3 4-4 7-4z"/><path class="wr" d="M22 9c4-6 10-8 21-6-4 2-6 5-6 8-3-2-6-1-8 2-1-3-4-4-7-4z"/><ellipse cx="22" cy="11" rx="3.2" ry="4.6"/><path d="M19.4 8l.9-3.4 1.3 2.4zM24.6 8l-.9-3.4-1.3 2.4z"/>';
-    for (let i = 0; i < 7; i++){
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', '0 0 44 22'); svg.setAttribute('class', 'sp-bat'); svg.innerHTML = BAT;
-      svg.style.animationDelay = svg.querySelector('.wl').style.animationDelay = svg.querySelector('.wr').style.animationDelay = `${-rnd()}s`;
-      root.querySelector('.sp-bats').append(svg);
-      spBats.push({ el: svg, x0: 1.1 + rnd() * 0.5, y0: 0.08 + rnd() * 0.42, vx: 1.2 + rnd() * 0.9, amp: 8 + rnd() * 18, ph: rnd() * 6, s: 0.6 + rnd() * 0.75 });
-    }
-    // the finale's burst of sparks around the moon
-    const COLORS = ['#ffb347', '#ff7a1a', '#9dff6e', '#fff1c4'];
-    for (let i = 0; i < 18; i++){
+    // string lights across the sky in two swags; each bulb lights when --l passes its own --i
+    const SWAGS = [[[-2, 6], [24, 62], [50, 10]], [[50, 10], [76, 62], [102, 6]]];
+    const BULBS = ['#ffcf6b', '#ff8a4c', '#ffe9a8', '#f25c54'];
+    let n = 0;
+    for (const [a, b, c] of SWAGS) for (let j = 0; j < 8; j++){
+      const s = (j + 0.5) / 8, u = 1 - s;
+      const x = u * u * a[0] + 2 * u * s * b[0] + s * s * c[0], y = u * u * a[1] + 2 * u * s * b[1] + s * s * c[1];
       const el = document.createElement('i');
-      el.style.background = COLORS[i % 4]; el.style.boxShadow = `0 0 10px ${COLORS[i % 4]}`;
-      root.querySelector('.sp-sparks').append(el);
-      const a = (i / 18) * Math.PI * 2 + rnd() * 0.3;
-      spSparks.push({ el, dx: Math.cos(a), dy: Math.sin(a), r: 70 + rnd() * 90 });
+      el.className = 'tg-bulb'; el.innerHTML = '<b></b>';
+      el.style.cssText = `left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--i:${n};--c:${BULBS[n % 4]}`;
+      root.querySelector('.tg-lights').append(el); n++;
+    }
+
+    const pumpkin = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})">
+      <ellipse class="tg-pk-rib" cx="-15" cy="-22" rx="19" ry="21"/><ellipse class="tg-pk-rib" cx="15" cy="-22" rx="19" ry="21"/>
+      <ellipse class="tg-pk" cx="0" cy="-22" rx="18" ry="22"/><path class="tg-pk-stem" d="M-2 -42q1-8 7-10l2 3q-4 2-5 8z"/><path class="tg-pk-leaf" d="M3 -45q9-7 15-1-8 4-15 1z"/></g>`;
+    const hay = (x, y, w, h) => `<rect class="tg-hay" x="${x}" y="${y}" width="${w}" height="${h}" rx="7"/>
+      <path class="tg-hay-l" d="M${x + 7} ${y + h * 0.36}H${x + w - 7}M${x + 7} ${y + h * 0.68}H${x + w - 7}"/><path class="tg-twine" d="M${x + w * 0.28} ${y + 2}v${h - 4}M${x + w * 0.72} ${y + 2}v${h - 4}"/>`;
+    const groundLeaves = (from, to, y0) => Array.from({ length: 14 }, () =>
+      `<ellipse cx="${(from + rnd() * (to - from)).toFixed(0)}" cy="${(y0 + rnd() * 14).toFixed(0)}" rx="${(3 + rnd() * 3).toFixed(1)}" ry="1.8" fill="${LEAF_COLORS[Math.floor(rnd() * 5)]}"/>`).join('');
+
+    // left (the copy's side, kept low): a little red barn on the far hill, the fence, a corn shock, hay bales and pumpkins
+    let fence = '';
+    for (let x = 14; x <= 700; x += 64) fence += `M${x} 388V326`;
+    root.querySelector('.tg-left').innerHTML = `
+      <path class="far" d="M0 300C110 272 230 262 340 274S560 268 700 282V420H0Z"/>
+      <g class="tg-barn"><path d="M524 288V262l21-14 21 14v26z"/><path class="tg-barn-roof" d="M519 264l26-19 26 19-3 2-23-16-23 16z"/></g><rect class="tg-win" x="539" y="270" width="12" height="18"/>
+      <path class="mid" d="M0 362Q320 334 700 358V420H0Z"/>
+      <path class="tg-fence" d="${fence}M0 340H700M0 364H700"/>
+      <g class="tg-corn"><path d="M84 398l22-96h12l22 96z"/><path class="tg-corn-l" d="M112 304l-16-30M112 304l-5-36M112 304l7-34M112 304l18-28M96 398l12-58M128 398l-10-58M112 398v-60"/><path class="tg-twine" d="M98 342h28"/></g>
+      ${hay(380, 346, 110, 50)}${hay(470, 352, 100, 46)}${hay(420, 304, 96, 44)}
+      ${pumpkin(250, 404, 1.15)}${pumpkin(312, 410, 0.74)}${pumpkin(470, 306, 0.66)}${pumpkin(620, 410, 0.9)}
+      <path class="near" d="M0 400Q360 382 700 402V420H0Z"/>${groundLeaves(0, 700, 398)}`;
+
+    // right: the farmhouse (its windows light up, its door opens), a big autumn tree, and a turkey behind a hay bale under it (clear of the docked pills)
+    const FEATHERS = [['-76deg', '#b8323f', '#d9545e'], ['-51deg', '#e8742a', '#f59a52'], ['-25deg', '#f2b33d', '#ffd27a'], ['0deg', '#d2691e', '#ec8f45'],
+                      ['25deg', '#f2b33d', '#ffd27a'], ['51deg', '#e8742a', '#f59a52'], ['76deg', '#b8323f', '#d9545e']];
+    const tail = FEATHERS.map(([a, c, l]) => `<g class="tg-fth" style="--a:${a}"><path fill="${c}" d="M0 0C-15 -16 -17 -48 0 -66C17 -48 15 -16 0 0Z"/><path fill="${l}" d="M0 -8C-7 -18 -8 -42 0 -56C8 -42 7 -18 0 -8Z"/></g>`).join('');
+    const turkey = `<g class="tg-tk">
+      <g transform="translate(0 -40)">${tail}</g>
+      <ellipse class="tg-body" cx="0" cy="-30" rx="24" ry="26"/><ellipse class="tg-belly" cx="0" cy="-24" rx="14" ry="15"/>
+      <path class="tg-wing" d="M-21 -36q-9 13 3 24 5-11-3-24zM21 -36q9 13-3 24-5-11 3-24z"/>
+      <g class="tg-head"><circle class="tg-neck" cx="0" cy="-62" r="13"/>
+        <circle class="tg-eye" cx="-5" cy="-65" r="4.2"/><circle class="tg-eye" cx="5" cy="-65" r="4.2"/><circle class="tg-pupil" cx="-4.2" cy="-64.4" r="2.1"/><circle class="tg-pupil" cx="5.8" cy="-64.4" r="2.1"/>
+        <circle class="tg-cheek" cx="-9.5" cy="-57.5" r="2.6"/><circle class="tg-cheek" cx="9.5" cy="-57.5" r="2.6"/>
+        <path class="tg-beak" d="M-3.4 -59.5h6.8L0 -53.5z"/><path class="tg-wattle" d="M1.6 -56q4.6 3.4 2.2 9.6-4.4.8-4.4-4.4z"/></g></g>`;
+    root.querySelector('.tg-right').innerHTML = `
+      <defs><clipPath id="tgGround"><rect x="0" y="0" width="700" height="392"/></clipPath></defs>
+      <path class="far" d="M0 318C150 292 300 276 440 270S620 262 700 252V420H0Z"/>
+      <path class="tg-trunk" d="M640 384c3-48 1-92-9-134l7-2c6 22 9 44 10 66 6-22 18-38 34-48l4 5c-16 12-26 30-30 52-1 22 0 42 2 61z"/>
+      <g class="tg-crown"><circle cx="602" cy="206" r="50" fill="#d9542a"/><circle cx="664" cy="174" r="58" fill="#e8843c"/><circle cx="694" cy="236" r="46" fill="#c0392b"/>
+        <circle cx="630" cy="146" r="40" fill="#f2b33d"/><circle cx="566" cy="244" r="32" fill="#e8843c"/><circle cx="650" cy="238" r="36" fill="#f2a03d"/></g>
+      <rect class="tg-chimney" x="512" y="190" width="18" height="46"/>
+      <circle class="tg-smoke" cx="521" cy="182" r="7"/><circle class="tg-smoke" cx="521" cy="182" r="7" style="animation-delay:-1.5s"/><circle class="tg-smoke" cx="521" cy="182" r="7" style="animation-delay:-3s"/>
+      <rect class="tg-wall" x="360" y="252" width="200" height="100"/>
+      <path class="tg-roof" d="M344 258L460 182L576 258Z"/><path class="tg-trim" d="M344 258L460 182L576 258"/><circle class="tg-win" cx="460" cy="228" r="11"/><path class="tg-mull" d="M449 228h22M460 217v22"/>
+      <rect class="tg-eave" x="350" y="252" width="220" height="10"/>
+      <rect class="tg-win" x="378" y="276" width="46" height="46"/><rect class="tg-win" x="496" y="276" width="46" height="46"/>
+      <path class="tg-mull" d="M401 276v46M378 299h46M519 276v46M496 299h46"/>
+      <path class="tg-shutter" d="M367 276h10v46h-10zM425 276h10v46h-10zM485 276h10v46h-10zM543 276h10v46h-10z"/>
+      <rect class="tg-doorway" x="440" y="284" width="40" height="68"/>
+      <g class="tg-door"><rect x="440" y="284" width="40" height="68"/><circle class="tg-wreath" cx="460" cy="304" r="8"/><path class="tg-bow" d="M456 311l4-3 4 3-4 2z"/></g>
+      <circle class="tg-lamp" cx="433" cy="292" r="3.2"/><circle class="tg-lamp" cx="487" cy="292" r="3.2"/>
+      <path class="tg-post" d="M352 262h8v90h-8zM560 262h8v90h-8z"/>
+      <path class="tg-rail" d="M366 352V320M384 352V320M402 352V320M420 352V320M500 352V320M518 352V320M536 352V320M554 352V320M356 321H434M486 321H564"/>
+      <rect class="tg-porch" x="346" y="350" width="228" height="9"/>
+      <path class="mid" d="M0 374Q360 356 700 376V420H0Z"/>
+      <path class="tg-step" d="M436 359h48v10h-48zM430 369h60v10h-60z"/>
+      <g clip-path="url(#tgGround)"><g style="transform:translateY(calc((1 - var(--t,0)) * 124px))"><g transform="translate(588 388)">${turkey}</g></g></g>
+      ${hay(532, 356, 112, 44)}
+      ${pumpkin(250, 404, 0.95)}${pumpkin(318, 408, 0.66)}${pumpkin(414, 388, 0.6)}${pumpkin(508, 390, 0.54)}
+      <path class="near" d="M0 402Q360 388 700 404V420H0Z"/>${groundLeaves(0, 700, 400)}`;
+
+    // leaves drifting down over everything (fewer on a slow phone: see .lite in the CSS)
+    for (let i = 0; i < 14; i++){
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'tg-leaf'); svg.innerHTML = i % 3 ? MAPLE : OVAL;
+      svg.style.fill = LEAF_COLORS[i % 5];
+      root.querySelector('.tg-leaves').append(svg);
+      leaves.push({ el: svg, x0: rnd(), off: rnd(), vy: 34 + rnd() * 42, amp: 14 + rnd() * 34, f: 0.6 + rnd() * 0.9, ph: rnd() * 6.28,
+                    vr: (rnd() < 0.5 ? -1 : 1) * (30 + rnd() * 80), s: 0.7 + rnd() * 0.8 });
+    }
+    // the family photo's burst of leaves, out from behind the phone
+    for (let i = 0; i < 16; i++){
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'tg-leaf'); svg.innerHTML = i % 2 ? MAPLE : OVAL;
+      svg.style.fill = LEAF_COLORS[(i + 2) % 5];
+      root.querySelector('.tg-burst').append(svg);
+      const a = (i / 16) * Math.PI * 2 + rnd() * 0.3;
+      burst.push({ el: svg, dx: Math.cos(a), dy: Math.sin(a), r: 300 + rnd() * 300, rot: (rnd() - 0.5) * 540, s: 1.1 + rnd() * 0.9 });   // (far enough to clear the phone)
     }
   }
-  if (spooky) buildSpookyScene(spooky);
+  if (tg) buildTgScene(tg);
 
-  // ---- layout-dependent values (rebuilt on resize) ----
-  // one unit U is a normal slide's share of p; slide k owns p ∈ [S0[k], END(k)], SPAN[k] units long (its data-span)
-  const F0 = 0.28, SPAN = feats.map(f => +(f.dataset.span || 1)), U = (1 - F0) / SPAN.reduce((a, b) => a + b, 0);
-  const S0 = SPAN.map((_, k) => F0 + SPAN.slice(0, k).reduce((a, b) => a + b, 0) * U), END = k => S0[k] + SPAN[k] * U;
-  const slideAt = p => { let k = -1; for (let i = 0; i < N; i++) if (p >= S0[i] + 0.025 * U) k = i; return k; };
-  // the intro keeps its own length of scroll however long the slides are: the track's first INTRO of scroll plays p 0 → F0
+  // ---- timing ----
+  // the intro plays p 0 → F0; the card is on from ON, and its chapters share p ON → T1 (the rest lets the family photo sit a moment).
+  // U is one "beat" of the spotlight's scroll, used to stage the copy and the phone.
+  const F0 = 0.28, U = (1 - F0) / 4, ON = F0 + 0.025 * U, T1 = 1 - 0.275 * U;
+  const chapterP = c => Math.max(F0 + 0.36 * U, lerp(ON, T1, (c + 0.3) / CH));   // where a pill jumps to
+  // the intro keeps its own length of scroll however long the spotlight is: the track's first INTRO of scroll plays p 0 → F0
   const INTRO = 0.22;
   const toP = r => r < INTRO ? r * F0 / INTRO : F0 + (r - INTRO) * (1 - F0) / (1 - INTRO);
   const toR = p => p < F0 ? p * INTRO / F0 : INTRO + (p - F0) * (1 - INTRO) / (1 - F0);
   let W = 0, H = 0, S = 1, mobile = false, keys = [], scatter = [], dockPos = [], dockY = 0, dockScale = 1;
-  let moonAt = { x: 0, y: 0 }, gateAt = { x: 0, y: 0 };
   const pose = (x, y, s, rx, ry, rz) => ({ x, y, s, rx, ry, rz });
   function measure(){
     W = window.innerWidth; H = (document.getElementById('phoneSticky') || {}).clientHeight || window.innerHeight; mobile = W <= 900;
     S = mobile ? Math.min(H * 0.45 / 580, W * 0.66 / 280) : clamp(H * 0.7 / 580, 0.5, 1.2);
     const py = mobile ? -H * 0.17 : 0, y0 = mobile ? H * 0.14 : 0;
     intro.style.setProperty('--gap', `${Math.round(280 * S + 70)}px`);
-    const F = k => pose(0, py, S, 3, k % 2 ? 15 : -15, k % 2 ? -3 : 3); // turns a little toward its copy
+    const card = pose(0, py, S, 3, -15, 3);   // turned a little toward its copy
     keys = [
       [0,    pose(0, y0 + H * 0.55, S * 0.92, 0, -20, 8)],
       [0.08, pose(0, y0, S, 5, -12, 4)],
       [0.16, pose(0, y0 * 0.6, S * 1.02, 4, 10, -3)],
       [0.27, pose(0, 0, S, 3, -8, 3)],
+      [F0 + 0.3 * U, card],
+      [1, card],
     ];
-    for (let k = 0; k < N; k++){
-      const a = S0[k] + 0.3 * U;
-      const b = k === N - 1 ? 1 : END(k) - 0.25 * U;
-      keys.push([a, F(k)], [b, F(k)]);
-      // between two tools the phone faces front for a beat while the screen slides over
-      if (k < N - 1) keys.push([S0[k + 1] + 0.025 * U, pose(0, py, S * 0.94, 5, 0, 0)]);
-    }
 
     // where the pills scatter to (loose, sticker-like) and where they dock (a row along the bottom)
     const ux = clamp(Math.min(W * 0.34, H * 0.5), 110, 340), uy = clamp(H * 0.28, 120, 260);
     scatter = [[-0.95, -0.7, -6], [0.92, -0.85, 5], [-0.9, 0.5, -4], [0.98, -0.05, -3], [0.9, 0.72, 7]]
       .map(([a, b, r]) => ({ x: a * ux, y: b * uy, r }));
     const gap = 8, ws = pills.map(p => p.offsetWidth);
-    const total = ws.reduce((a, b) => a + b, 0) + gap * (N - 1);
+    const total = ws.reduce((a, b) => a + b, 0) + gap * (CH - 1);
     dockScale = Math.min(1, (W - 32) / total);
     let x = -total * dockScale / 2;
     dockPos = ws.map(w => { const cx = x + w * dockScale / 2; x += (w + gap) * dockScale; return cx; });
     dockY = H / 2 - (mobile ? 40 : 52);
-    // where the finale's sparks burst (the moon) and where the letter rises from (behind the gate), in stage pixels
-    if (spooky){
-      const o = spooky.getBoundingClientRect(), m = spooky.querySelector('.sp-moon').getBoundingClientRect(), g = spooky.querySelector('.sp-left').getBoundingClientRect();
-      moonAt = { x: m.left - o.left + m.width / 2, y: m.top - o.top + m.height / 2 };
-      gateAt = { x: g.left - o.left + g.width * 410 / 700, y: g.top - o.top + g.height * 330 / 420 };
-    }
   }
   function poseAt(p){
     if (p <= keys[0][0]) return keys[0][1];
@@ -1709,94 +1647,76 @@ function initPhoneSection(){
     }
     return keys[keys.length - 1][1];
   }
-  // how much each slide owns the stage right now (0..1 each); the last 30% of a slide blends into the next
-  function weightsAt(p){
-    const w = new Array(N).fill(0);
-    const k = slideAt(p);
-    if (k < 0){ w[0] = smooth(seg(p, 0.2, F0)); return w; } // still the intro colour, easing toward slide 1
-    if (k < N - 1){ const e = S0[k + 1] + 0.025 * U, t = smooth(seg(p, e - 0.3 * U, e)); w[k] = 1 - t; w[k + 1] = t; } else w[k] = 1;
-    return w;
-  }
-  function tintAt(w, p){
-    const wb = 1 - w.reduce((a, b) => a + b, 0);
-    let c = [0, 1, 2].map(i => BASE[i] * wb + w.reduce((a, wk, k) => a + wk * TINTS[k][i], 0));
-    if (p > 0.93) c = mix(c, DARK, smooth(seg(p, 0.93, 1))); // settle back to the page colour before the next section
-    return `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
-  }
 
-  // ---- Halloween Night's hill: everything on it is a function of the slide's own progress t, so it plays forward and back with the
-  // scroll in step with the chapter on the phone (t 0–.2 the gate · .2–.4 the letter · .4–.6 the pumpkin · .6–.8 the date plan · .8–1 the finale)
-  const spVars = {}, spImgs = $$('.s-spooky img'), spSteps = $$('.sp-steps li'), planesBox = $('#phonePlanes');
-  const spLetter = spooky && spooky.querySelector('.sp-letter'), spMoon = spooky && spooky.querySelector('.sp-moon');
-  const spClouds = spooky ? [...spooky.querySelectorAll('.sp-clouds i')] : [], spFog = spooky && spooky.querySelector('.sp-fog');
-  let spLive = false, spCh = -1, spOp = '';
-  const setVar = (k, v) => { const s = v.toFixed(3); if (spVars[k] !== s){ spVars[k] = s; spooky.style.setProperty(k, s); } };
-  function renderSpooky(p, ws, q, bob){
+  // ---- the farm: everything on it is a function of the chapter progress t, so it plays forward and back with the scroll in step
+  // with the chapter on the phone (t 0–.2 come on in · .2–.4 the table · .4–.6 the wishbone · .6–.8 game day · .8–1 the family photo).
+  // Only the leaves also drift with time.
+  const tgVars = {}, ball = tg && tg.querySelector('.tg-ball'), flash = tg && tg.querySelector('.tg-flash'), moon = tg && tg.querySelector('.tg-moon');
+  const planesBox = $('#phonePlanes');
+  let tgLive = false, tgOp = '', ballOn = false, burstOn = false;
+  const setVar = (k, v) => { const s = v.toFixed(3); if (tgVars[k] !== s){ tgVars[k] = s; tg.style.setProperty(k, s); } };
+  function renderTg(t, ws, cx, cy, now){
     const live = ws > 0.005;
-    if (live !== spLive){ spLive = live; spooky.classList.toggle('is-live', live); }
+    if (live !== tgLive){ tgLive = live; tg.classList.toggle('is-live', live); }
     const op = ws.toFixed(3);
-    if (op !== spOp){ spOp = op; spooky.style.opacity = op; if (planesBox) planesBox.style.opacity = (1 - ws).toFixed(3); }   // the paper planes give the sky to the bats
-    const t = seg(p, S0[iSpooky] + 0.025 * U, END(iSpooky) - 0.275 * U);
-    const ch = Math.min(4, Math.floor(t * 5));
-    if (ch !== spCh){
-      spCh = ch;
-      spImgs.forEach((im, i) => im.classList.toggle('is-on', i === ch));
-      spSteps.forEach((li, i) => { li.classList.toggle('is-on', i === ch); li.classList.toggle('is-done', i < ch); });
-    }
+    if (op !== tgOp){ tgOp = op; tg.style.opacity = op; if (planesBox) planesBox.style.opacity = (1 - ws).toFixed(3); }   // the paper planes give the sky to the leaves
     if (!live) return;
 
-    const f = smooth(seg(t, 0.8, 0.88));
-    setVar('--g', smooth(seg(t, 0.05, 0.12)));                          // 1 · "Open the gate": the iron gate swings open
-    setVar('--w', Math.max(smooth(seg(t, 0.2, 0.36)), f));              // 2 · the house wakes up while the letter is read
-    for (let i = 0; i < 4; i++){
-      setVar(`--k${i}`, smooth(seg(t, 0.4 + i * 0.025, 0.45 + i * 0.025)));   // 3 · the jack-o'-lanterns light, one by one
-      setVar(`--r${i}`, smooth(seg(t, 0.6 + i * 0.03, 0.67 + i * 0.03)));     // 4 · the gravestones of the date plan rise
-    }
-    setVar('--f', f);                                                    // 5 · the finale: the moon flares, sparks burst, the bats scatter
+    setVar('--w', smooth(seg(t, 0.02, 0.09)));     // 1 · "Come on in": the farmhouse lights up…
+    setVar('--d', smooth(seg(t, 0.09, 0.17)));     //     …and its door swings open
+    setVar('--l', seg(t, 0.21, 0.35));             // 2 · "The table": the string lights come on, bulb by bulb
+    setVar('--t', smooth(seg(t, 0.41, 0.48)));     // 3 · "Wishbone": a turkey pops up behind the hay and fans its tail
+    const f = smooth(seg(t, 0.81, 0.87));
+    setVar('--f', f);                              // 5 · "Family photo": the moon glows
 
-    // the letter rises beyond the gate and flies into the phone just as the phone opens it
-    // (on a narrow screen the copy sits between the gate and the phone, so the letter comes in from the side)
-    const e = seg(t, 0.1, 0.2);
-    if (e <= 0 || e >= 1){ if (spLetter.style.opacity !== '0') spLetter.style.opacity = '0'; }
-    else {
-      const rise = smooth(Math.min(1, e / 0.35)), fly = smooth(seg(e, 0.35, 1)), from = mobile ? { x: -10, y: H / 2 + q.y } : gateAt;
-      const sx = from.x, sy = from.y - 80 * rise, tx = W / 2 + q.x, ty = H / 2 + q.y + bob;
-      const x = lerp(sx, tx, fly), y = lerp(sy, ty, fly) - Math.sin(fly * Math.PI) * 90, sc = lerp(0.55 + 0.45 * rise, 0.35, fly);
-      spLetter.style.opacity = (seg(e, 0, 0.12) * (1 - seg(e, 0.86, 1))).toFixed(3);
-      spLetter.style.transform = `translate3d(${(x - 32).toFixed(1)}px,${(y - 23).toFixed(1)}px,0) rotate(${(-8 + 16 * fly).toFixed(1)}deg) scale(${sc.toFixed(3)})`;
-    }
+    // 4 · "Game day": a football spirals over the farm
+    const b = seg(t, 0.61, 0.77);
+    if (b > 0 && b < 1){
+      const x = lerp(-0.08, 1.08, b) * W, y = H * (0.42 - Math.sin(b * Math.PI) * 0.33);   // (its peak passes over the phone, not behind it)
+      ball.style.opacity = (seg(b, 0, 0.05) * (1 - seg(b, 0.95, 1))).toFixed(3);
+      ball.style.transform = `translate3d(${(x - 23).toFixed(1)}px,${(y - 13).toFixed(1)}px,0) rotate(${(-30 + b * 60).toFixed(1)}deg) scaleX(${(0.85 + 0.15 * Math.cos(b * 40)).toFixed(3)})`;
+      ballOn = true;
+    } else if (ballOn){ ballOn = false; ball.style.opacity = '0'; }
 
-    spMoon.style.transform = `translate3d(0,${((1 - t) * 26).toFixed(1)}px,0) scale(${(1 + f * 0.06).toFixed(3)})`;
-    spClouds.forEach((c, i) => { c.style.transform = `translate3d(${(-t * (4 + i * 3)).toFixed(2)}vw,0,0)`; });
-    spFog.style.transform = `translate3d(${(-t * 6).toFixed(2)}vw,0,0)`;
-    spBats.forEach(b => {   // right to left across the sky; the finale sends them off faster
-      const x = (b.x0 - t * b.vx - f * 0.5) * W, y = b.y0 * H + Math.sin(t * 9 + b.ph) * b.amp - f * 60 * b.s;
-      b.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) scale(${b.s.toFixed(2)})`;
-    });
-    const fb = seg(t, 0.8, 0.92), so = (smooth(seg(t, 0.8, 0.83)) * (1 - seg(t, 0.9, 0.99))).toFixed(3);
-    spSparks.forEach(s => {
-      const d = s.r * (1 - Math.pow(1 - fb, 3));
-      s.el.style.opacity = so;
-      s.el.style.transform = `translate3d(${(moonAt.x + s.dx * d).toFixed(1)}px,${(moonAt.y + s.dy * d + fb * fb * 26).toFixed(1)}px,0)`;
+    // 5 · the camera flashes, and a burst of leaves flies out from behind the phone
+    flash.style.opacity = (smooth(seg(t, 0.815, 0.825)) * (1 - smooth(seg(t, 0.825, 0.9))) * 0.85).toFixed(3);
+    const fb = seg(t, 0.82, 0.96), bo = smooth(seg(t, 0.82, 0.85)) * (1 - seg(t, 0.93, 0.99));
+    if (bo > 0.002){
+      burstOn = true;
+      const e = 1 - Math.pow(1 - fb, 3);
+      burst.forEach(s => {
+        s.el.style.opacity = bo.toFixed(3);
+        s.el.style.transform = `translate3d(${(cx + s.dx * s.r * e - 11).toFixed(1)}px,${(cy + s.dy * s.r * e + fb * fb * 70 - 11).toFixed(1)}px,0) rotate(${(s.rot * fb).toFixed(1)}deg) scale(${s.s.toFixed(2)})`;
+      });
+    } else if (burstOn){ burstOn = false; burst.forEach(s => { s.el.style.opacity = '0'; }); }
+
+    moon.style.transform = `translate3d(0,${((1 - t) * 30).toFixed(1)}px,0) scale(${(1 + f * 0.06).toFixed(3)})`;
+    // the leaves fall with time (and a little faster as you scroll), swaying as they go
+    const s = reduceMotion ? 0 : now / 1000, span = H + 80;
+    leaves.forEach(L => {
+      const y = ((s * L.vy + L.off * span + t * H * 0.8) % span) - 40;
+      const x = L.x0 * W + Math.sin(s * L.f + L.ph + t * 5) * L.amp;
+      L.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) rotate(${(L.ph * 57 + s * L.vr + t * 220).toFixed(1)}deg) scale(${L.s.toFixed(2)})`;
     });
   }
 
   // ---- one frame ----
-  let idx = -2, mx = 0, my = 0, tmx = 0, tmy = 0, lastTint = '';
+  let cur = -2, mx = 0, my = 0, tmx = 0, tmy = 0, lastTint = '';
   function render(p, now){
-    const w = weightsAt(p);
-    const tint = tintAt(w, p);
+    const w = smooth(seg(p, 0.2, F0));   // how much the card owns the stage (0 → 1 as the intro ends)
+    let c = BASE.map((v, i) => lerp(v, TINT[i], w));
+    if (p > 0.93) c = mix(c, DARK, smooth(seg(p, 0.93, 1)));   // settle back to the page colour before the next section
+    const tint = `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
     if (tint !== lastTint){ lastTint = tint; sticky.style.backgroundColor = tint; }
-    glowWhite.style.opacity = 1 - (w[iPinky] || 0) * 0.9 - (w[iSpooky] || 0) * 0.6;
-    glowPink.style.opacity = w[iPinky] || 0;
-    gridEl.style.opacity = (w[iPixel] || 0) * 0.3;
+    glow.style.opacity = 1 - w * 0.6;
     const q = poseAt(p);
     const bob = reduceMotion ? 0 : Math.sin(now * 0.0012) * 6;
-    if (spooky) renderSpooky(p, w[iSpooky] || 0, q, bob);
+    const t = seg(p, ON, T1);
+    if (tg) renderTg(t, w, W / 2 + q.x, H / 2 + q.y + bob, now);
     if (flat){
       phone.style.transform =
         `perspective(1200px) translate3d(${q.x}px,${q.y + bob}px,0) rotateX(${(-my * 14).toFixed(2)}deg) rotateY(${(mx * 18).toFixed(2)}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
-      if (wordsBox) wordsBox.style.transform = `translate3d(${(-mx * 18).toFixed(1)}px,${(-my * 10).toFixed(1)}px,0)`;   // the big words sit further back
+      if (wordsBox) wordsBox.style.transform = `translate3d(${(-mx * 18).toFixed(1)}px,${(-my * 10).toFixed(1)}px,0)`;   // the big word sits further back
     } else {
       phone.style.transform =
         `translate3d(${q.x}px,${q.y + bob}px,0) rotateX(${q.rx - my * 4}deg) rotateY(${q.ry + mx * 5}deg) rotateZ(${q.rz}deg) scale(${q.s})`;
@@ -1809,7 +1729,7 @@ function initPhoneSection(){
     ringCopy.style.opacity = seg(p, 0.16, 0.2) * (1 - seg(p, 0.26, 0.3));
     idleLogo.style.opacity = 1 - seg(p, 0.05, 0.11);
 
-    // pills: burst out of the phone → scatter → dock along the bottom as the nav
+    // pills: burst out of the phone → scatter → dock along the bottom as the chapter nav
     const appear = seg(p, 0.08, 0.15), fly = smooth(seg(p, 0.15, 0.25)), dock = smooth(seg(p, F0, F0 + 0.39 * U));
     const cy = H / 2 + q.y, cx = W / 2;
     const linkOp = fly * (1 - smooth(seg(p, 0.25, 0.31)));
@@ -1831,29 +1751,22 @@ function initPhoneSection(){
       }
     });
 
-    // copy + giant word for each tool
-    feats.forEach((f, k) => {
-      const a0 = S0[k], e0 = END(k);
-      const inn = seg(p, a0 + 0.12 * U, a0 + 0.34 * U);
-      const out = k === N - 1 ? 0 : seg(p, e0 - 0.26 * U, e0 - 0.06 * U);
-      const a = inn * (1 - out);
-      f.style.visibility = a > 0.01 ? 'visible' : 'hidden';
-      inner[k].style.opacity = a;
-      inner[k].style.transform = `translate3d(0,${(1 - inn) * 34 - out * 34}px,0)`;
+    // the copy and the giant word behind the phone
+    const inn = seg(p, F0 + 0.12 * U, F0 + 0.34 * U);
+    feat.style.visibility = inn > 0.01 ? 'visible' : 'hidden';
+    inner.style.opacity = inn;
+    inner.style.transform = `translate3d(0,${(1 - inn) * 34}px,0)`;
+    const wi = seg(p, F0 - 0.1 * U, F0 + 0.3 * U);
+    word.style.opacity = wi;
+    word.style.transform = `translate3d(${(1 - wi) * W * 0.35}px,-50%,0)`;
 
-      const wi = seg(p, a0 - 0.1 * U, a0 + 0.3 * U), wo = k === N - 1 ? 0 : seg(p, e0 - 0.3 * U, e0 + 0.05 * U);
-      words[k].style.opacity = wi * (1 - wo);
-      words[k].style.transform = `translate3d(${(1 - wi) * W * 0.35 - wo * W * 0.35}px,-50%,0)`;
-    });
-
-    // which screen the phone shows
-    const ni = slideAt(p);
-    if (ni !== idx){
-      idx = ni;
-      idle.dataset.s = ni < 0 ? 'on' : 'before';
-      screens.forEach((s, i) => { s.dataset.s = i < ni ? 'before' : i === ni ? 'on' : 'after'; });
-      pills.forEach((b, i) => b.classList.toggle('is-on', i === ni));
-      phone.style.setProperty('--st', STATUS_INK[Math.max(ni, 0)]);
+    // what the phone shows: the logo, then the card's chapter (its still, and its pill lit in the dock)
+    const ch = p < ON ? -1 : Math.min(CH - 1, Math.floor(t * CH));
+    if (ch !== cur){
+      const was = cur; cur = ch;
+      if ((was < 0) !== (ch < 0)){ idle.dataset.s = ch < 0 ? 'on' : 'before'; screen.dataset.s = ch < 0 ? 'after' : 'on'; }
+      if (ch >= 0) shots.forEach((im, i) => im.classList.toggle('is-on', i === ch));
+      pills.forEach((b, i) => b.classList.toggle('is-on', i === ch));
     }
   }
 
@@ -1884,10 +1797,10 @@ function initPhoneSection(){
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); // pill widths depend on the webfont
   render(0, 0);
 
-  // pills jump straight to a tool
-  function goTo(k){
+  // a pill jumps straight to its chapter
+  function goTo(c){
     const r = track.getBoundingClientRect();
-    const y = window.scrollY + r.top + toR(S0[k] + (SPAN[k] > 1 ? 0.36 : 0.52) * U) * (r.height - H);   // the spotlight opens on its first chapter
+    const y = window.scrollY + r.top + toR(chapterP(c)) * (r.height - H);
     if (lenis) lenis.scrollTo(y, { duration: 1.6 });
     else window.scrollTo({ top: y, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
@@ -1898,8 +1811,7 @@ function initPhoneSection(){
    id = what the orders server and the gateway call it (see worker/ and gateway/); the demo link is /?share=test-<id>.
    live: false = not deployed yet: shown as "coming soon" and left out of the order dialog. */
 const STYLES = [
-  { id: 'spooky',    name: 'Halloween Night', blurb: 'A haunted hill with your date plan', color: '#ff7a1a', glyph: '☠',  group: 'holiday', live: true },
-  { id: 'halloween', name: 'Halloween',  blurb: 'A spooky quest for two',                  color: '#8a5cff', glyph: '☾',  group: 'holiday', live: true },
+  { id: 'thanksgiving', name: 'Thanksgiving', blurb: 'The whole family at the farmhouse', color: '#d2691e', glyph: '❦', group: 'holiday', live: true },
   { id: 'pixel',     name: 'Pixel',      blurb: 'A Game Boy love letter',                  color: '#6d9b3a', glyph: 'px', group: 'date', live: true },
   { id: 'pinky',     name: 'Pinky',      blurb: 'Neon, after dark',                        color: '#ff2e7e', glyph: '♥',  group: 'date', live: true },
   { id: 'winxp',     name: 'WinXP',      blurb: 'A retro desktop',                         color: '#2a63d8', glyph: 'xp', group: 'date', live: true },
@@ -1907,6 +1819,8 @@ const STYLES = [
   { id: 'picnic',    name: 'Picnic',     blurb: 'A birthday picnic under the stars',       color: '#e8843c', glyph: '☆',  group: 'birthday', live: true },
   { id: 'salon',     name: 'Heritage',   blurb: 'A candle-lit birthday from another century', color: '#b0314f', glyph: '♪',  group: 'birthday', live: true },
   { id: 'mission',   name: 'Mission',    blurb: 'A birthday mission at a desert base',     color: '#d9a441', glyph: '★',  group: 'birthday', live: true },
+  { id: 'spooky',    name: 'Halloween Night', blurb: 'A haunted hill with your date plan', color: '#ff7a1a', glyph: '☠',  group: 'holiday', live: true },
+  { id: 'halloween', name: 'Halloween',  blurb: 'A spooky quest for two',                  color: '#8a5cff', glyph: '☾',  group: 'holiday', live: true },
 ];
 const STYLE_NAMES = Object.fromEntries(STYLES.map(s => [s.id, s.name]));
 const STYLE_COLORS = Object.fromEntries(STYLES.map(s => [s.id, s.color]));
