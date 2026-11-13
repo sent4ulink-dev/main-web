@@ -130,45 +130,42 @@
 
   <!-- 1. HERO -->
   <section class="section hero" id="hero">
-    <!-- sits outside the tilted 3D stack (so it stays perfectly level); earth-scene.js pins it next to the globe -->
-    <div class="globe-label" id="globeLabel" aria-hidden="true">
-      <div class="gt-card">
-        <span class="gt-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M21.5 2.5 2.5 9.8l7.1 2.9 2.9 7.1z"/></svg></span>
-        <span class="gt-text"><b>Link sent</b><span class="gt-route"></span></span>
-      </div>
-    </div>
     <div class="hero-wordmark" data-parallax-speed="0.15" aria-hidden="true">sent4u</div>
-    <div class="hero-layers signal-scene" aria-hidden="true">
-      <div class="signal-tilt" id="signalTilt">
-        <!-- earth: a dot-matrix globe drawn from real land outlines, with messages flying between cities, plus the moon and a satellite on their own orbits -->
-        <div class="signal-layer" data-parallax-speed="0.55" data-cursor-depth="30">
-          <div class="signal-layer-inner">
-            <!-- billboarded so the canvas always faces the camera; the real low-poly
-                 3D (earth/moon/satellite, lighting, orbits) is rendered inside it
-                 by earth-scene.js, not faked with CSS -->
-            <div class="billboard earth-billboard">
-              <canvas id="earthCanvas" class="earth-canvas" aria-hidden="true"></canvas>
+    <div class="container hero-inner">
+      <div class="hero-text">
+        <p class="eyebrow">Invitations, as a link</p>
+        <h1 class="hero-title" id="heroTitle">Your invitation,<br>sent as one link.</h1>
+      </div>
+      <!-- what it is, at a glance: a chat where a sent4u link arrives, is tapped, and opens into the real card (see initHeroDemo) -->
+      <div class="hero-demo" id="heroDemo" aria-hidden="true">
+        <div class="hd-steps"><span class="on">1 · Send a link</span><span>2 · They tap it</span><span>3 · A card opens</span></div>
+        <div class="hd-phone">
+          <span class="hd-island"></span>
+          <div class="hd-screen">
+            <div class="hd-chat">
+              <div class="hd-head"><span class="hd-av"></span><span><b class="hd-name">Family</b><small>online</small></span></div>
+              <div class="hd-body">
+                <div class="hd-msg in hd-m1"></div>
+                <div class="hd-msg hd-link"><span class="hd-url">sent4u.link</span><span class="hd-thumb"><img alt="" width="524" height="1134" decoding="async"></span><span class="hd-title"></span></div>
+                <div class="hd-seen">Seen just now ✓✓</div>
+              </div>
             </div>
+            <div class="hd-card"><img alt="" width="524" height="1134" decoding="async"></div>
+            <span class="hd-tap"></span>
           </div>
         </div>
       </div>
-    </div>
-    <div class="container hero-inner">
-      <div class="hero-lead">
-        <p class="eyebrow" data-reveal="fade">Date invitations, as a link</p>
-        <h1 class="hero-title" id="heroTitle">A link that<br>asks them<br>out for you.</h1>
-      </div>
-      <div class="hero-follow">
-        <p class="hero-sub" data-reveal="fade">sent4u turns “will you go on a date with me?” into a tiny interactive world — a Game Boy love letter,
-          a neon Yes or No, a retro Windows desktop. Pick a style, make it yours, and send one link.</p>
+      <div class="hero-more">
+        <p class="hero-sub">Pick a card for a date, a birthday or Thanksgiving with the family. Make it yours, then send one link: they tap it and a little world opens.</p>
         <div class="hero-ctas">
-          <a href="#pricing" class="btn btn-primary btn-magnetic" data-magnetic>
+          <a href="#styles" class="btn btn-primary btn-magnetic" data-magnetic>
+            <span class="btn-label" data-text="Try a card free">Try a card free</span>
+          </a>
+          <a href="#pricing" class="btn btn-outline btn-magnetic" data-magnetic>
             <span class="btn-label" data-text="Get your link — $3.99">Get your link — <span data-lp="single">$3.99</span></span>
           </a>
-          <a href="#apps" class="btn btn-outline btn-magnetic" data-magnetic>
-            <span class="btn-label" data-text="See the styles">See the styles</span>
-          </a>
         </div>
+        <p class="hero-note"><i aria-hidden="true"></i>Every card has a free demo: try it and change the words before you buy.</p>
       </div>
     </div>
     <div class="scroll-cue" aria-hidden="true"><span></span>Scroll</div>
@@ -227,8 +224,8 @@
             <div class="how-copy">
               <span class="how-step">Step 1 <em>of 4</em></span>
               <h3>Pick a style</h3>
-              <p class="how-lead">Choose from ten little worlds: a Thanksgiving at the farmhouse, a Game Boy love letter, a neon Yes-or-No, a retro desktop, a floating island, a birthday picnic and more. Every one has a live demo to try first.</p>
-              <ul class="how-chips"><li>Live demos</li><li>Ten styles</li><li>From <span data-lp="single">$3.99</span></li></ul>
+              <p class="how-lead">Choose from eight little worlds: a Thanksgiving at the farmhouse, a Game Boy love letter, a neon Yes-or-No, a retro desktop, a floating island, a birthday picnic and more. Every one has a live demo to try first.</p>
+              <ul class="how-chips"><li>Live demos</li><li>Eight styles</li><li>From <span data-lp="single">$3.99</span></li></ul>
             </div>
             <div class="how-card hc-violet" aria-hidden="true"><div class="hc-ui">
               <p class="hc-title">Pick a style <span class="hc-badge">9 styles</span></p>
@@ -315,10 +312,13 @@
           <div class="tg-stars"></div>
           <div class="tg-moon"><i></i></div>
           <div class="tg-lights"><svg class="tg-wire" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M-2 6Q24 62 50 10Q76 62 102 6"/></svg></div>
-          <div class="tg-ground"></div>
-          <svg class="tg-side tg-left" viewBox="0 0 700 420" preserveAspectRatio="xMinYMax meet"></svg>
-          <svg class="tg-side tg-right" viewBox="0 0 700 420" preserveAspectRatio="xMaxYMax meet"></svg>
-          <div class="tg-side tg-smoke"><i></i><i></i><i></i></div><!-- the chimney's smoke, over the right-hand SVG (moved on the GPU, not drawn in the SVG) -->
+          <div class="tg-clouds"><i></i><i></i><i></i></div>
+          <!-- the farm, painted to the screen's own size in three depth layers (see paintFarm) -->
+          <svg class="tg-layer tg-far" preserveAspectRatio="none"></svg>
+          <svg class="tg-layer tg-mid" preserveAspectRatio="none"></svg>
+          <div class="tg-smoke"><i></i><i></i><i></i></div>
+          <svg class="tg-layer tg-front" preserveAspectRatio="none"></svg>
+          <div class="tg-motes"></div>
           <svg class="tg-ball" viewBox="0 0 48 28"><ellipse cx="24" cy="14" rx="22" ry="12.5"/><path class="tg-ball-end" d="M7 7.5q-2 6.5 0 13M41 7.5q2 6.5 0 13"/><path class="tg-lace" d="M16 14h16M19 11v6M22.3 11v6M25.6 11v6M29 11v6"/></svg>
           <div class="tg-leaves"></div>
           <div class="tg-burst"></div>
@@ -332,7 +332,7 @@
         <div class="phone-intro" id="phoneIntro">
           <div class="pi-row">
             <h2 class="pi-l">sent4u,</h2>
-            <div class="pi-r"><h2>in your <br>pocket.</h2><p class="phone-intro-sub">Send a link. Open a world. Ten styles, one link.</p></div>
+            <div class="pi-r"><h2>in your <br>pocket.</h2><p class="phone-intro-sub">Send a link. Open a world. Eight styles, one link.</p></div>
           </div>
         </div>
         <p class="phone-ring-copy" id="phoneRingCopy">One link. The whole family.</p>
@@ -392,7 +392,7 @@
       <div class="sg-head">
         <span class="sg-eyebrow">All styles</span>
         <h2>Pick the world<br>they’ll <span class="sg-hl">open.</span></h2>
-        <p class="sg-lead">Ten little worlds, one link. Every style has a live demo, so you can try it before you buy.</p>
+        <p class="sg-lead">Eight little worlds, one link. Try any of them free first: open its demo, change the words, see it on your phone, and buy only when you love it.</p>
       </div>
       <div class="sg-tabs" role="tablist" aria-label="Filter the styles">
         <button type="button" role="tab" aria-selected="true" data-filter="all">All</button>
@@ -470,6 +470,7 @@
     <div class="container pr-inner">
       <span class="pr-eyebrow" style="--n:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>Pricing</span>
       <h2 style="--n:1">Pay once.<br>Send it <span class="pr-hl">anywhere.</span></h2>
+      <p class="pr-try" style="--n:2"><b>Try before you buy.</b> Every card has a free live demo: open it, change the words and see it on your phone. <a href="#styles">Try a card</a></p>
       <div class="pricing-grid">
         <article class="price-card" style="--n:0; --side:-1; --c1:#5ce1ff; --c2:#7c5cff">
           <div class="pc-fan"><div class="pc-inner">

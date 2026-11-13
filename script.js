@@ -3,7 +3,6 @@ import {
   splitText, stagger, onScroll, utils, engine
 } from './vendor/animejs.js';
 import Lenis from './vendor/lenis.js';
-import { initEarthScene } from './earth-scene.js';
 import { initFinale } from './finale.js';
 import { onRealResize, pinnedHeight } from './viewport.js';
 import { tilt, initTilt } from './tilt.js';
@@ -103,13 +102,14 @@ function prepareHero(){
 }
 
 function startHeroReveal(){
+  window.dispatchEvent(new Event('sent4u:hero-in'));   // the hero's chat starts now, not behind the loading screen
   animate(heroSplit.words, {
     y: ['110%', '0%'],
     duration: 900,
     ease: 'out(4)',
     delay: stagger(55),
   });
-  animate('.hero .eyebrow, .hero .hero-sub, .hero .hero-ctas, .hero .scroll-cue', {
+  animate('.hero .eyebrow, .hero .hero-demo, .hero .hero-sub, .hero .hero-ctas, .hero .hero-note, .hero .scroll-cue', {
     opacity: [0, 1],
     y: [16, 0],
     duration: 700,
@@ -148,42 +148,54 @@ function initHeroParallax(){
   });
 }
 
-/* ---------------- Hero signal: interactive 3D tilt ---------------- */
-function initHeroTilt(){
-  const tilt = document.getElementById('signalTilt');
-  if (!tilt || reduceMotion) return;
-
-  // Single Animatable owns all three rotate axes on this element — base tilt
-  // set once, then nudged by the cursor. One controller per element, as always.
-  const BASE_RX = 56, BASE_RZ = -7;
-  const tiltable = createAnimatable(tilt, { rotateX: 0, rotateY: 0, rotateZ: 0, ease: 'out(3)', duration: 650 });
-
-  // The earth/moon/satellite spheres each sit in a .billboard wrapper carrying its
-  // own Animatable, declared in reverse axis order (Z,Y,X) so it renders the exact
-  // matrix inverse of #signalTilt's rotate(X,Y,Z) and always faces the camera —
-  // otherwise a flat circle embedded in the tilted scene reads as a squashed ellipse
-  // instead of a round 3D sphere.
-  const billboards = Array.from(document.querySelectorAll('.billboard')).map(el =>
-    createAnimatable(el, { rotateZ: 0, rotateY: 0, rotateX: 0, ease: 'out(3)', duration: 650 })
-  );
-
-  function setTilt(rx, ry, rz){
-    tiltable.rotateX(rx);
-    tiltable.rotateY(ry);
-    tiltable.rotateZ(rz);
-    billboards.forEach(b => { b.rotateZ(-rz); b.rotateY(-ry); b.rotateX(-rx); });
+/* ---------------- Hero: a chat where a sent4u link arrives, is tapped, and opens into the real card ----------------
+   What the site is, at a glance. Three scenes in turn (Thanksgiving, a birthday, a date), each about eight seconds: a message comes
+   in, the sent4u link goes out, it's seen, a tap, and the card opens on the phone. Steps added as classes (a1…a5) on #heroDemo;
+   the movement is CSS (opacity and transforms). It pauses while the hero is off screen or the tab is hidden. */
+const HERO_SCENES = [
+  { name: 'Family 🦃', av: 'linear-gradient(135deg,#f2a03d,#b8323f)', ask: 'who’s hosting thanksgiving this year?', kind: 'Thanksgiving', title: 'Thanksgiving with the Millers 🍂', img: 'assets/showcase/tg-1-arrive.webp' },
+  { name: 'Mia', av: 'linear-gradient(135deg,#ffb86b,#ff6b9d)', ask: 'can’t believe I’m turning 25 tomorrow 😭', kind: 'Birthday', title: 'Happy birthday, Mia 🎈', img: 'assets/styles/picnic.webp' },
+  { name: 'Naraa', av: 'linear-gradient(135deg,#7c5cff,#5ce1ff)', ask: 'so… what are we doing friday? 👀', kind: 'Date invitation', title: 'Will you go on a date with me? 💌', img: 'assets/styles/pixel.webp' },
+];
+function initHeroDemo(){
+  const demo = document.getElementById('heroDemo');
+  if (!demo) return;
+  const $ = s => demo.querySelector(s);
+  const steps = [...demo.querySelectorAll('.hd-steps span')];
+  let n = 0, timers = [], running = false, onScreen = true;
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+  const state = cls => { demo.className = `hero-demo ${cls}`; };
+  const step = i => steps.forEach((el, j) => el.classList.toggle('on', j === i));
+  function fill(s){
+    $('.hd-name').textContent = s.name; $('.hd-av').style.background = s.av; $('.hd-m1').textContent = s.ask;
+    const t = $('.hd-title'); t.textContent = ''; const k = document.createElement('small'); k.textContent = `sent4u.link · ${s.kind}`; t.append(k, s.title);
+    $('.hd-thumb img').src = s.img; $('.hd-card img').src = s.img;
   }
-  setTilt(BASE_RX, 0, BASE_RZ);
-
-  if (window.matchMedia('(hover: none)').matches) return;
-  const heroEl = document.querySelector('.hero');
-  heroEl.addEventListener('mousemove', e => {
-    const r = heroEl.getBoundingClientRect();
-    const nx = (e.clientX - r.left) / r.width - 0.5;
-    const ny = (e.clientY - r.top) / r.height - 0.5;
-    setTilt(BASE_RX - ny * 26, nx * 34, BASE_RZ);
-  });
-  heroEl.addEventListener('mouseleave', () => setTilt(BASE_RX, 0, BASE_RZ));
+  // where the finger taps: the middle of the link, and the card grows out of that same spot
+  function aim(){
+    const scr = $('.hd-screen').getBoundingClientRect(), b = $('.hd-link').getBoundingClientRect();
+    if (!scr.width) return;
+    demo.style.setProperty('--tx', `${(((b.left + b.width / 2) - scr.left) / scr.width * 100).toFixed(1)}%`);
+    demo.style.setProperty('--ty', `${(((b.top + b.height * 0.45) - scr.top) / scr.height * 100).toFixed(1)}%`);
+  }
+  function play(){
+    timers.forEach(clearTimeout); timers = []; running = true;
+    const s = HERO_SCENES[n++ % HERO_SCENES.length];
+    state(''); fill(s); step(0);
+    new Image().src = HERO_SCENES[n % HERO_SCENES.length].img;   // the next scene's card, ready in time
+    at(400, () => state('a1'));
+    at(1300, () => state('a1 a2'));
+    at(2250, () => state('a1 a2 a3'));
+    at(2950, () => { aim(); step(1); state('a1 a2 a3 a4'); });
+    at(3400, () => { step(2); state('a1 a2 a3 a4 a5'); });
+    at(7900, () => state('a1 a2 a3'));   // the card closes back into the chat…
+    at(8500, () => { if (onScreen && !document.hidden) play(); else running = false; });   // …and the next scene starts
+  }
+  if (reduceMotion){ fill(HERO_SCENES[0]); step(2); state('a1 a2 a3 a5'); return; }
+  let shown = false;   // (from the moment the loading screen lifts)
+  window.addEventListener('sent4u:hero-in', () => { shown = true; if (onScreen && !running) play(); }, { once: true });
+  new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; if (shown && onScreen && !running) play(); }).observe(demo);
+  document.addEventListener('visibilitychange', () => { if (shown && !document.hidden && onScreen && !running) play(); });
 }
 
 /* ---------------- How it works: a pinned page that slides right → left as you scroll ---------------- */
@@ -323,7 +335,7 @@ function initLetterRoll(){
     '.main-nav a, .text-link, .footer-col a, .menu-link-inner, .menu-social a, main h2, main h3'
   );
   targets.forEach($el => {
-    if ($el.closest('.hero-lead, .preloader, .signal-tilt, .phone-copy') || $el.dataset.rolled) return;
+    if ($el.closest('.hero-text, .preloader, .phone-copy') || $el.dataset.rolled) return;
     $el.dataset.rolled = '1';
     const isHeading = /^H[23]$/.test($el.tagName);
     $el.classList.add(isHeading ? 'roll-heading' : 'rollable');
@@ -1227,7 +1239,7 @@ function initPreloader(){
   animate(word, { opacity: [0, 1], scale: [.94, 1], duration: 700, ease: 'outCubic' });
 
   createTimer({
-    duration: 2000,
+    duration: 1000,
     onUpdate: self => {
       const p = Math.round(self.progress * 100);
       fill.style.width = p + '%';
@@ -1548,65 +1560,6 @@ function initPhoneSection(){
       root.querySelector('.tg-lights').append(el); n++;
     }
 
-    const pumpkin = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})">
-      <ellipse class="tg-pk-rib" cx="-15" cy="-22" rx="19" ry="21"/><ellipse class="tg-pk-rib" cx="15" cy="-22" rx="19" ry="21"/>
-      <ellipse class="tg-pk" cx="0" cy="-22" rx="18" ry="22"/><path class="tg-pk-stem" d="M-2 -42q1-8 7-10l2 3q-4 2-5 8z"/><path class="tg-pk-leaf" d="M3 -45q9-7 15-1-8 4-15 1z"/></g>`;
-    const hay = (x, y, w, h) => `<rect class="tg-hay" x="${x}" y="${y}" width="${w}" height="${h}" rx="7"/>
-      <path class="tg-hay-l" d="M${x + 7} ${y + h * 0.36}H${x + w - 7}M${x + 7} ${y + h * 0.68}H${x + w - 7}"/><path class="tg-twine" d="M${x + w * 0.28} ${y + 2}v${h - 4}M${x + w * 0.72} ${y + 2}v${h - 4}"/>`;
-    const groundLeaves = (from, to, y0) => Array.from({ length: 14 }, () =>
-      `<ellipse cx="${(from + rnd() * (to - from)).toFixed(0)}" cy="${(y0 + rnd() * 14).toFixed(0)}" rx="${(3 + rnd() * 3).toFixed(1)}" ry="1.8" fill="${LEAF_COLORS[Math.floor(rnd() * 5)]}"/>`).join('');
-
-    // left (the copy's side, kept low): a little red barn on the far hill, the fence, a corn shock, hay bales and pumpkins
-    let fence = '';
-    for (let x = 14; x <= 700; x += 64) fence += `M${x} 388V326`;
-    root.querySelector('.tg-left').innerHTML = `
-      <path class="far" d="M0 300C110 272 230 262 340 274S560 268 700 282V420H0Z"/>
-      <g class="tg-barn"><path d="M524 288V262l21-14 21 14v26z"/><path class="tg-barn-roof" d="M519 264l26-19 26 19-3 2-23-16-23 16z"/></g><rect class="tg-win" x="539" y="270" width="12" height="18"/>
-      <path class="mid" d="M0 362Q320 334 700 358V420H0Z"/>
-      <path class="tg-fence" d="${fence}M0 340H700M0 364H700"/>
-      <g class="tg-corn"><path d="M84 398l22-96h12l22 96z"/><path class="tg-corn-l" d="M112 304l-16-30M112 304l-5-36M112 304l7-34M112 304l18-28M96 398l12-58M128 398l-10-58M112 398v-60"/><path class="tg-twine" d="M98 342h28"/></g>
-      ${hay(380, 346, 110, 50)}${hay(470, 352, 100, 46)}${hay(420, 304, 96, 44)}
-      ${pumpkin(250, 404, 1.15)}${pumpkin(312, 410, 0.74)}${pumpkin(470, 306, 0.66)}${pumpkin(620, 410, 0.9)}
-      <path class="near" d="M0 400Q360 382 700 402V420H0Z"/>${groundLeaves(0, 700, 398)}`;
-
-    // right: the farmhouse (its windows light up, its door opens), a big autumn tree, and a turkey behind a hay bale under it (clear of the docked pills)
-    const FEATHERS = [['-76deg', '#b8323f', '#d9545e'], ['-51deg', '#e8742a', '#f59a52'], ['-25deg', '#f2b33d', '#ffd27a'], ['0deg', '#d2691e', '#ec8f45'],
-                      ['25deg', '#f2b33d', '#ffd27a'], ['51deg', '#e8742a', '#f59a52'], ['76deg', '#b8323f', '#d9545e']];
-    const tail = FEATHERS.map(([a, c, l]) => `<g class="tg-fth" style="--a:${a}"><path fill="${c}" d="M0 0C-15 -16 -17 -48 0 -66C17 -48 15 -16 0 0Z"/><path fill="${l}" d="M0 -8C-7 -18 -8 -42 0 -56C8 -42 7 -18 0 -8Z"/></g>`).join('');
-    const turkey = `<g class="tg-tk">
-      <g transform="translate(0 -40)">${tail}</g>
-      <ellipse class="tg-body" cx="0" cy="-30" rx="24" ry="26"/><ellipse class="tg-belly" cx="0" cy="-24" rx="14" ry="15"/>
-      <path class="tg-wing" d="M-21 -36q-9 13 3 24 5-11-3-24zM21 -36q9 13-3 24-5-11 3-24z"/>
-      <g class="tg-head"><circle class="tg-neck" cx="0" cy="-62" r="13"/>
-        <circle class="tg-eye" cx="-5" cy="-65" r="4.2"/><circle class="tg-eye" cx="5" cy="-65" r="4.2"/><circle class="tg-pupil" cx="-4.2" cy="-64.4" r="2.1"/><circle class="tg-pupil" cx="5.8" cy="-64.4" r="2.1"/>
-        <circle class="tg-cheek" cx="-9.5" cy="-57.5" r="2.6"/><circle class="tg-cheek" cx="9.5" cy="-57.5" r="2.6"/>
-        <path class="tg-beak" d="M-3.4 -59.5h6.8L0 -53.5z"/><path class="tg-wattle" d="M1.6 -56q4.6 3.4 2.2 9.6-4.4.8-4.4-4.4z"/></g></g>`;
-    root.querySelector('.tg-right').innerHTML = `
-      <defs><clipPath id="tgGround"><rect x="0" y="0" width="700" height="392"/></clipPath></defs>
-      <path class="far" d="M0 318C150 292 300 276 440 270S620 262 700 252V420H0Z"/>
-      <path class="tg-trunk" d="M640 384c3-48 1-92-9-134l7-2c6 22 9 44 10 66 6-22 18-38 34-48l4 5c-16 12-26 30-30 52-1 22 0 42 2 61z"/>
-      <g class="tg-crown"><circle cx="602" cy="206" r="50" fill="#d9542a"/><circle cx="664" cy="174" r="58" fill="#e8843c"/><circle cx="694" cy="236" r="46" fill="#c0392b"/>
-        <circle cx="630" cy="146" r="40" fill="#f2b33d"/><circle cx="566" cy="244" r="32" fill="#e8843c"/><circle cx="650" cy="238" r="36" fill="#f2a03d"/></g>
-      <rect class="tg-chimney" x="512" y="190" width="18" height="46"/>
-      <rect class="tg-wall" x="360" y="252" width="200" height="100"/>
-      <path class="tg-roof" d="M344 258L460 182L576 258Z"/><path class="tg-trim" d="M344 258L460 182L576 258"/><circle class="tg-win" cx="460" cy="228" r="11"/><path class="tg-mull" d="M449 228h22M460 217v22"/>
-      <rect class="tg-eave" x="350" y="252" width="220" height="10"/>
-      <rect class="tg-win" x="378" y="276" width="46" height="46"/><rect class="tg-win" x="496" y="276" width="46" height="46"/>
-      <path class="tg-mull" d="M401 276v46M378 299h46M519 276v46M496 299h46"/>
-      <path class="tg-shutter" d="M367 276h10v46h-10zM425 276h10v46h-10zM485 276h10v46h-10zM543 276h10v46h-10z"/>
-      <rect class="tg-doorway" x="440" y="284" width="40" height="68"/>
-      <g class="tg-door"><rect x="440" y="284" width="40" height="68"/><circle class="tg-wreath" cx="460" cy="304" r="8"/><path class="tg-bow" d="M456 311l4-3 4 3-4 2z"/></g>
-      <circle class="tg-lamp" cx="433" cy="292" r="3.2"/><circle class="tg-lamp" cx="487" cy="292" r="3.2"/>
-      <path class="tg-post" d="M352 262h8v90h-8zM560 262h8v90h-8z"/>
-      <path class="tg-rail" d="M366 352V320M384 352V320M402 352V320M420 352V320M500 352V320M518 352V320M536 352V320M554 352V320M356 321H434M486 321H564"/>
-      <rect class="tg-porch" x="346" y="350" width="228" height="9"/>
-      <path class="mid" d="M0 374Q360 356 700 376V420H0Z"/>
-      <path class="tg-step" d="M436 359h48v10h-48zM430 369h60v10h-60z"/>
-      <g clip-path="url(#tgGround)"><g style="transform:translateY(calc((1 - var(--t,0)) * 124px))"><g transform="translate(588 388)">${turkey}</g></g></g>
-      ${hay(532, 356, 112, 44)}
-      ${pumpkin(250, 404, 0.95)}${pumpkin(318, 408, 0.66)}${pumpkin(414, 388, 0.6)}${pumpkin(508, 390, 0.54)}
-      <path class="near" d="M0 402Q360 388 700 404V420H0Z"/>${groundLeaves(0, 700, 400)}`;
-
     // leaves drifting down over everything (fewer on a slow phone: see .lite in the CSS)
     for (let i = 0; i < 14; i++){
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1627,6 +1580,117 @@ function initPhoneSection(){
     }
   }
   if (tg) buildTgScene(tg);
+
+  // ---- the farm itself: painted to the stage's own size (a phone's tall screen gets its own layout), in three depth layers that
+  // drift a little apart as you scroll. Far: misty hills, tree lines, a barn and silo. Mid: the rolling field with its crop rows,
+  // autumn trees, the path up to the farmhouse (its windows, door and porch light act out the chapters), the turkey, hay and
+  // pumpkins. Front: grass and wheat in silhouette. Repainted only when the stage really changes size.
+  const FARM = tg ? { far: tg.querySelector('.tg-far'), mid: tg.querySelector('.tg-mid'), front: tg.querySelector('.tg-front'), smoke: tg.querySelector('.tg-smoke'), motes: tg.querySelector('.tg-motes') } : null;
+  const HOUSE = `<rect class="tg-chimney" x="512" y="190" width="18" height="46"/><rect class="tg-wall" x="360" y="252" width="200" height="100"/>
+    <path class="tg-wall-shade" d="M360 252h200v14H360z"/>
+    <path class="tg-roof" d="M344 258L460 182L576 258Z"/><path class="tg-roof-shade" d="M460 182L576 258H540L460 204z"/><path class="tg-trim" d="M344 258L460 182L576 258"/>
+    <circle class="tg-win" cx="460" cy="228" r="11"/><path class="tg-mull" d="M449 228h22M460 217v22"/><rect class="tg-eave" x="350" y="252" width="220" height="10"/>
+    <rect class="tg-win" x="378" y="276" width="46" height="46"/><rect class="tg-win" x="496" y="276" width="46" height="46"/>
+    <path class="tg-mull" d="M401 276v46M378 299h46M519 276v46M496 299h46"/><path class="tg-shutter" d="M367 276h10v46h-10zM425 276h10v46h-10zM485 276h10v46h-10zM543 276h10v46h-10z"/>
+    <rect class="tg-doorway" x="440" y="284" width="40" height="68"/>
+    <g class="tg-door"><rect x="440" y="284" width="40" height="68"/><circle class="tg-wreath" cx="460" cy="304" r="8"/><path class="tg-bow" d="M456 311l4-3 4 3-4 2z"/></g>
+    <circle class="tg-lamp-glow" cx="433" cy="292" r="16"/><circle class="tg-lamp-glow" cx="487" cy="292" r="16"/><circle class="tg-lamp" cx="433" cy="292" r="3.2"/><circle class="tg-lamp" cx="487" cy="292" r="3.2"/>
+    <path class="tg-post" d="M352 262h8v90h-8zM560 262h8v90h-8z"/>
+    <path class="tg-rail" d="M366 352V320M384 352V320M402 352V320M420 352V320M500 352V320M518 352V320M536 352V320M554 352V320M356 321H434M486 321H564"/>
+    <rect class="tg-porch" x="346" y="350" width="228" height="9"/><path class="tg-step" d="M436 359h48v10h-48zM430 369h60v10h-60z"/>`;
+  const FEATHERS = [['-76deg', '#b8323f', '#d9545e'], ['-51deg', '#e8742a', '#f59a52'], ['-25deg', '#f2b33d', '#ffd27a'], ['0deg', '#d2691e', '#ec8f45'],
+                    ['25deg', '#f2b33d', '#ffd27a'], ['51deg', '#e8742a', '#f59a52'], ['76deg', '#b8323f', '#d9545e']];
+  const TURKEY = `<g class="tg-tk"><g transform="translate(0 -40)">${FEATHERS.map(([a, c, l]) => `<g class="tg-fth" style="--a:${a}"><path fill="${c}" d="M0 0C-15 -16 -17 -48 0 -66C17 -48 15 -16 0 0Z"/><path fill="${l}" d="M0 -8C-7 -18 -8 -42 0 -56C8 -42 7 -18 0 -8Z"/></g>`).join('')}</g>
+    <ellipse class="tg-body" cx="0" cy="-30" rx="24" ry="26"/><ellipse class="tg-belly" cx="0" cy="-24" rx="14" ry="15"/><path class="tg-wing" d="M-21 -36q-9 13 3 24 5-11-3-24zM21 -36q9 13-3 24-5-11 3-24z"/>
+    <g class="tg-head"><circle class="tg-neck" cx="0" cy="-62" r="13"/><circle class="tg-eye" cx="-5" cy="-65" r="4.2"/><circle class="tg-eye" cx="5" cy="-65" r="4.2"/><circle class="tg-pupil" cx="-4.2" cy="-64.4" r="2.1"/><circle class="tg-pupil" cx="5.8" cy="-64.4" r="2.1"/>
+    <circle class="tg-cheek" cx="-9.5" cy="-57.5" r="2.6"/><circle class="tg-cheek" cx="9.5" cy="-57.5" r="2.6"/><path class="tg-beak" d="M-3.4 -59.5h6.8L0 -53.5z"/><path class="tg-wattle" d="M1.6 -56q4.6 3.4 2.2 9.6-4.4.8-4.4-4.4z"/></g></g>`;
+  const PUMPKIN = (x, y, s) => `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s.toFixed(3)})"><ellipse class="tg-pk-rib" cx="-15" cy="-22" rx="19" ry="21"/><ellipse class="tg-pk-rib" cx="15" cy="-22" rx="19" ry="21"/>
+    <ellipse class="tg-pk" cx="0" cy="-22" rx="18" ry="22"/><path class="tg-pk-stem" d="M-2 -42q1-8 7-10l2 3q-4 2-5 8z"/><path class="tg-pk-leaf" d="M3 -45q9-7 15-1-8 4-15 1z"/><ellipse cx="-6" cy="-30" rx="5" ry="9" fill="#fff" opacity=".14"/></g>`;
+  const HAY = (x, y, s) => `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s.toFixed(3)})"><rect class="tg-hay" x="-56" y="-44" width="112" height="44" rx="7"/>
+    <path class="tg-hay-l" d="M-49 -28H49M-49 -14H49"/><path class="tg-twine" d="M-25 -42v40M25 -42v40"/></g>`;
+  const TREE = (x, y, s, k) => { const c = [['#e8843c', '#c8552b', '#f2b33d'], ['#d9542a', '#a8321e', '#e8742a'], ['#f2b33d', '#d98c2a', '#ffd27a']][k];
+    return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s.toFixed(3)})"><path d="M-6 0c2-24 1-42-3-58h10c-2 16-3 34-1 58z" fill="#3a2214"/>
+      <circle cx="-17" cy="-62" r="24" fill="${c[1]}"/><circle cx="15" cy="-67" r="27" fill="${c[0]}"/><circle cx="-2" cy="-88" r="25" fill="${c[2]}"/><circle cx="19" cy="-45" r="16" fill="${c[1]}"/>
+      <circle cx="-9" cy="-84" r="10" fill="#fff" opacity=".13"/><circle cx="24" cy="-60" r="9" fill="#000" opacity=".1"/></g>`; };
+  let farmKey = '';
+  function paintFarm(W, H){
+    if (!FARM || !W || !H) return;
+    const key = `${W}x${H}`;
+    if (key === farmKey) return;
+    farmKey = key;
+    const portrait = W / H < 0.9;
+    const u = portrait ? clamp(W / 600, 0.5, 0.95) : clamp(Math.min(W / 1440, H / 900), 0.55, 1.3);
+    let seed = 23; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+    const f = n => n.toFixed(1);
+    const roll = (base, amp, waves, ph) => x => base + amp * (0.62 * Math.sin(x / W * Math.PI * waves + ph) + 0.38 * Math.sin(x / W * Math.PI * waves * 2.3 + ph * 1.7));
+    const edge = (y, step = 14) => { let d = `M-4 ${f(y(0))}`; for (let x = step; x < W + step; x += step) d += `L${f(Math.min(x, W + 4))} ${f(y(Math.min(x, W)))}`; return d; };
+    const under = y => `${edge(y)}L${W + 4} ${H + 80}L-4 ${H + 80}Z`;   // (past the bottom: the layers drift up and down a little)
+    const yA = roll(H * (portrait ? 0.43 : 0.55), 26 * u, 2.2, 0.6), yB = roll(H * (portrait ? 0.49 : 0.615), 17 * u, 3.1, 2.1);
+    const yM = roll(H * (portrait ? 0.565 : 0.695), 13 * u, 1.6, 4.0), yF = roll(H * (portrait ? 0.86 : 0.935), 9 * u, 2.4, 1.2);
+
+    // far: two misty ranges, a tree line along the nearer one, a little barn and silo with a lit window
+    let trees = '';
+    for (let x = -10; x < W + 20; x += (7 + rnd() * 9) * u) { if (rnd() < 0.3) continue; const r = (5 + rnd() * 8) * u; trees += `<circle cx="${f(x)}" cy="${f(yB(x) + r * 0.3)}" r="${f(r)}"/>`; }
+    const xb = W * (portrait ? 0.84 : 0.33), sb = 0.6 * u;
+    FARM.far.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    FARM.far.innerHTML = `<defs><linearGradient id="tgFarA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b0647e"/><stop offset=".6" stop-color="#7e4064"/></linearGradient>
+        <linearGradient id="tgFarB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#70365a"/><stop offset=".7" stop-color="#4a2244"/></linearGradient>
+        <linearGradient id="tgHaze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb38a" stop-opacity="0"/><stop offset="1" stop-color="#ffb38a" stop-opacity=".22"/></linearGradient></defs>
+      <path d="${under(yA)}" fill="url(#tgFarA)"/>
+      <rect x="0" y="${f(H * (portrait ? 0.38 : 0.5))}" width="${W}" height="${f(H * 0.14)}" fill="url(#tgHaze)"/>
+      <g fill="#5a294d">${trees}</g><path d="${under(yB)}" fill="url(#tgFarB)"/>
+      <g transform="translate(${f(xb)} ${f(yB(xb) + 3 * u)}) scale(${f(sb)})"><rect x="24" y="-60" width="20" height="60" rx="9" fill="#7a3346"/><path d="M24 -50a10 9 0 0 1 20 0z" fill="#a24f5c"/>
+        <path d="M-30 0V-34l20-16 20 16V0z" fill="#8e2f2a"/><path d="M-34 -32l24-21 24 21-3 3-21-18-21 18z" fill="#5a1f1c"/><path d="M-16 0v-16h12V0z" fill="#5a1f1c"/>
+        <rect class="tg-win" x="-15" y="-29" width="10" height="9"/></g>`;
+
+    // mid: the field, its crop rows, autumn trees, the path to the house, the house and its yard
+    const xh = W * (portrait ? 0.13 : 0.75), sh = (portrait ? 0.62 : 0.86) * u, yh = yM(xh) + 26 * sh;
+    let rows = '';
+    for (let k = 1; k <= 8; k++) rows += `<path d="${edge(x => yM(x) + Math.pow(k, 1.6) * 7 * u)}" fill="none" stroke="rgba(40,26,6,${(0.12 + k * 0.025).toFixed(3)})" stroke-width="${f((0.8 + k * 0.4) * u)}"/>`;
+    const treeAt = portrait ? [[0.95, 1.05, 2], [0.86, 0.75, 0], [0.33, 0.55, 1]] : [[0.03, 1.25, 1], [0.11, 0.95, 0], [0.23, 0.7, 2], [0.52, 0.6, 1], [0.6, 0.5, 2], [0.9, 1.45, 0], [0.975, 1.05, 2]];
+    const tx = W * (portrait ? 0.9 : 0.86), ty = yh + 18 * sh, ts = sh * 0.95;   // the turkey, beside the house
+    const px0 = W * (portrait ? 0.5 : 0.58);
+    const path = `M${f(xh - 12 * sh)} ${f(yh)}Q${f((xh + px0) / 2)} ${f(yh + (H - yh) * 0.25)} ${f(px0 - 120 * u)} ${f(H + 80)}L${f(px0 + 130 * u)} ${f(H + 80)}Q${f((xh + px0) / 2 + 40 * u)} ${f(yh + (H - yh) * 0.3)} ${f(xh + 12 * sh)} ${f(yh)}Z`;
+    let fence = '';
+    for (let i = 0; i < 9; i++) { const x = xh - (300 + i * 46) * sh; if (x < -20) break; const y = yM(x) + 30 * sh; fence += `M${f(x)} ${f(y)}v${f(-26 * sh)}`; }
+    const pumpkins = (portrait ? [[0.62, 0.7, 0.55], [0.74, 0.6, 0.5]] : [[0.37, 0.75, 0.7], [0.42, 0.62, 0.55], [0.63, 0.7, 0.6], [0.68, 0.58, 0.5]])
+      .map(([x, s, d]) => PUMPKIN(W * x, yM(W * x) + d * 90 * u, s * u)).join('');
+    FARM.mid.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    FARM.mid.innerHTML = `<defs><linearGradient id="tgMeadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f7f36"/><stop offset=".35" stop-color="#6c5c27"/><stop offset="1" stop-color="#3a3016"/></linearGradient>
+        <radialGradient id="tgSpill"><stop offset="0" stop-color="#ffcf73" stop-opacity=".6"/><stop offset="1" stop-color="#ffcf73" stop-opacity="0"/></radialGradient>
+        <clipPath id="tgTk"><rect x="0" y="0" width="${W}" height="${f(ty - 2 * ts)}"/></clipPath></defs>
+      ${treeAt.filter(([x]) => x < 0.5 || portrait).map(([x, s, k]) => TREE(W * x, yM(W * x) + 6 * u, s * u, k)).join('')}
+      <path d="${under(yM)}" fill="url(#tgMeadow)"/>${rows}
+      <path d="${path}" fill="#d9b076" opacity=".28"/>
+      <path d="${fence}${fence ? `M${f(xh - 300 * sh)} ${f(yM(xh - 300 * sh) + 14 * sh)}L${f(Math.max(-20, xh - 668 * sh))} ${f(yM(Math.max(0, xh - 668 * sh)) + 14 * sh)}` : ''}" class="tg-fence-line" stroke-width="${f(5 * sh)}"/>
+      ${treeAt.filter(([x]) => x >= 0.5 && !portrait).map(([x, s, k]) => TREE(W * x, yM(W * x) + 10 * u, s * u, k)).join('')}
+      <ellipse class="tg-spill" cx="${f(xh)}" cy="${f(yh + 6 * sh)}" rx="${f(220 * sh)}" ry="${f(46 * sh)}" fill="url(#tgSpill)"/>
+      <g transform="translate(${f(xh)} ${f(yh)}) scale(${f(sh)}) translate(-460 -379)">${HOUSE}</g>
+      ${PUMPKIN(xh - 30 * sh, yh - 12 * sh, 0.34 * sh)}${PUMPKIN(xh + 34 * sh, yh - 10 * sh, 0.28 * sh)}
+      <g clip-path="url(#tgTk)"><g style="transform:translateY(calc((1 - var(--t,0)) * ${f(124 * ts)}px))"><g transform="translate(${f(tx)} ${f(ty)}) scale(${f(ts)})">${TURKEY}</g></g></g>
+      ${HAY(tx - 8 * ts, ty + 6 * ts, ts)}${pumpkins}`;
+    // the chimney's smoke (HTML puffs, moved on the GPU): at the chimney's top, the same size as the house
+    if (FARM.smoke) { FARM.smoke.style.cssText = `left:${f(xh + 61 * sh)}px;top:${f(yh - 198 * sh)}px;--s:${f(14 * sh)}px`; }
+
+    // front: grass and wheat in silhouette along the bottom
+    let blades = '';
+    for (let x = -4; x < W + 4; x += 4.5 * u) {
+      const y = yF(x) + 2, side = x < W * 0.18 || x > W * 0.82, h = (7 + rnd() * 20) * u * (side ? 1.8 : 1), lean = (rnd() - 0.5) * 12 * u;
+      blades += `M${f(x - 2.2 * u)} ${f(y)}Q${f(x + lean * 0.4)} ${f(y - h * 0.6)} ${f(x + lean)} ${f(y - h)}Q${f(x + lean * 0.3)} ${f(y - h * 0.5)} ${f(x + 2.2 * u)} ${f(y)}Z`;
+    }
+    let wheat = '';
+    for (const [a, b] of [[0, 0.12], [0.88, 1]]) for (let i = 0; i < 9; i++) {
+      const x = W * (a + rnd() * (b - a)), y = yF(x) + 4, h = (60 + rnd() * 70) * u, lean = (rnd() - 0.5) * 26 * u;
+      wheat += `<path d="M${f(x)} ${f(y)}Q${f(x + lean * 0.3)} ${f(y - h * 0.6)} ${f(x + lean)} ${f(y - h)}" class="tg-stalk" stroke-width="${f(1.6 * u)}"/><ellipse cx="${f(x + lean)}" cy="${f(y - h - 8 * u)}" rx="${f(3.4 * u)}" ry="${f(10 * u)}" transform="rotate(${f(lean / u * 1.2)} ${f(x + lean)} ${f(y - h - 8 * u)})" class="tg-head-w"/>`;
+    }
+    FARM.front.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    FARM.front.innerHTML = `${wheat}<path d="${under(yF)}" class="tg-front-ground"/><path d="${blades}" class="tg-front-ground"/>`;
+
+    // fireflies over the field
+    if (FARM.motes && !FARM.motes.childElementCount) {
+      for (let i = 0; i < 12; i++) { const m = document.createElement('i'); m.style.cssText = `left:${f(4 + rnd() * 92)}%;top:${f((portrait ? 50 : 62) + rnd() * 30)}%;animation-delay:${f(-rnd() * 7)}s;animation-duration:${f(5 + rnd() * 5)}s`; FARM.motes.append(m); }
+    }
+  }
 
   // ---- timing ----
   // the intro plays p 0 → F0; the card is on from ON, and its chapters share p ON → T1 (the rest lets the family photo sit a moment).
@@ -1664,6 +1728,7 @@ function initPhoneSection(){
     let x = -total * dockScale / 2;
     dockPos = ws.map(w => { const cx = x + w * dockScale / 2; x += (w + gap) * dockScale; return cx; });
     dockY = H / 2 - (mobile ? 40 : 52);
+    paintFarm(W, H);
   }
   function poseAt(p){
     if (p <= keys[0][0]) return keys[0][1];
@@ -1721,6 +1786,10 @@ function initPhoneSection(){
     } else if (burstOn){ burstOn = false; burst.forEach(s => { s.el.style.opacity = '0'; }); }
 
     moon.style.transform = `translate3d(0,${((1 - t) * 30).toFixed(1)}px,0) scale(${(1 + f * 0.06).toFixed(3)})`;
+    if (FARM) for (const [el, k] of [[FARM.far, 8], [FARM.mid, 18], [FARM.smoke, 18], [FARM.front, 34]]){
+      const v = `translate3d(0,${((0.5 - t) * k).toFixed(1)}px,0)`;
+      if (el && el.dataset.t !== v){ el.dataset.t = v; el.style.transform = v; }
+    }
     // the leaves fall with time (and a little faster as you scroll), swaying as they go
     const s = reduceMotion ? 0 : now / 1000, span = H + 80;
     leaves.forEach(L => {
@@ -1849,8 +1918,9 @@ const STYLES = [
   { id: 'picnic',    name: 'Picnic',     blurb: 'A birthday picnic under the stars',       color: '#e8843c', glyph: '☆',  group: 'birthday', live: true },
   { id: 'salon',     name: 'Heritage',   blurb: 'A candle-lit birthday from another century', color: '#b0314f', glyph: '♪',  group: 'birthday', live: true },
   { id: 'mission',   name: 'Mission',    blurb: 'A birthday mission at a desert base',     color: '#d9a441', glyph: '★',  group: 'birthday', live: true },
-  { id: 'spooky',    name: 'Halloween Night', blurb: 'A haunted hill with your date plan', color: '#ff7a1a', glyph: '☠',  group: 'holiday', live: true },
-  { id: 'halloween', name: 'Halloween',  blurb: 'A spooky quest for two',                  color: '#8a5cff', glyph: '☾',  group: 'holiday', live: true },
+  // out of season: hidden from the gallery and the order list (links already bought still open). Set hidden: false next October.
+  { id: 'spooky',    name: 'Halloween Night', blurb: 'A haunted hill with your date plan', color: '#ff7a1a', glyph: '☠',  group: 'holiday', live: true, hidden: true },
+  { id: 'halloween', name: 'Halloween',  blurb: 'A spooky quest for two',                  color: '#8a5cff', glyph: '☾',  group: 'holiday', live: true, hidden: true },
 ];
 const STYLE_NAMES = Object.fromEntries(STYLES.map(s => [s.id, s.name]));
 const STYLE_COLORS = Object.fromEntries(STYLES.map(s => [s.id, s.color]));
@@ -1920,7 +1990,7 @@ function initOrders(){
   const panel = modal.querySelector('.rvm-panel');
   const views = Object.fromEntries([...modal.querySelectorAll('[data-view]')].map(v => [v.dataset.view, v]));
   // the style rows, built from STYLES (name, one line, colour, a + and − each)
-  $('odProducts').innerHTML = STYLES.filter(s => s.live).map(s => `
+  $('odProducts').innerHTML = STYLES.filter(s => s.live && !s.hidden).map(s => `
         <li class="od-prod" data-product="${s.id}" style="--c:${s.color}">
           <span class="od-swatch" aria-hidden="true">${s.glyph}</span>
           <div class="od-name"><b>${s.name}</b><small>${s.blurb}</small></div>
@@ -1929,7 +1999,7 @@ function initOrders(){
   const rows = [...modal.querySelectorAll('.od-prod')];
   const createBtn = $('odCreate'), errBox = views.choose.querySelector('.rvm-error');
   const lockables = [$('mainContent'), $('siteHeader')].filter(Boolean);
-  const counts = Object.fromEntries(STYLES.filter(s => s.live).map(s => [s.id, 0]));
+  const counts = Object.fromEntries(STYLES.filter(s => s.live && !s.hidden).map(s => [s.id, 0]));
   const clearCounts = () => { for (const id in counts) counts[id] = 0; };
   let order = null, pendingPack = '', busy = false, run = 0, lastFocus = null, closeTimer = 0, made = 0;
 
@@ -2346,11 +2416,11 @@ function initAuth(){
 function initStyles(){
   const grid = document.getElementById('sgGrid');
   if (!grid) return;
-  grid.innerHTML = STYLES.map(s => {
+  grid.innerHTML = STYLES.filter(s => !s.hidden).map(s => {
     const shot = s.live
       ? `<img src="assets/styles/${s.id}.webp" alt="A preview of the ${s.name} style" width="520" height="853" loading="lazy" decoding="async">`
       : `<span class="sg-soon" aria-hidden="true">${s.glyph}</span>`;
-    const inner = `<span class="sg-shot">${shot}</span><span class="sg-name">${s.name}</span><span class="sg-blurb">${s.blurb}</span><span class="sg-demo">${s.live ? 'Open live demo' : 'Coming soon'}</span>`;
+    const inner = `<span class="sg-shot">${shot}</span><span class="sg-name">${s.name}</span><span class="sg-blurb">${s.blurb}</span><span class="sg-demo">${s.live ? 'Try it free' : 'Coming soon'}</span>`;
     return `<li class="sg-item" data-group="${s.group}" style="--c:${s.color}">${s.live
       ? `<a class="sg-card" href="/?share=test-${s.id}" target="_blank" rel="noopener">${inner}</a>`
       : `<div class="sg-card is-soon">${inner}</div>`}</li>`;
@@ -2387,8 +2457,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initProgressBar();
   initHeader();
   initHeroParallax();
-  initHeroTilt();
-  setTimeout(() => initEarthScene({ canvas: document.getElementById('earthCanvas'), reduceMotion }), 60);   // after the loading screen's first paint: creating the 3D renderer stalls the page for a moment
+  initHeroDemo();
   initHow();
   initLetterRoll();
   initMenu();

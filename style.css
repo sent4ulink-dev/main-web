@@ -190,73 +190,79 @@ p{ margin:0 0 1em; color:var(--fg-dim); }
 .site-header .btn .btn-label{ gap:14px; }
 .site-header .btn .btn-label::after{ width:30px; height:30px; font-size:.95rem; }
 
-/* ---------- hero ---------- */
-.hero{ min-height:100vh; min-height:100svh; display:flex; align-items:center; overflow:hidden; padding-top:120px; }
+/* ---------- hero: what sent4u is, at a glance (a chat where a link arrives and opens into a card; see initHeroDemo) ---------- */
+.hero{ min-height:100vh; min-height:100svh; display:flex; align-items:center; overflow:hidden; padding-top:108px; padding-bottom:56px; }
 .hero-wordmark{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-start;
   font-family:var(--ff-head); font-weight:700; font-size:min(38vw,520px); color:#fff;
   opacity:.045; letter-spacing:-.02em; pointer-events:none; user-select:none;
   padding-left:clamp(8px,3vw,40px);
 }
-.hero-layers{ position:absolute; inset:0; pointer-events:none; }
-.signal-scene{ perspective:1600px; }
-
-/* satellite / broadcast-signal composition, tilted into 3D and driven by the cursor.
-   .signal-tilt owns the interactive rotateX/Y/Z (one Animatable, set in initHeroTilt).
-   Each .signal-layer inside it is JS-parallaxed (translate only) via [data-parallax-speed];
-   all pulse/spin/travel animation lives on .signal-layer-inner and its children —
-   so no two controllers/CSS rules ever fight over the same element's transform. */
-.signal-tilt{
-  position:absolute; right:2%; top:50%; width:940px; height:940px; margin-top:-400px;
-  transform-style:preserve-3d; will-change:transform;
+.hero-inner{
+  position:relative; z-index:2; width:100%; max-width:1320px; margin:0 auto; padding-inline:clamp(16px,3.4vw,56px);
+  display:grid; grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr); grid-template-areas:"text demo" "more demo"; column-gap:clamp(24px,5vw,90px); align-items:center;
 }
-.signal-layer{ position:absolute; inset:0; transform-style:preserve-3d; }
-.signal-layer-inner{ position:absolute; inset:0; transform-style:preserve-3d; }
-
-/* counter-rotated wrapper around each rigid 3D body (earth/moon/satellite) so it
-   always faces the camera as a true sphere/object instead of the flat disc it
-   actually is — see initHeroTilt(), which drives its rotate to the inverse of
-   #signalTilt's own rotate on every update. */
-.billboard{ transform-style:preserve-3d; }
-.earth-billboard{ position:absolute; inset:0; }
-
-/* the earth/moon/satellite are a real WebGL scene (earth-scene.js) painted into this canvas.
-   The orbit radii in earth-scene.js are kept inside the camera's field of view with
-   margin, so nothing clips against the camera frustum — canvas size below is purely
-   a display-size choice now, it can't fix frustum clipping since it scales the whole
-   scene (earth included) uniformly rather than adding safe margin around it. */
-.earth-canvas{
-  position:absolute; top:50%; left:50%; width:1500px; height:1500px; margin:-750px 0 0 -750px;
-}
-
-/* a small link packet continuously travels its own orbit around the earth canvas */
-@media (max-width:760px){
-  /* phones: the globe sits centred above the headline (scaled down), the copy starts below it.
-     Kept noticeably shorter than it looks like it needs to be: a phone browser's own address/tab bar
-     covers a real chunk of the screen that plain CSS viewport units don't reliably account for
-     (confirmed against a real device, not just a simulated one — see the CTAs below). */
-  .hero{ align-items:flex-start; padding-top:266px; padding-bottom:36px; }
-  .earth-canvas{ width:820px; height:820px; margin:-410px 0 0 -410px; }
-  .signal-layer-inner{ transform:scale(.56); transform-origin:center; }
-  .signal-tilt{ left:50%; right:auto; margin-left:-470px; top:-222px; margin-top:0; opacity:1; }
-  .signal-tilt, .billboard{ transform:none !important; } /* no CSS 3D tilt on phones: the globe stays a flat, true circle */
-  .globe-label{ display:none; }
-  .hero-sub{ font-size:1rem; line-height:1.45; }
-}
-
-/* full-bleed: drops .container's centered max-width + side padding so the headline
-   touches the left edge of the viewport and the sub copy + CTAs touch the right edge */
-.hero-inner{ position:relative; z-index:2; max-width:none; width:100%; margin:0; padding-inline:clamp(16px,2.6vw,44px); }
-.hero-lead{ margin-left:0; }
-.hero-follow{ margin-left:auto; margin-top:28px; text-align:right; }
-.hero-title{ font-size:clamp(2.6rem,6vw,4.6rem); }
+.hero-text{ grid-area:text; align-self:end; }
+.hero-more{ grid-area:more; align-self:start; }
+.hero-demo{ grid-area:demo; justify-self:center; }
+.hero-title{ font-size:clamp(2.6rem,5.4vw,4.8rem); margin-bottom:0; }
 .hero-title .split-line{ overflow:hidden; display:block; }
 .hero-title .split-line > span{ display:inline-block; will-change:transform; }
-.hero-sub{ font-size:1.15rem; max-width:46ch; margin-left:auto; color:#c9c7d6; text-shadow:0 1px 14px rgba(8,8,12,.95), 0 0 4px rgba(8,8,12,.8); }
-.hero-ctas{ display:flex; gap:16px; margin-top:12px; flex-wrap:wrap; justify-content:flex-end; }
-@media (max-width:760px){
-  .hero-follow{ margin-top:14px; }
-  .hero-ctas{ gap:12px; margin-top:8px; } /* the two CTAs stack here (too narrow to sit side by side): tighter spacing keeps both on screen without scrolling */
+.hero-sub{ font-size:1.12rem; max-width:44ch; margin:22px 0 0; color:#c9c7d6; }
+.hero-ctas{ display:flex; gap:14px; margin-top:26px; flex-wrap:wrap; }
+.hero-note{ display:flex; align-items:center; gap:10px; margin:18px 0 0; font-size:.92rem; color:var(--fg-dim); }
+.hero-note i{ flex:none; width:8px; height:8px; border-radius:50%; background:#3ddc84; box-shadow:0 0 10px #3ddc84; }
+
+/* the phone: sizes inside the screen are in cqw (its width), so it scales as one piece */
+.hero-demo{ position:relative; display:flex; flex-direction:column; align-items:center; gap:18px; }
+.hero-demo::before{ content:""; position:absolute; left:50%; top:55%; width:130%; aspect-ratio:1; translate:-50% -50%; border-radius:50%; pointer-events:none; z-index:-1;
+  background:radial-gradient(closest-side,rgba(124,92,255,.5),rgba(255,107,157,.2) 50%,transparent 78%); }
+.hd-steps{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+.hd-steps span{ padding:7px 12px; border-radius:99px; font:600 .74rem/1 var(--ff-body); letter-spacing:.02em; color:var(--fg-dim);
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); transition:color .3s, background-color .3s, border-color .3s; }
+.hd-steps span.on{ color:#fff; background:rgba(124,92,255,.24); border-color:rgba(124,92,255,.65); }
+.hd-phone{ position:relative; height:min(64vh,600px); aspect-ratio:300/620; padding:3.4%; border-radius:13% / 6.3%; background:#0e0e16;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 0 0 0 2px #4a4a62, 0 0 0 7px #1b1b26, 0 0 0 8px rgba(255,255,255,.14), 0 46px 90px -34px rgba(0,0,0,.85), 0 0 80px -10px rgba(124,92,255,.45); }
+.hd-island{ position:absolute; top:4.1%; left:50%; width:27%; height:3.4%; translate:-50% 0; border-radius:99px; background:#000; z-index:5; }
+.hd-screen{ position:relative; height:100%; overflow:hidden; border-radius:10.5% / 5%; background:#0b0b12; container-type:inline-size; }
+.hd-chat{ position:absolute; inset:0; display:flex; flex-direction:column; }
+.hd-head{ display:flex; align-items:center; gap:3.4cqw; padding:17cqw 5cqw 4cqw; border-bottom:1px solid rgba(255,255,255,.07); }
+.hd-av{ flex:none; width:10cqw; height:10cqw; border-radius:50%; }
+.hd-name{ display:block; font:600 4.6cqw/1.15 var(--ff-body); color:#fff; }
+.hd-head small{ display:block; font-size:3.3cqw; color:#3ddc84; }
+.hd-body{ flex:1; display:flex; flex-direction:column; justify-content:flex-end; gap:3cqw; padding:5cqw 4.5cqw 9cqw; }
+.hd-msg{ max-width:80%; padding:3cqw 4.2cqw; border-radius:6cqw; font:400 4.3cqw/1.35 var(--ff-body); opacity:0; transform:translateY(5cqw) scale(.94);
+  transition:opacity .35s, transform .5s cubic-bezier(.2,.9,.3,1.2); }
+.hd-msg.in{ align-self:flex-start; background:#25252f; color:#eee; border-bottom-left-radius:2cqw; transform-origin:0 100%; }
+.hd-link{ align-self:flex-end; width:76%; padding:1.6cqw; background:linear-gradient(135deg,#7c5cff,#b45cff 60%,#ff6b9d); border-bottom-right-radius:2cqw; transform-origin:100% 100%; }
+.hd-url{ display:block; padding:1cqw 2.4cqw 2cqw; font-size:3.7cqw; color:#fff; text-decoration:underline; text-underline-offset:.6cqw; }
+.hd-thumb{ display:block; height:36cqw; overflow:hidden; border-radius:4.6cqw 4.6cqw 0 0; background:#1b1430; }
+.hd-thumb img{ display:block; width:100%; height:100%; object-fit:cover; object-position:50% 22%; }
+.hd-title{ display:block; padding:2.4cqw 3cqw 2.8cqw; border-radius:0 0 4.6cqw 4.6cqw; background:#fff; color:#0b0b12; font:600 3.8cqw/1.25 var(--ff-body); }
+.hd-title small{ display:block; margin-bottom:.8cqw; font-weight:500; font-size:2.9cqw; letter-spacing:.04em; text-transform:uppercase; color:#6b6b80; }
+.hd-seen{ align-self:flex-end; font-size:3.2cqw; color:#8f8cab; opacity:0; transition:opacity .3s; }
+.hd-tap{ position:absolute; left:var(--tx,62%); top:var(--ty,64%); z-index:3; width:16cqw; height:16cqw; margin:-8cqw 0 0 -8cqw; border-radius:50%;
+  background:rgba(255,255,255,.6); opacity:0; pointer-events:none; }
+.hd-card{ position:absolute; inset:0; z-index:2; opacity:0; transform:scale(.3); transform-origin:var(--tx,62%) var(--ty,64%);
+  transition:opacity .35s, transform .65s cubic-bezier(.2,.8,.2,1); }
+.hd-card img{ display:block; width:100%; height:100%; object-fit:cover; transition:transform 4.6s linear; }
+.hero-demo.a1 .hd-m1, .hero-demo.a2 .hd-link{ opacity:1; transform:none; }
+.hero-demo.a3 .hd-seen{ opacity:1; }
+.hero-demo.a4 .hd-tap{ animation:hdTap .6s ease-out; }
+.hero-demo.a5 .hd-card{ opacity:1; transform:none; }
+.hero-demo.a5 .hd-card img{ transform:scale(1.07); }
+@keyframes hdTap{ from{ opacity:.95; transform:scale(.3); } to{ opacity:0; transform:scale(1.7); } }
+
+@media (max-width:900px){
+  /* phones: the headline, then the phone playing the scenes, then the words and the buttons */
+  .hero{ align-items:flex-start; padding-top:96px; padding-bottom:40px; }
+  .hero-inner{ grid-template-columns:minmax(0,1fr); grid-template-areas:"text" "demo" "more"; row-gap:22px; }
+  .hero-title{ font-size:clamp(2.2rem,9.6vw,3.4rem); }
+  .hd-phone{ height:min(54vh,470px); }
+  .hd-steps span{ padding:6px 10px; font-size:.68rem; }
+  .hero-sub{ font-size:1rem; line-height:1.45; margin-top:0; }
+  .hero-ctas{ gap:12px; margin-top:18px; }
+  .scroll-cue{ display:none; }
 }
 .scroll-cue{
   position:absolute; bottom:36px; left:24px; display:flex; align-items:center; gap:10px;
@@ -397,6 +403,10 @@ main{ position:relative; overflow-x:clip; } /* slide-in reveals must not widen t
 }
 @keyframes prGrid{ to{ transform:translate3d(0,90px,0); } }
 
+.pr-try{ max-width:56ch; margin:-.4em auto 2.4em; padding:12px 18px; border-radius:16px; font-size:.98rem; line-height:1.5; color:rgba(255,255,255,.82);
+  background:rgba(61,220,132,.08); border:1px solid rgba(61,220,132,.3); }
+.pr-try b{ color:#fff; }
+.pr-try a{ color:#3ddc84; font-weight:600; text-decoration:underline; text-underline-offset:3px; margin-left:4px; white-space:nowrap; }
 .pr-inner{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; text-align:center; }
 /* the heading block arrives piece by piece: the headline pulls into focus */
 .pr-inner > :not(.pricing-grid){ opacity:0; transform:translateY(26px); transition:opacity .8s, transform .9s cubic-bezier(.2,.8,.2,1); transition-delay:calc(var(--n,0) * 90ms); }
@@ -967,7 +977,7 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .pf-new{ padding:6px 12px; border-radius:100px; font:600 .68rem/1 var(--ff-body); font-style:normal; letter-spacing:.08em; text-transform:uppercase;
   color:#2a1206; background:linear-gradient(135deg,#ffc46b,#f08a3c); box-shadow:0 0 18px rgba(240,138,60,.5); }
 .t-tg .pf-text{ color:rgba(255,236,220,.9); }
-.t-tg .pf-tags li{ background:rgba(255,196,107,.14); border:1px solid rgba(255,196,107,.42); color:#ffe7c4; }
+.t-tg .pf-tags li{ background:rgba(40,16,32,.78); border:1px solid rgba(255,196,107,.45); color:#ffe7c4; }   /* (solid enough to read over the trees behind) */
 .t-tg .pf-tags li::before{ background:#ffc46b; }
 .t-tg .pf-link{ background:linear-gradient(135deg,#ffc46b,#f08a3c); color:#2a1206; box-shadow:0 0 24px rgba(240,138,60,.45); }
 .t-tg .pf-link i{ background:#2a1206; color:#ffc46b; }
@@ -992,15 +1002,15 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .phone-tg:not(.is-live) *{ animation-play-state:paused !important; }
 .tg-sky{ position:absolute; inset:0;
   background:
-    radial-gradient(60% 36% at 50% 96%, rgba(255,170,90,.5), transparent 70%),
-    linear-gradient(180deg,#1b0f2e 0%,#3a1c46 34%,#76334f 60%,#c8664a 82%,#eb9a56 100%); }
+    radial-gradient(70% 30% at 62% 58%, rgba(255,170,100,.45), transparent 70%),
+    linear-gradient(180deg,#130a26 0%,#2a1644 26%,#542758 44%,#9a4560 54%,#de7a52 62%,#f2a85e 72%,#f7c27a 100%); }
 .tg-stars{ position:absolute; left:0; top:0; width:2px; height:2px; border-radius:50%; background:transparent; animation:tgTwinkle 3.8s ease-in-out infinite; }
 .tg-stars.b{ animation-delay:-1.9s; }
 @keyframes tgTwinkle{ 50%{ opacity:.35; } }
 .tg-moon{
-  position:absolute; right:9%; top:10%; width:clamp(90px,15vmin,170px); aspect-ratio:1; border-radius:50%; will-change:transform;
+  position:absolute; right:9%; top:12%; width:clamp(100px,17vmin,190px); aspect-ratio:1; border-radius:50%; will-change:transform;
   background:radial-gradient(circle at 40% 36%,#fff3d0 0%,#ffd98a 40%,#f7b25a 76%,#e8923e 100%);
-  box-shadow:0 0 60px 18px rgba(255,190,110,.3), 0 0 160px 60px rgba(255,140,80,.16);
+  box-shadow:0 0 0 14px rgba(255,214,150,.06), 0 0 0 34px rgba(255,214,150,.04), 0 0 60px 18px rgba(255,190,110,.3), 0 0 180px 70px rgba(255,140,80,.16);
 }
 .tg-moon::before{ content:""; position:absolute; inset:0; border-radius:50%; opacity:.45;
   background:radial-gradient(circle at 62% 58%,rgba(200,120,50,.45) 0 9%,transparent 10%), radial-gradient(circle at 34% 64%,rgba(200,120,50,.3) 0 6%,transparent 7%); }
@@ -1011,10 +1021,21 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .tg-bulb{ position:absolute; width:9px; height:13px; margin:-1px 0 0 -4.5px; border-radius:45% 45% 50% 50% / 38% 38% 62% 62%; background:#5a4636; }
 .tg-bulb::before{ content:""; position:absolute; left:2px; right:2px; top:-3px; height:4px; border-radius:1px; background:#2b2420; }
 .tg-bulb b{ position:absolute; inset:0; border-radius:inherit; background:var(--c); box-shadow:0 0 10px 3px var(--c); opacity:clamp(0, calc(var(--l,0) * 16 - var(--i)), 1); }
-.tg-ground{ position:absolute; left:0; right:0; bottom:0; height:calc(min(46vh,430px) * .1); border-radius:50% 50% 0 0 / 100% 100% 0 0; background:linear-gradient(180deg,#5b5426,#2f2514 80%); }
-.tg-side{ position:absolute; bottom:0; height:min(46vh,430px); width:calc(min(46vh,430px) * 5 / 3); overflow:visible; }
-.tg-left{ left:0; } .tg-right, .tg-smoke{ right:0; }
-.tg-side .far{ fill:#6e3448; } .tg-side .mid{ fill:#5b5426; } .tg-side .near{ fill:#2f2514; }
+.tg-layer{ position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; will-change:transform; }
+.tg-clouds i{ position:absolute; border-radius:50%; will-change:transform; animation:tgCloud 80s linear infinite alternate;
+  background:radial-gradient(closest-side,rgba(255,196,170,.3),rgba(160,86,130,.18) 55%,transparent); }
+.tg-clouds i:nth-child(1){ left:6%; top:17%; width:38vw; height:7vw; }
+.tg-clouds i:nth-child(2){ left:44%; top:8%; width:30vw; height:5.5vw; opacity:.8; animation-duration:100s; animation-direction:alternate-reverse; }
+.tg-clouds i:nth-child(3){ left:58%; top:33%; width:44vw; height:7.5vw; opacity:.75; animation-duration:120s; }
+@keyframes tgCloud{ to{ transform:translateX(-7vw); } }
+.tg-motes{ position:absolute; inset:0; pointer-events:none; }
+.tg-motes i{ position:absolute; width:4px; height:4px; border-radius:50%; background:#ffe08a; box-shadow:0 0 8px 3px rgba(255,200,110,.55); opacity:0; will-change:transform,opacity; animation:tgMote 7s ease-in-out infinite; }
+@keyframes tgMote{ 0%{ opacity:0; transform:translate(0,0); } 35%{ opacity:.95; } 70%{ opacity:.55; } 100%{ opacity:0; transform:translate(20px,-30px); } }
+.tg-wall-shade{ fill:rgba(0,0,0,.12); } .tg-roof-shade{ fill:rgba(0,0,0,.2); }
+.tg-lamp-glow{ fill:#ffd98a; opacity:calc(var(--w,0) * .35); }
+.tg-spill{ opacity:calc(.25 + var(--w,0) * .75); }
+.tg-fence-line{ fill:none; stroke:#4a2f1d; stroke-linecap:round; }
+.tg-front-ground{ fill:#1a1209; } .tg-stalk{ fill:none; stroke:#6e5022; } .tg-head-w{ fill:#b58436; }
 .tg-win{ fill:#ffcf73; opacity:calc(.28 + var(--w,0) * .72); }
 .tg-doorway{ fill:#ffdf9a; opacity:calc(.3 + var(--w,0) * .7); }
 .tg-mull{ fill:none; stroke:#5a362a; stroke-width:3; }
@@ -1030,9 +1051,8 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .tg-rail{ fill:none; stroke:#f1dfbf; stroke-width:3; stroke-linecap:round; }
 .tg-porch{ fill:#6b4a32; } .tg-step{ fill:#7a5a3e; }
 .tg-trunk{ fill:#4a2e1e; }
-.tg-smoke{ pointer-events:none; }
-.tg-smoke i{ position:absolute; left:74.43%; top:43.33%; width:2%; aspect-ratio:1; margin:-1% 0 0 -1%; border-radius:50%; opacity:0;
-  background:rgba(240,226,236,.42); animation:tgSmoke 4.5s linear infinite; will-change:transform,opacity; }
+.tg-smoke{ position:absolute; width:var(--s,14px); height:var(--s,14px); margin:calc(var(--s,14px) / -2) 0 0 calc(var(--s,14px) / -2); pointer-events:none; will-change:transform; }
+.tg-smoke i{ position:absolute; inset:0; border-radius:50%; opacity:0; background:rgba(240,226,236,.42); animation:tgSmoke 4.5s linear infinite; will-change:transform,opacity; }
 .tg-smoke i:nth-child(2){ animation-delay:-1.5s; } .tg-smoke i:nth-child(3){ animation-delay:-3s; }
 @keyframes tgSmoke{ from{ opacity:0; transform:translate(0,0) scale(.6); } 20%{ opacity:.9; } to{ opacity:0; transform:translate(114%,-430%) scale(1.9); } }
 .tg-barn path{ fill:#8e2f2a; } .tg-barn .tg-barn-roof{ fill:#5a1f1c; }
@@ -1055,11 +1075,10 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .tg-leaf .vein{ fill:none; stroke:rgba(60,20,10,.35); stroke-width:1.2; }
 .tg-flash{ position:absolute; inset:0; opacity:0; background:radial-gradient(70% 70% at 50% 45%,#fffaf0,rgba(255,240,215,.55)); will-change:opacity; }
 @media (max-width:900px){
-  .tg-sky{ background:radial-gradient(60% 30% at 50% 98%, rgba(255,170,90,.4), transparent 70%), linear-gradient(180deg,#1b0f2e 0%,#3a1c46 45%,#5e2a4c 76%,#8a4048 100%); }   /* darker low down: the copy sits there */
   .tg-moon{ right:6%; top:7%; width:clamp(60px,17vw,90px); }
   .tg-lights{ top:70px; height:12vh; }
-  .tg-side{ height:calc(50vw * .6); width:50vw; }
-  .tg-ground{ height:calc(50vw * .6 * .1); }
+  .phone-tg::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:52%; pointer-events:none;
+    background:linear-gradient(180deg,rgba(20,10,14,0),rgba(20,10,14,.55) 45%,rgba(16,8,12,.82)); }   /* the copy sits here, over the field */
 }
 .lite .tg-stars.b, .lite .tg-leaves .tg-leaf:nth-child(n+8), .lite .tg-burst .tg-leaf:nth-child(n+9){ display:none; }
 .lite .tg-bulb b{ box-shadow:none; }
@@ -1092,21 +1111,6 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .tl-c i{ height:calc(100vh + 320px); }
 @keyframes tideDrift{ to{ transform:translate3d(-50%,0,0); } }
 body:not(.tide-on) .tide{ display:none; }
-
-/* ---------- the globe's "link sent" toast (its position is set in earth-scene.js) ---------- */
-.globe-label{ position:absolute; left:0; top:0; z-index:3; pointer-events:none; will-change:transform; }
-.gt-card{
-  display:flex; align-items:center; gap:11px; padding:8px 16px 8px 8px; border-radius:16px; white-space:nowrap;
-  background:#fff; color:#0b0b12; box-shadow:0 16px 36px -12px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.35);
-  opacity:0; transform-origin:0 100%;
-}
-.gt-card.pop{ animation:gtPop .55s cubic-bezier(.2,.9,.3,1.2) both; }
-.gt-icon{ display:grid; place-items:center; width:32px; height:32px; border-radius:11px; color:#fff; background:linear-gradient(140deg,#7c5cff,#ff6b9d); }
-.gt-text{ display:flex; flex-direction:column; gap:4px; }
-.gt-text b{ font:600 .8rem/1 var(--ff-head); }
-.gt-route{ font:400 .72rem/1 var(--ff-body); color:#5b5b70; }
-@keyframes gtPop{ from{ opacity:0; transform:translateY(10px) scale(.92); } to{ opacity:1; transform:none; } }
-@media (max-width:760px){ .globe-label{ display:none; } } /* after the base rule so it wins */
 
 /* ---------- how it works: a pinned page that slides right → left, one full screen per step ---------- */
 .how-wrapper{ position:relative; height:calc(100vh + max(340vw, 300vh) + 120px); padding:0 0 120px; }
