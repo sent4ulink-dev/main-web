@@ -160,6 +160,7 @@ async function boot() {
   // the step editor's preview runs a salon of its own: while it is open this page lets go of its 3D and its sound
   // (two 3D scenes at once are too much for a phone; closing the editor reloads the page)
   editor.release3d = () => {
+    window.__card3dReleased = true;   // (the loading guard must not take this for a crash)
     story.stopSong(); story.bgTube.stop(); audio.setMuted?.(true);
     R.renderer.setAnimationLoop(null);
     try { R.renderer.dispose(); R.renderer.forceContextLoss(); } catch { /* already gone */ }
@@ -222,8 +223,12 @@ async function boot() {
   let shadowFrame = 0;
   salon.sun.shadow.autoUpdate = false;
   const hemiBase = salon.hemi.intensity, hemiColor = salon.hemi.color.clone();
-  let lastTs = 0;
+  let lastTs = 0, drawnAt = -1e9;
+  // phones: at most 60 frames a second (a 120 Hz phone would otherwise draw twice as many, for nothing but heat)
+  const minGap = R.isMobile ? 1000 / 60 - 2.5 : 0;
   const frame = (ts) => {
+    if (ts - drawnAt < minGap) return;
+    drawnAt = ts;
     lastTs = ts;
     timer.update(ts);
     const dt = Math.max(0, Math.min(timer.getDelta(), 1 / 15));
@@ -302,6 +307,7 @@ async function boot() {
   if (DEBUG) window.__frame = (n = 1, ms = 16.7) => { timer.disconnect?.(); for (let i = 0; i < n; i++) frame(lastTs + ms); };
 
   // ── reveal ──
+  window.__cardReady?.();
   loaderEl.classList.add('done');
   setTimeout(() => loaderEl.remove(), 1000);
   if (EMBED) { startPreview({ R, story, ui, o, content, apply, director, camera, capture }); return; }
@@ -319,4 +325,5 @@ async function boot() {
 boot().catch((e) => {
   console.error(e);
   loaderText.textContent = 'Something went wrong preparing the salon. Please reload the page.';
+  window.__cardFailed?.();
 });

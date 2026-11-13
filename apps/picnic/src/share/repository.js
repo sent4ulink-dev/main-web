@@ -22,19 +22,32 @@ export class ModeRepository {
   constructor(mode, { fetcher = (...a) => fetch(...a), storage = () => localStorage } = {}) { Object.assign(this, { mode, fetcher, storage }); this.token = null; }
   clearAccess() { this.token = null; }
   async request(path, { method = 'GET', body, patient = false } = {}) {
-    let response; const started = Date.now();
+    const started = Date.now(), PATIENCE = 60000;
     for (let attempt = 0; ; attempt++) {
+      // each try has a time limit that covers the whole answer, not just its first bytes: an answer that stops halfway (it happens
+      // on phone networks) counts as failed and is asked for again, quickly
+      const stop = new AbortController(), timer = patient ? setTimeout(() => stop.abort(), 8000 + attempt * 4000) : 0;
+      let response, text;
       try {
-        const stop = new AbortController(), timer = patient ? setTimeout(() => stop.abort(), 20000) : 0;   // a request that never answers counts as failed
         response = await this.fetcher(path, { method, signal: stop.signal, cache: 'no-store', headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+        text = await response.text();
+      } catch {
         clearTimeout(timer);
-        if (!patient || !(response.status >= 500 || response.status === 408 || response.status === 429) || Date.now() - started > 30000) break;
-      } catch { if (!patient || Date.now() - started > 30000) throw new RequestError('Connection error. Check your internet and try again.'); }
-      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, 6000)));
+        if (!patient || Date.now() - started > PATIENCE) throw new RequestError('Connection error. Check your internet and try again.');
+        this.onRetry?.(attempt + 1);
+        await new Promise((r) => setTimeout(r, Math.min(500 * 2 ** attempt, 4000)));
+        continue;
+      }
+      clearTimeout(timer);
+      if (patient && (response.status >= 500 || response.status === 408 || response.status === 429) && Date.now() - started <= PATIENCE) {
+        this.onRetry?.(attempt + 1);
+        await new Promise((r) => setTimeout(r, Math.min(500 * 2 ** attempt, 4000)));
+        continue;
+      }
+      let data; try { data = JSON.parse(text); } catch { throw new RequestError('Could not read the reply from the server.', response.status); }
+      if (!response.ok) throw new RequestError(data.error || 'Could not load.', response.status, data);
+      return data;
     }
-    let data; try { data = await response.json(); } catch { throw new RequestError('Could not read the reply from the server.', response.status); }
-    if (!response.ok) throw new RequestError(data.error || 'Could not load.', response.status, data);
-    return data;
   }
   async login(password) { const d = await this.request('/api/studio/login', { method: 'POST', body: { password } }); this.token = d.token; }
   async load() {

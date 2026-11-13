@@ -51,7 +51,7 @@ export default defineConfig({
   server: { port: 5173, host: '127.0.0.1' },
   plugins: [snapPlugin, cardApi],
   build: {
-    target: 'es2022',
+    target: ['es2021', 'safari15', 'chrome90'],   // older iPhones can't read newer code at all: they'd stay on the loading screen
     chunkSizeWarningLimit: 1500,
     assetsInlineLimit: 0,
   },

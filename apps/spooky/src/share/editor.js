@@ -66,6 +66,8 @@ export class CardEditor {
     this.resetBtn.hidden = kind !== 'test';
     if (kind === 'unavailable') return this.state('Link not found', 'This link is not valid. Please check the full link.');
     if (kind === 'studio') await this.passwordGate();
+    // a slow phone network: say that it's still trying (the request repeats by itself)
+    if (kind !== 'studio') this.repo.onRetry = () => this.state(kind === 'test' ? 'Getting the demo ready…' : 'Opening your gift…', 'The internet is slow, still trying…', false, true);
     for (;;) {
       try {
         if (kind !== 'studio') this.state(kind === 'test' ? 'Getting the demo ready…' : 'Opening your gift…', '', false, true);
