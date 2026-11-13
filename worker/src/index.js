@@ -51,7 +51,7 @@
      session:<token>  a signed-in visitor's email, 30-day TTL
      rla:<hash>       per-visitor counters for requesting sign-in links */
 
-const TOOLS = ['Send', 'Pixel', 'Pinky', 'WinXP', 'Petal Isle', 'Picnic', 'Heritage', 'Salon', 'Mission', 'Halloween', 'Halloween Night', 'Marketplace'];   // Salon = Heritage's old name
+const TOOLS = ['Send', 'Pixel', 'Pinky', 'WinXP', 'Petal Isle', 'Picnic', 'Heritage', 'Salon', 'Mission', 'Halloween', 'Halloween Night', 'Thanksgiving', 'Marketplace'];   // Salon = Heritage's old name
 const MAX_LIST = 100;             // how many reviews the public list holds
 const MIN_GAP_MS = 60_000;        // one review per visitor per minute…
 const MAX_PER_DAY = 5;            // …and five a day
@@ -240,7 +240,7 @@ async function deleteReview(request, env, cors, id) {
 
 const RESERVED = new Set(['admin', 'administrator', 'support', 'help', 'sent4u', 'sent', 'www', 'api', 'app', 'root', 'mail', 'email', 'billing', 'security',
   'about', 'blog', 'careers', 'terms', 'privacy', 'login', 'logout', 'signup', 'register', 'account', 'settings', 'pricing', 'status', 'team', 'staff',
-  'official', 'contact', 'press', 'legal', 'escrow', 'marketplace', 'pixel', 'pinky', 'winxp', 'petal', 'picnic', 'salon', 'mission', 'halloween', 'spooky', 'send', 'null', 'undefined']);
+  'official', 'contact', 'press', 'legal', 'escrow', 'marketplace', 'pixel', 'pinky', 'winxp', 'petal', 'picnic', 'salon', 'mission', 'halloween', 'spooky', 'thanksgiving', 'send', 'null', 'undefined']);
 
 // 3–24 characters: lower-case letters and numbers, with - or _ allowed in the middle
 function handleProblem(h) {
@@ -576,7 +576,7 @@ async function getMe(request, env, cors) {
 // object instead of failing the lookup below, silently turning credits/amount into undefined further down.
 const PACKS = Object.assign(Object.create(null), { single: { credits: 1, amount: 399 }, pack: { credits: 8, amount: 1499 } });
 // every style a buyer can make a link for; the ids are what the gateway and each style's own server know it by
-const PRODUCTS = ['pixel', 'pinky', 'winxp', 'petal', 'picnic', 'salon', 'mission', 'halloween', 'spooky'];
+const PRODUCTS = ['pixel', 'pinky', 'winxp', 'petal', 'picnic', 'salon', 'mission', 'halloween', 'spooky', 'thanksgiving'];
 const JSON_OBJECT = { httpMetadata: { contentType: 'application/json' } };
 const WEBHOOK_TOLERANCE_S = 300;                                // reject a Paddle-Signature whose timestamp is older than this (clock skew + retry headroom)
 

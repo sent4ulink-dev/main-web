@@ -47,8 +47,12 @@ const ORIGIN_VARS = {
   mission: 'MISSION_ORIGIN',
   halloween: 'HALLOWEEN_ORIGIN',
   spooky: 'SPOOKY_ORIGIN',
+  thanksgiving: 'THANKSGIVING_ORIGIN',
 };
 const PRODUCTS = Object.keys(ORIGIN_VARS);
+// Thanksgiving's family guest link (/?guest=<id>, made by that card's own server for everyone at the table) opens
+// Thanksgiving: it is the only style that makes guest links.
+const guestOf = (id) => (id && /^[A-Za-z0-9_-]{16,64}$/.test(id) ? 'thanksgiving' : null);
 const DEMO_PRODUCTS = Object.fromEntries(PRODUCTS.map(p => [`test-${p}`, p]));
 const COOKIE_NAME = 's4u_app';
 const COOKIE_MAX_AGE = 6 * 60 * 60; // 6 hours — long enough for one browsing session
@@ -69,7 +73,7 @@ export default {
     if (SITE_PAGES.test(url.pathname)) return withClearedAppCookie(await env.ASSETS.fetch(request));
     if (url.pathname === '/') {
       const shareId = url.searchParams.get('share');
-      const product = shareId ? await resolveProduct(shareId, env) : null;
+      const product = shareId ? await resolveProduct(shareId, env) : guestOf(url.searchParams.get('guest'));
       const origin = product && originFor(product, env);
       if (origin) return withAppCookie(await proxy(origin, request), product);
       // No id, an id nobody recognizes, or a recognized product that isn't deployed yet:
@@ -101,8 +105,9 @@ async function productOfPage(request, url, env) {
   if (!referer) return null;
   try {
     const page = new URL(referer);
-    const id = page.origin === url.origin && page.pathname === '/' ? page.searchParams.get('share') : null;
-    return id ? await resolveProduct(id, env, { cached: true }) : null;
+    if (page.origin !== url.origin || page.pathname !== '/') return null;
+    const id = page.searchParams.get('share');
+    return id ? await resolveProduct(id, env, { cached: true }) : guestOf(page.searchParams.get('guest'));
   } catch {
     return null;
   }

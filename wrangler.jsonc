@@ -31,6 +31,7 @@
     "MISSION_ORIGIN": "https://sent4u-mission.pages.dev",
     "HALLOWEEN_ORIGIN": "https://sent4u-halloween.pages.dev",
     "SPOOKY_ORIGIN": "https://sent4u-spooky.pages.dev",
+    "THANKSGIVING_ORIGIN": "https://sent4u-thanksgiving.pages.dev",
     // The orders Worker (see /worker), used to look up which product a REAL (paid) share id
     // belongs to. Demo ids (test-pixel, test-picnic, ...) never need this.
     "ORDERS_API_BASE": "https://sent4u-reviews.sent4u-link.workers.dev",

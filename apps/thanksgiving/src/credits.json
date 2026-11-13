@@ -1,0 +1,99 @@
+{
+  "original": "The farmhouse and everything in it, the feast, the family's characters (every hairstyle, hat, outfit, pair of glasses and beard), the chalkboard, the cornucopia, the TV's parade and game, the fire, the wishbone, the old snapshots on the wall, the story and all of the code were made for this card. The parade balloons on the TV are our own designs.",
+  "blender": [
+    {
+      "name": "The feast",
+      "detail": "turkey, glazed ham, pies (pumpkin, apple, pecan), rolls, bread board, cranberry sauce, gravy boat, mashed potatoes, green beans, sweet potatoes, mac & cheese, stuffing, salad, corn, deviled eggs, a fruit bowl, butter, a pitcher of cider, and dinner on every plate · art/blender/scripts/thanksgiving_props.py"
+    },
+    {
+      "name": "The farmhouse",
+      "detail": "porch and front door with its wreath, the long table, chairs, place settings, candles, windows, sideboards, china hutch, bookshelf, armchair, side table and lamp, plants, wall clock, bench and coat hooks, blanket basket, horn of plenty, plaid sofa, console TV, fireplace, welcome easel, the family camera · same script"
+    },
+    {
+      "name": "The family",
+      "detail": "one friendly body; 11 men's and 13 women's hairstyles (each with a version that sits under a hat), 14 tops with their own sleeves, pants and skirts, 9 hats, 9 pairs of glasses, 9 beards, a mouth that talks · art/blender/scripts/avatar_kit.py"
+    }
+  ],
+  "sounds": [
+    {
+      "name": "Music Jingles, Interface Sounds, RPG Audio",
+      "authors": [
+        "Kenney"
+      ],
+      "url": "https://kenney.nl/assets/music-jingles",
+      "license": "CC0 1.0",
+      "use": "pizzicato flourishes, chimes, pops, the door, the creak, glasses, pages"
+    }
+  ],
+  "music": [
+    {
+      "name": "Harvest waltz and parade march",
+      "authors": [
+        "made for this card"
+      ],
+      "url": "",
+      "license": "Original — played by the browser itself (plucked strings, snare and brass), no recordings"
+    }
+  ],
+  "fonts": [
+    {
+      "name": "Playfair Display",
+      "url": "https://fonts.google.com/specimen/Playfair+Display",
+      "authors": [
+        "Claus Eggers Sørensen"
+      ],
+      "license": "SIL OFL 1.1"
+    },
+    {
+      "name": "Great Vibes",
+      "url": "https://fonts.google.com/specimen/Great+Vibes",
+      "authors": [
+        "Robert Leuschke"
+      ],
+      "license": "SIL OFL 1.1"
+    },
+    {
+      "name": "Nunito",
+      "url": "https://fonts.google.com/specimen/Nunito",
+      "authors": [
+        "Vernon Adams",
+        "Jacques Le Bailly"
+      ],
+      "license": "SIL OFL 1.1"
+    },
+    {
+      "name": "Caveat",
+      "url": "https://fonts.google.com/specimen/Caveat",
+      "authors": [
+        "Impallari Type"
+      ],
+      "license": "SIL OFL 1.1"
+    }
+  ],
+  "code": [
+    {
+      "name": "three.js",
+      "url": "https://threejs.org",
+      "authors": [
+        "three.js authors"
+      ],
+      "license": "MIT"
+    },
+    {
+      "name": "postprocessing",
+      "url": "https://github.com/pmndrs/postprocessing",
+      "authors": [
+        "Raoul van Rüschen"
+      ],
+      "license": "Zlib"
+    },
+    {
+      "name": "GSAP",
+      "url": "https://gsap.com",
+      "authors": [
+        "GreenSock"
+      ],
+      "license": "GSAP Standard License"
+    }
+  ]
+}
