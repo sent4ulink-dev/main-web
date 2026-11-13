@@ -305,7 +305,9 @@ export async function handleApi(request, env = {}, { now = Date.now(), fetchImpl
       // replaces deleted; DELETE takes it away (back to the drawing).
       if (parts.length === 3 && parts[2] === "images" && (method === "POST" || method === "DELETE")) {
         if (closed) return json({ error: closed }, 403);
-        const path = IMAGE_SLOTS[url.searchParams.get("slot")];
+        const slot = url.searchParams.get("slot");
+        // own keys only: "constructor" or "__proto__" would pass a plain lookup, and the upload below would then be stored and never used
+        const path = slot && Object.hasOwn(IMAGE_SLOTS, slot) ? IMAGE_SLOTS[slot] : null;
         if (!path) return json({ error: "invalid_slot" }, 400);
         let next = "";
         if (method === "POST") {

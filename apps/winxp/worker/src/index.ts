@@ -101,9 +101,14 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
 // server-to-server, the moment a paid order generates this id. Never called from a
 // browser: there is no public studio, no password, no way to mint a share id from
 // this app at all — a real invitation only ever exists because it was paid for.
-function createSecretOk(request: Request, env: Env): boolean {
-  if (!env.SHARE_CREATE_SECRET) return true; // not configured yet — dev convenience only
-  return request.headers.get("x-date-create-secret") === env.SHARE_CREATE_SECRET;
+async function createSecretOk(request: Request, env: Env): Promise<boolean> {
+  if (!env.SHARE_CREATE_SECRET) return false; // not configured: nobody may create a share this way
+  // compared as digests, so the time taken says nothing about how much of a guess was right
+  const digest = async (v: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)));
+  const [a, b] = await Promise.all([digest(request.headers.get("x-date-create-secret") || ""), digest(env.SHARE_CREATE_SECRET)]);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
 
 function editable(record: Share, env: Env): boolean {
@@ -186,7 +191,7 @@ export default {
 
       const ensure = url.pathname.match(/^\/shares\/([A-Za-z0-9_-]+)\/ensure$/);
       if (ensure && request.method === "POST") {
-        if (!createSecretOk(request, env)) return reply({ status: "forbidden" }, 403, cors);
+        if (!(await createSecretOk(request, env))) return reply({ status: "forbidden" }, 403, cors);
         const id = ensure[1];
         if (!ID.test(id)) return reply({ status: "invalid", message: "Invalid share ID" }, 400, cors);
         const createdAt = now(env);

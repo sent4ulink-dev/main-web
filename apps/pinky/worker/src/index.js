@@ -67,6 +67,15 @@ function defaultShareContent() {
   };
 }
 
+// A saved plan is a few KB of text (pictures are links, not data); anything far bigger is not a plan.
+const MAX_CONTENT_CHARS = 64 * 1024;
+// No value in a plan may be a javascript:, data: or vbscript: address: the page opens some of them (the map link) as they are.
+function hasScriptUrl(value) {
+  if (typeof value === 'string') return /^(javascript|data|vbscript):/i.test(value.replace(/[\u0000-\u0020\u007f-\u00a0]/g, ''));
+  if (value && typeof value === 'object') return Object.values(value).some(hasScriptUrl);
+  return false;
+}
+
 function reply(body, status, cors, extra = {}) {
   return new Response(JSON.stringify(body), { status, headers: { ...JSON_TYPE, ...cors, ...extra } });
 }
@@ -116,9 +125,14 @@ function corsHeaders(request, env) {
 // server-to-server, the moment a paid order generates this id. Never called from a
 // browser: there is no public studio, no password, no way to mint a share id from
 // this app at all — a real invitation only ever exists because it was paid for.
-function createSecretOk(request, env) {
-  if (!env.SHARE_CREATE_SECRET) return true; // not configured yet — dev convenience only
-  return request.headers.get('x-date-create-secret') === env.SHARE_CREATE_SECRET;
+async function createSecretOk(request, env) {
+  if (!env.SHARE_CREATE_SECRET) return false; // not configured: nobody may create a share this way
+  // compared as digests, so the time taken says nothing about how much of a guess was right
+  const digest = async (v) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+  const [a, b] = await Promise.all([digest(request.headers.get('x-date-create-secret') || ''), digest(env.SHARE_CREATE_SECRET)]);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
 
 // Self-heal: if a share isn't in storage yet, ask the sent4u order Worker whether this
@@ -165,7 +179,7 @@ export default {
 
       const ensure = url.pathname.match(/^\/api\/shares\/([^/]+)\/ensure$/);
       if (ensure && request.method === 'POST') {
-        if (!createSecretOk(request, env)) return reply({ error: 'forbidden' }, 403, cors);
+        if (!(await createSecretOk(request, env))) return reply({ error: 'forbidden' }, 403, cors);
         const id = ensure[1];
         const existing = await getShare(bucket, id);
         if (existing) return reply({ ok: true, existed: true }, 200, cors);
@@ -195,9 +209,12 @@ export default {
         if (!entry) return reply({ error: 'not_found' }, 404, cors);
         if (entry.finalized) return reply({ error: 'finalized' }, 403, cors);
         if (Date.now() > entry.editUntil) return reply({ error: 'edit_window_closed' }, 403, cors);
-        const body = await request.json().catch(() => null);
+        const raw = await request.text();
+        if (raw.length > MAX_CONTENT_CHARS) return reply({ error: 'too_large' }, 413, cors);
+        let body = null;
+        try { body = JSON.parse(raw); } catch { /* invalid below */ }
         const content = body?.content;
-        if (!content || typeof content !== 'object') return reply({ error: 'invalid_content' }, 400, cors);
+        if (!content || typeof content !== 'object' || Array.isArray(content) || hasScriptUrl(content)) return reply({ error: 'invalid_content' }, 400, cors);
         entry.content = content;
         await putShare(bucket, share[1], entry);
         return reply({ ok: true }, 200, cors);
@@ -209,7 +226,7 @@ export default {
       return reply({ error: 'not_found' }, 404, cors);
     } catch (err) {
       console.error(`${request.method} ${url.pathname} failed:`, err);
-      return reply({ error: 'storage_error', message: err.message }, 500, cors);
+      return reply({ error: 'storage_error' }, 500, cors);
     }
   },
 };

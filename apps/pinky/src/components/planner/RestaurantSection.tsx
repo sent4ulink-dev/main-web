@@ -105,6 +105,8 @@ export function RestaurantSection({
 
   const handleOpenGoogleMaps = (e: React.MouseEvent, url: string) => {
     e.stopPropagation();
+    // only a real web address: a saved plan is written by whoever holds the link, and a javascript: address would run on this site
+    if (!/^https:\/\//i.test(url)) return;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

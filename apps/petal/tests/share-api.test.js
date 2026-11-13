@@ -168,6 +168,9 @@ describe("share links' server", () => {
     expect((await call("DELETE", `shares/${body.id}/images?slot=book`)).body).toEqual({ ok: true, url: "" });
     expect(env.SHARES.keys().some((key) => key.startsWith("images/"))).toBe(false);
     expect((await call("GET", `shares/${body.id}`)).body.content.book.photo).toBe("");
+    // A name that only an object's prototype has is no slot: refused, and nothing is stored.
+    for (const slot of ["constructor", "__proto__", "toString"]) expect((await upload(slot, webp(100))).status).toBe(400);
+    expect(env.SHARES.keys().some((key) => key.startsWith("images/"))).toBe(false);
   });
 
   it("never lets the page set a photo itself, nor keeps one it didn't make", async () => {

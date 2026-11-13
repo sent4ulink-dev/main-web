@@ -57,7 +57,7 @@ const DEMO_PRODUCTS = Object.fromEntries(PRODUCTS.map(p => [`test-${p}`, p]));
 const COOKIE_NAME = 's4u_app';
 const COOKIE_MAX_AGE = 6 * 60 * 60; // 6 hours — long enough for one browsing session
 const API_PATHS = [/^\/auth\//, /^\/me$/, /^\/checkout$/, /^\/orders\//];
-const SITE_PAGES = /^\/(pay|terms|privacy|refunds)(\.html)?\/?$/;
+const SITE_PAGES = /^\/(pay|terms|privacy|refunds)(\.html)?\/?$/i;
 
 export default {
   async fetch(request, env) {
@@ -65,7 +65,7 @@ export default {
     if (API_PATHS.some(re => re.test(url.pathname))) {
       const ordersApiBase = (env.ORDERS_API_BASE ?? '').replace(/\/$/, '');
       if (!ordersApiBase) return new Response('Not configured.', { status: 501 });
-      return proxy(ordersApiBase, request);
+      return proxy(ordersApiBase, request, env.ORDERS);
     }
     // The site's own pages (checkout, legal) are never an app's: an app answers any unknown path with its own page, so a
     // buyer who looked at a card a moment ago would otherwise get that card instead of the payment window. These pages also
@@ -75,7 +75,7 @@ export default {
       const shareId = url.searchParams.get('share');
       const product = shareId ? await resolveProduct(shareId, env) : guestOf(url.searchParams.get('guest'));
       const origin = product && originFor(product, env);
-      if (origin) return withAppCookie(await proxy(origin, request), product);
+      if (origin) return withAppCookie(await proxyApp(origin, request), product);
       // No id, an id nobody recognizes, or a recognized product that isn't deployed yet:
       // show the marketing site, and drop any stale app cookie so it can't misroute the
       // asset requests this same page is about to make.
@@ -84,7 +84,7 @@ export default {
     const appProduct = await productOfPage(request, url, env) || readCookie(request, COOKIE_NAME);
     const origin = appProduct && originFor(appProduct, env);
     if (origin) {
-      const proxied = await proxy(origin, request);
+      const proxied = await proxyApp(origin, request);
       // an app's own API answers 404 with a JSON body its page understands: pass that through as it is
       if (url.pathname.startsWith('/api/')) return proxied;
       // a Pages app answers a file it doesn't have with its own index.html (status 200): that's a miss too
@@ -136,7 +136,7 @@ async function lookUpLink(id, env) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    const r = await fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, {
+    const r = await (env.ORDERS || globalThis).fetch(`${ordersApiBase}/links/${encodeURIComponent(id)}`, {
       signal: controller.signal,
     });
     if (!r.ok) return null;
@@ -155,14 +155,28 @@ function originFor(product, env) {
   return value ? value.replace(/\/$/, '') : null;
 }
 
-async function proxy(origin, request) {
+// The orders Worker is reached through its service binding (ORDERS in wrangler.jsonc) when there is one: a request to its public
+// workers.dev address arrives with Cloudflare's own address as CF-Connecting-IP, so every visitor would share one rate-limit counter.
+async function proxy(origin, request, binding = null) {
   const target = new URL(request.url);
   const upstream = new URL(origin);
   target.protocol = upstream.protocol;
   target.host = upstream.host;
   const proxied = new Request(target, request);
   proxied.headers.set('Host', upstream.host);
-  return fetch(proxied);
+  return binding ? binding.fetch(proxied) : fetch(proxied);
+}
+
+// A card app gets no cookies (sent4u.link's are the sign-in session's and this gateway's own, and no app uses any) and can set none:
+// the apps are other sites served under this address, and must never see or replace the session.
+async function proxyApp(origin, request) {
+  const outgoing = new Request(request);
+  outgoing.headers.delete('Cookie');
+  const response = await proxy(origin, outgoing);
+  if (!response.headers.has('Set-Cookie')) return response;
+  const next = new Response(response.body, response);
+  next.headers.delete('Set-Cookie');
+  return next;
 }
 
 function readCookie(request, name) {
@@ -179,13 +193,13 @@ function withAppCookie(response, product) {
   const next = new Response(response.body, response);
   next.headers.append(
     'Set-Cookie',
-    `${COOKIE_NAME}=${product}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly`,
+    `${COOKIE_NAME}=${product}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly; Secure`,
   );
   return next;
 }
 
 function withClearedAppCookie(response) {
   const next = new Response(response.body, response);
-  next.headers.append('Set-Cookie', `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly`);
+  next.headers.append('Set-Cookie', `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure`);
   return next;
 }

@@ -135,4 +135,19 @@ describe('share API', () => {
     const unknown = await worker.fetch(new Request(`${base}/api/shares/NeverIssuedId12345`), e);
     expect(unknown.status).toBe(404);
   });
+
+  it('refuses a plan with a script address in it, or one far too big, and never mints a share without the secret set', async () => {
+    const e = env();
+    const id = 'realOrderId1234567890';
+    await worker.fetch(new Request(`${base}/api/shares/${id}/ensure`, { method: 'POST', headers: { 'x-date-create-secret': 'test-fulfillment-secret' } }), e);
+    const put = (content) => worker.fetch(new Request(`${base}/api/shares/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content }) }), e);
+    expect((await put({ restaurants: [{ mapsLink: 'javascript:alert(1)' }] })).status).toBe(400);
+    expect((await put({ restaurants: [{ mapsLink: ' JaVa	script:alert(1)' }] })).status).toBe(400);
+    expect((await put({ question: 'x'.repeat(70 * 1024) })).status).toBe(413);
+    expect((await put({ restaurants: [{ mapsLink: 'https://maps.google.com/?q=x' }] })).status).toBe(200);
+
+    const unset = env({ SHARE_CREATE_SECRET: undefined });
+    const open = await worker.fetch(new Request(`${base}/api/shares/${id}/ensure`, { method: 'POST' }), unset);
+    expect(open.status).toBe(403);
+  });
 });

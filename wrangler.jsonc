@@ -36,4 +36,7 @@
     // belongs to. Demo ids (test-pixel, test-picnic, ...) never need this.
     "ORDERS_API_BASE": "https://sent4u-reviews.sent4u-link.workers.dev",
   },
+  // The same orders Worker as a service binding: the gateway reaches it through this (not the public address above), so it sees each
+  // visitor's own IP for its rate limits. ORDERS_API_BASE is still needed: it is the address the requests are written for.
+  "services": [{ "binding": "ORDERS", "service": "sent4u-reviews" }],
 }

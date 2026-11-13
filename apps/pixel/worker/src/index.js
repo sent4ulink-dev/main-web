@@ -219,9 +219,14 @@ function corsHeaders(request, env) {
 // server-to-server, the moment a paid order generates this id. Never called from a
 // browser: there is no public studio, no password, no way to mint a share id from
 // this app at all — a real invitation only ever exists because it was paid for.
-function createSecretOk(request, env) {
-  if (!env.SHARE_CREATE_SECRET) return true; // not configured yet — dev convenience only
-  return request.headers.get('x-date-create-secret') === env.SHARE_CREATE_SECRET;
+async function createSecretOk(request, env) {
+  if (!env.SHARE_CREATE_SECRET) return false; // not configured: nobody may create a share this way
+  // compared as digests, so the time taken says nothing about how much of a guess was right
+  const digest = async (v) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+  const [a, b] = await Promise.all([digest(request.headers.get('x-date-create-secret') || ''), digest(env.SHARE_CREATE_SECRET)]);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
 
 // Self-heal: if a share isn't in storage yet, ask the sent4u order Worker whether this
@@ -270,7 +275,7 @@ export default {
 
       const ensure = url.pathname.match(/^\/shares\/([A-Za-z0-9_-]+)\/ensure$/);
       if (ensure && request.method === 'POST') {
-        if (!createSecretOk(request, env)) return reply({ error: 'forbidden' }, 403, cors);
+        if (!(await createSecretOk(request, env))) return reply({ error: 'forbidden' }, 403, cors);
         const id = ensure[1];
         if (!validId(id)) return reply({ error: 'Invalid id.' }, 422, cors);
         const existing = await storage.get(id);

@@ -21,4 +21,11 @@ assets/models/moon.glb
 # local secrets and dev state
 .dev.vars
 .env*.local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+test-results/
+playwright-report/
 .sites-runtime/

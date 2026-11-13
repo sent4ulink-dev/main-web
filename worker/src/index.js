@@ -48,8 +48,9 @@
 
    KV layout (see AUTH in wrangler.toml) — both auto-expire, nothing to clean up by hand
      login:<token>    a pending sign-in link's destination email, 15-minute TTL, deleted the moment it's used (one-time)
-     session:<token>  a signed-in visitor's email, 30-day TTL
-     rla:<hash>       per-visitor counters for requesting sign-in links */
+     pending:<token>  a browser waiting for its sign-in to be confirmed (its two-digit number), 15-minute TTL
+     session:<token>  a signed-in visitor's email, 90-day TTL (renewed at most weekly while used)
+   (the counters for sign-in emails live in R2: rla/<hash>.json per visitor, rle/<hash>.json per inbox) */
 
 const TOOLS = ['Send', 'Pixel', 'Pinky', 'WinXP', 'Petal Isle', 'Picnic', 'Heritage', 'Salon', 'Mission', 'Halloween', 'Halloween Night', 'Thanksgiving', 'Marketplace'];   // Salon = Heritage's old name
 const MAX_LIST = 100;             // how many reviews the public list holds
@@ -99,8 +100,9 @@ export default {
 
 /* ---------------- responses + CORS ---------------- */
 
+// no-store unless a route says otherwise (the public lists do): orders, sessions and /me must never sit in a cache
 function reply(body, status, cors, extra = {}) {
-  return new Response(JSON.stringify(body), { status, headers: { ...JSON_TYPE, ...cors, ...extra } });
+  return new Response(JSON.stringify(body), { status, headers: { ...JSON_TYPE, 'Cache-Control': 'no-store', ...cors, ...extra } });
 }
 
 function allowedOrigins(env) {
@@ -337,10 +339,11 @@ function readCookie(request, name) {
   if (!header) return null;
   for (const part of header.split(';')) {
     const [key, ...rest] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(rest.join('='));
+    if (key === name) { try { return decodeURIComponent(rest.join('=')); } catch { return null; } }
   }
   return null;
 }
+const TOKEN_SHAPE = /^[A-Za-z0-9_-]{22}$/;   // every token this Worker makes (randomToken): anything else is not worth a KV read
 
 // The cookies carry no Domain attribute, so the browser scopes them to whichever host actually answered — sent4u.link, since the
 // gateway proxies /auth/* and /me there (see gateway/index.js): first-party cookies, not ones shared cross-site with this Worker's own
@@ -362,7 +365,7 @@ async function startSession(env, email) {
 
 async function readSession(request, env) {
   const token = readCookie(request, SESSION_COOKIE);
-  if (!token) return null;
+  if (!token || !TOKEN_SHAPE.test(token)) return null;
   const stored = await env.AUTH.get(`session:${token}`);
   return stored ? { token, ...JSON.parse(stored) } : null;
 }
@@ -402,6 +405,20 @@ async function loginLimit(env, ipHash) {
   return false;
 }
 
+// …and per inbox, whoever asks: a handful of IP addresses must not be able to fill one person's inbox with sign-in emails.
+async function recipientLimit(env, emailHash) {
+  const key = `rle/${emailHash}.json`;
+  const now = Date.now(), hour = Math.floor(now / 3_600_000), day = new Date(now).toISOString().slice(0, 10);
+  const stored = await env.BUCKET.get(key);
+  let s = stored ? await stored.json().catch(() => ({})) : {};
+  if (s.day !== day) s = { day, n: 0, hour, h: 0 };
+  if (s.hour !== hour) { s.hour = hour; s.h = 0; }
+  if (s.h >= 5 || s.n >= 10) return true;
+  s.n += 1; s.h += 1;
+  await env.BUCKET.put(key, JSON.stringify(s));
+  return false;
+}
+
 async function sendLoginEmail(env, email, link) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -434,6 +451,7 @@ async function requestLoginLink(request, env, cors) {
 
   const ipHash = await sha256(`${env.IP_SALT || ''}|${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
   if (await loginLimit(env, ipHash)) return reply({ ok: true, code }, 200, cors, headers);
+  if (await recipientLimit(env, await sha256(`${env.IP_SALT || ''}|to|${email}`))) return reply({ ok: true, code }, 200, cors, headers);
 
   const token = randomToken();
   await env.AUTH.put(`pending:${pending}`, JSON.stringify({ email, code, confirmed: false }), { expirationTtl: LOGIN_TOKEN_TTL_S });
@@ -442,7 +460,7 @@ async function requestLoginLink(request, env, cors) {
   try {
     await sendLoginEmail(env, email, `${origin}/auth/confirm?token=${token}`);
   } catch (err) {
-    console.error('sign-in email failed to send:', err);
+    console.error('sign-in email failed to send:', String(err.message).slice(0, 12));   // the status only: Resend's text can hold the address
   }
   return reply({ ok: true, code }, 200, cors, headers);
 }
@@ -467,7 +485,10 @@ form{margin:0}button,.btn{display:inline-block;width:100%;padding:13px 20px;bord
 .codes button{width:76px;height:64px;padding:0;font-size:1.6rem;border-radius:16px;background:#191926;color:#f3f2f7;border:1px solid rgba(255,255,255,.14)}.codes button:hover{border-color:#7c5cff}
 .or{margin:22px 0 12px;font-size:.85rem}
 </style></head><body><main><a class="logo" href="/"><img src="/assets/brand/logo.webp" width="507" height="120" alt="sent4u"></a>${body}</main></body></html>`;
-  return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', ...headers } });
+  return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY',
+    // same-origin, not no-referrer: with no-referrer a browser sends "Origin: null" on the page's own form posts, which originOk refuses
+    'Referrer-Policy': 'same-origin',
+    'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'", ...headers } });
 }
 const expiredPage = () => page('Link expired', '<h1>This link has expired</h1><p>Sign-in links work for 15 minutes and only once. Go back to sent4u and ask for a new one.</p><a class="btn" href="/">Back to sent4u</a>', 410);
 
@@ -486,7 +507,11 @@ async function confirmPage(request, env) {
   const { code } = JSON.parse(waiting);
   const options = new Set([code]);
   while (options.size < 3) options.add(twoDigits());
-  const shuffled = [...options].sort(() => crypto.getRandomValues(new Uint8Array(1))[0] - 128);
+  const shuffled = [...options];
+  for (let i = shuffled.length - 1; i > 0; i--) {                // Fisher-Yates: the right number is equally likely in each place
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   const buttons = shuffled.map(n => `<button type="submit" name="choice" value="${n}">${n}</button>`).join('');
   return page('Confirm sign-in', `<h1>Signing in on another device?</h1><p>As <b>${escapeHtml(maskEmail(email))}</b>. Tap the number that the other screen is showing.</p>
 <form method="post" action="/auth/confirm"><input type="hidden" name="token" value="${token}"><div class="codes">${buttons}</div></form>
@@ -531,7 +556,7 @@ async function loginStatus(request, env, cors) {
   const answer = body => new Response(JSON.stringify(body), { status: 200, headers });
   if (await readSession(request, env)) { headers.append('Set-Cookie', pendingCookie('', 0)); return answer({ signedIn: true }); }
   const pending = readCookie(request, PENDING_COOKIE);
-  const waiting = pending && (await env.AUTH.get(`pending:${pending}`));
+  const waiting = pending && TOKEN_SHAPE.test(pending) && (await env.AUTH.get(`pending:${pending}`));
   if (!waiting) return answer({ signedIn: false, expired: true });
   const record = JSON.parse(waiting);
   if (!record.confirmed) return answer({ signedIn: false, waiting: true });
@@ -584,7 +609,8 @@ const orderKey = token => `orders/${token}.json`;
 const txKey = id => `tx/${id}.json`;                            // Paddle's transaction id -> our order token
 const REFUND_WINDOW_MS = 10 * 60 * 1000;                        // a buyer can undo a purchase themselves for 10 minutes after paying
 // …and only while no link has been made: a link that exists can be sent, opened and enjoyed, so a refund after that would be a free card
-const refundableUntil = o => (o.status === 'paid' && o.paidAt && o.paddleTransactionId && !o.links.length ? o.paidAt + REFUND_WINDOW_MS : null);
+// (and once Paddle has turned a refund down, the order stays bought: no second try, no switching the links off again and again)
+const refundableUntil = o => (o.status === 'paid' && o.paidAt && o.paddleTransactionId && !o.links.length && o.refundStatus !== 'rejected' ? o.paidAt + REFUND_WINDOW_MS : null);
 const publicOrder = o => ({ token: o.token, pack: o.pack, credits: o.credits, remaining: o.credits - o.links.length, amount: o.amount, status: o.status, links: o.links, paidAt: o.paidAt || null, refundableUntil: refundableUntil(o) });
 
 function randomToken(bytes = 16) {
@@ -636,7 +662,7 @@ async function createCheckout(request, env, cors) {
   // Signed-in visitors get this order added to "My links" automatically — everyone else can still open it later from the checkout
   // redirect or /?order=<token>, same as before sign-in existed. Not required to buy at all.
   const email = await sessionEmail(request, env);
-  const order = { token, pack, credits: PACKS[pack].credits, amount: PACKS[pack].amount, status: 'pending', createdAt: Date.now(), links: [], ipHash, paddleTransactionId: paddle.id, userEmail: email || undefined };
+  const order = { token, pack, credits: PACKS[pack].credits, amount: PACKS[pack].amount, status: 'pending', createdAt: Date.now(), links: [], ipHash, paddleTransactionId: paddle.id, priceId, userEmail: email || undefined };
   await env.BUCKET.put(orderKey(token), JSON.stringify(order), JSON_OBJECT);
   await env.BUCKET.put(txKey(paddle.id), JSON.stringify({ token }), JSON_OBJECT);   // lets a webhook that only carries the transaction id still find this order
   if (email) await addOrderToUser(env, email, token);
@@ -688,17 +714,29 @@ async function getOrder(env, cors, token) {
 // The compare-and-set loop shared by the webhook (Paddle says a transaction completed) and the manual owner-only route below (for fixing
 // an order by hand, or testing). Idempotent: a repeated "paid" notice for an already-paid order is a no-op, not an error — Paddle retries
 // webhooks it isn't sure were received, so this will be called more than once for the same transaction in normal operation.
-async function markPaid(env, token) {
+async function markPaid(env, token, transaction = null) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const found = await readOrder(env, token);
     if (!found) return { error: 'not_found' };
     const { order, etag } = found;
+    if (transaction && !paidForThisOrder(env, order, transaction)) return { error: 'mismatch' };
     if (order.status === 'refunded' || order.status === 'refunding') return { error: 'refunded' };
     if (order.status === 'paid') return { order };
     const next = { ...order, status: 'paid', paidAt: Date.now() };
     if (await env.BUCKET.put(orderKey(token), JSON.stringify(next), { ...JSON_OBJECT, onlyIf: { etagMatches: etag } })) return { order: next };
   }
   return { error: 'busy' };
+}
+
+// The completed transaction is the one this Worker created for this order, and it is for the order's own price: exactly one item,
+// quantity 1. (Paddle's transaction items carry price_id, and price.id in the webhook's expanded form.)
+function paidForThisOrder(env, order, transaction) {
+  if (!order.paddleTransactionId || transaction.id !== order.paddleTransactionId) return false;
+  const expected = order.priceId || (order.pack === 'single' ? env.PADDLE_PRICE_SINGLE : env.PADDLE_PRICE_PACK);
+  const items = Array.isArray(transaction.items) ? transaction.items : [];
+  if (items.length !== 1) return false;
+  const [item] = items;
+  return (item.price_id || (item.price && item.price.id)) === expected && Number(item.quantity) === 1;
 }
 
 async function confirmOrder(request, env, cors, token) {
@@ -751,12 +789,12 @@ async function generateLinks(request, env, cors, token) {
 
 async function refundOrder(request, env, cors, token) {
   if (!(await isOwner(request, env))) return reply({ error: 'Not allowed.' }, 403, cors);
-  const found = await readOrder(env, token);
-  if (!found) return reply({ error: 'We couldn’t find that order.' }, 404, cors);
-  const next = { ...found.order, status: 'refunded', refundedAt: Date.now() };
-  await env.BUCKET.put(orderKey(token), JSON.stringify(next), JSON_OBJECT);
-  await setLinksRevoked(env, next, true);
-  return reply(publicOrder(next), 200, cors);
+  // compare-and-set, so a link made at the same instant can't slip past being revoked
+  const { order, error } = await updateOrder(env, token, o => ({ ...o, status: 'refunded', refundedAt: Date.now() }));
+  if (error === 'not_found') return reply({ error: 'We couldn’t find that order.' }, 404, cors);
+  if (error === 'busy') return reply({ error: 'That order is busy. Please try again.' }, 409, cors);
+  await setLinksRevoked(env, order, true);
+  return reply(publicOrder(order), 200, cors);
 }
 
 // A link stops working the moment its order is refunded (or a refund is on its way), and works again if Paddle turns the refund down.
@@ -806,7 +844,7 @@ async function requestRefund(request, env, cors, token) {
     const saved = await updateOrder(env, token, o => (o.status === 'refunding' ? { ...o, refundAdjustmentId: adjustment.id, refundStatus: adjustment.status } : null));
     return reply(publicOrder(saved.order || order), 200, cors);
   } catch (err) {
-    console.error('paddle: could not create a refund', token, err);
+    console.error('paddle: could not create a refund', short(token), err);
     // Paddle didn't take it: put the order back the way it was, so the buyer still has what they paid for and can try again
     const back = await updateOrder(env, token, o => {
       if (o.status !== 'refunding' || o.refundAdjustmentId) return null;
@@ -882,16 +920,18 @@ async function paddleWebhook(request, env, cors) {
 
   if (event && event.event_type === 'transaction.completed') {
     const data = event.data || {};
-    let token = data.custom_data && data.custom_data.orderToken;
-    if (!token && data.id) {                                      // fallback: look the transaction id up in the secondary index
-      const stored = await env.BUCKET.get(txKey(data.id));
-      if (stored) token = (await stored.json()).token;
-    }
-    if (token) {
-      const { error } = await markPaid(env, token);
-      if (error && error !== 'refunded') console.error('paddle webhook: could not mark paid', token, error);
-    } else {
+    // The order is found by Paddle's transaction id in our own index (written when this Worker created that transaction), never by
+    // custom_data alone: anyone can open a checkout of their own with Paddle.js and the public client token, put someone's order token
+    // in its custom_data and pay for the cheapest price, which would otherwise mark an 8-link order paid for $3.99.
+    const token = await tokenForTransaction(env, data.id);
+    const claimed = data.custom_data && data.custom_data.orderToken;
+    if (!token || (claimed && claimed !== token)) {
       console.error('paddle webhook: transaction.completed with no matching order', data.id);
+    } else {
+      const { error } = await markPaid(env, token, data);
+      // busy: answer with an error so Paddle sends it again, instead of leaving a paid order pending
+      if (error === 'busy') return reply({ error: 'Busy, try again.' }, 503, cors);
+      if (error && error !== 'refunded') console.error('paddle webhook: could not mark paid', short(token), error);
     }
   }
   if (event && (event.event_type === 'adjustment.created' || event.event_type === 'adjustment.updated')) await settleAdjustment(env, event.data || {});
@@ -903,17 +943,22 @@ async function paddleWebhook(request, env, cors) {
 // Paddle-Signature looks like "ts=<unix-seconds>;h1=<hex>" (more than one h1= can appear while a secret is being rotated — every one
 // must be checked, since the request is valid if any of them matches, but there is only ever one secret configured here).
 async function verifyPaddleSignature(rawBody, header, secret) {
-  const parts = Object.fromEntries(header.split(';').map(p => p.split('=').map(s => s.trim())));
-  const ts = Number(parts.ts);
-  if (!ts || !parts.h1) return false;
-  if (Math.abs(Date.now() / 1000 - ts) > WEBHOOK_TOLERANCE_S) return false;
+  const parts = header.split(';').map(p => p.split('=').map(s => s.trim()));
+  const ts = (parts.find(([k]) => k === 'ts') || [])[1] || '';
+  const signatures = parts.filter(([k, v]) => k === 'h1' && v).map(([, v]) => v);
+  if (!/^\d{1,12}$/.test(ts) || !signatures.length) return false;
+  if (Math.abs(Date.now() / 1000 - Number(ts)) > WEBHOOK_TOLERANCE_S) return false;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${ts}:${rawBody}`));
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${ts}:${rawBody}`));   // the ts exactly as Paddle sent it
   const hex = [...new Uint8Array(mac)].map(b => b.toString(16).padStart(2, '0')).join('');
-  return await safeEqual(hex, parts.h1);
+  for (const h1 of signatures) if (await safeEqual(hex, h1)) return true;
+  return false;
 }
 
 /* ---------------- small helpers ---------------- */
+
+// enough of an order token to find it in the bucket by hand, not enough to use it (a token is the buyer's key to their links)
+const short = token => `${String(token).slice(0, 6)}…`;
 
 function randomHex(bytes) {
   return [...crypto.getRandomValues(new Uint8Array(bytes))].map(b => b.toString(16).padStart(2, '0')).join('');

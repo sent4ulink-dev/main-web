@@ -235,7 +235,9 @@ const paddleSig = async (secret, rawBody, ts = Math.floor(Date.now() / 1000)) =>
 const postWebhook = (e, rawBody, sigHeader) => worker.fetch(new Request('https://reviews.test/webhooks/paddle', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...(sigHeader !== undefined ? { 'Paddle-Signature': sigHeader } : {}) }, body: rawBody,
 }), e);
-const completedPayload = (id, token) => JSON.stringify({ event_type: 'transaction.completed', data: { id, custom_data: token ? { orderToken: token } : undefined } });
+const completedPayload = (id, token, priceId = 'pri_pack', quantity = 1) => JSON.stringify({ event_type: 'transaction.completed',
+  data: { id, custom_data: token ? { orderToken: token } : undefined, items: [{ price_id: priceId, price: { id: priceId }, quantity }] } });
+const priceOf = pack => (pack === 'single' ? 'pri_single' : 'pri_pack');
 
 const startOrder = async (e, pack = 'pack', ip = '9.9.9.9') => (await (await call(e, '/checkout', { method: 'POST', body: { pack }, ip })).json());
 const generate = (e, token, items, extra = {}) => call(e, `/orders/${token}/generate`, { method: 'POST', body: { items }, ...extra });
@@ -245,7 +247,7 @@ const generate = (e, token, items, extra = {}) => call(e, `/orders/${token}/gene
 const paidOrder = async (e, calls, pack = 'pack', ip = '9.9.9.9') => {
   const { token } = await startOrder(e, pack, ip);
   const { id } = calls.at(-1);
-  const raw = completedPayload(id, token);
+  const raw = completedPayload(id, token, priceOf(pack));
   const res = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
   assert.equal(res.status, 200);
   return token;
@@ -363,6 +365,40 @@ await test('Paddle webhook: refuses a bad, missing, wrongly-signed or stale sign
   assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status, 'pending');             // none of the above touched the order
   const good = await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
   assert.equal(good.status, 200);
+  assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status, 'paid');
+});
+
+// regression: the webhook used to trust custom_data.orderToken. With Paddle.js and the public client token anyone can open a checkout of
+// their own for the $3.99 price with someone's pack token in custom_data: that marked the 8-link order paid for $3.99.
+await test('Paddle webhook: a payment for another transaction, price or quantity never marks an order paid', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const { token } = await startOrder(e, 'pack');
+  const ours = paddle.calls[0].id;
+  const status = () => JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status;
+  const tries = [
+    completedPayload('txn_made_in_the_browser', token, 'pri_single'),   // a checkout this Worker never created, pointing at our order
+    completedPayload('txn_made_in_the_browser', token, 'pri_pack'),
+    completedPayload(ours, token, 'pri_single'),                        // our transaction, but for the cheap price
+    completedPayload(ours, token, 'pri_pack', 2),
+    completedPayload(ours, 'BBBBBBBBBBBBBBBBBBBBBB', 'pri_pack'),        // custom_data naming another order
+  ];
+  for (const raw of tries) assert.equal((await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw))).status, 200);
+  assert.equal(status(), 'pending');
+  const raw = completedPayload(ours, token, 'pri_pack');
+  await postWebhook(e, raw, await paddleSig(PADDLE_WEBHOOK_SECRET, raw));
+  assert.equal(status(), 'paid');
+});
+
+await test('Paddle webhook: any one of several h1 signatures may match (while Paddle rotates its secret)', async () => {
+  const e = shop(), paddle = fakePaddle();
+  globalThis.fetch = paddle.fetchFn;
+  const { token } = await startOrder(e);
+  const raw = completedPayload(paddle.calls[0].id, token);
+  const ts = Math.floor(Date.now() / 1000);
+  const real = (await paddleSig(PADDLE_WEBHOOK_SECRET, raw, ts)).split(';')[1];
+  assert.equal((await postWebhook(e, raw, `ts=${ts};h1=${'0'.repeat(64)};h1=${'1'.repeat(64)}`)).status, 401);
+  assert.equal((await postWebhook(e, raw, `ts=${ts};${real};h1=${'0'.repeat(64)}`)).status, 200);
   assert.equal(JSON.parse(e.BUCKET.store.get(`orders/${token}.json`)).status, 'paid');
 });
 
@@ -588,6 +624,7 @@ await test('if Paddle rejects the refund, the order comes back', async () => {
   const adj = paddle.calls.at(-1);
   await sendAdjustment(e, 'adjustment.updated', { id: adj.id, action: 'refund', type: 'full', status: 'rejected', transaction_id: adj.body.transaction_id });
   assert.equal(stored(e, token).status, 'paid');
+  assert.equal((await askRefund(e, token)).status, 409);       // no second try: the links can't be switched off again and again
   assert.equal((await generate(e, token, { mission: 1 })).status, 200);
 });
 
@@ -832,6 +869,37 @@ await test('sign-in requests are rate limited per visitor, without revealing tha
   assert.equal(limited.status, 200);            // looks identical to a normal success…
   assert.match((await limited.json()).code, /^\d{2}$/);
   assert.equal(mail.sent.length, 5);             // …but nothing was actually sent the 6th time
+});
+
+await test('one inbox gets at most 5 sign-in emails an hour, however many visitors ask', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  for (let i = 0; i < 8; i++) assert.equal((await requestLink(e, 'victim@example.com', { ip: `7.7.7.${i}` })).status, 200);
+  assert.equal(mail.sent.length, 5);
+});
+
+await test('a malformed or oddly shaped cookie is just "not signed in", not an error', async () => {
+  const e = withEmail(env());
+  assert.equal((await call(e, '/me', { headers: { Cookie: 's4u_session=%E0' } })).status, 401);
+  assert.equal((await call(e, '/me', { headers: { Cookie: `s4u_session=${'x'.repeat(600)}` } })).status, 401);
+  assert.equal((await call(e, '/auth/status', { headers: { Cookie: 's4u_signin=%E0' } })).status, 200);
+});
+
+await test('the confirmation page keeps its own Origin on form posts and allows nothing it does not need', async () => {
+  const e = withEmail(env());
+  const mail = fakeEmail();
+  globalThis.fetch = mail.fetchFn;
+  await startSignIn(e);
+  const res = await call(e, `/auth/confirm?token=${tokenFromEmail(mail.sent)}`, { headers: {} });
+  // no-referrer would make browsers send "Origin: null" on the page's own buttons, which is refused
+  assert.equal(res.headers.get('Referrer-Policy'), 'same-origin');
+  assert.match(res.headers.get('Content-Security-Policy'), /form-action 'self'.*frame-ancestors 'none'/);
+  const nullOrigin = await worker.fetch(new Request('https://reviews.test/auth/confirm', {
+    method: 'POST', headers: { Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token: tokenFromEmail(mail.sent) }).toString(),
+  }), e);
+  assert.equal(nullOrigin.status, 403);
 });
 
 await test('a session lasts 90 days and is renewed while it is used, so a browser stays signed in', async () => {
