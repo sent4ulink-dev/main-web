@@ -59,9 +59,27 @@ const COOKIE_MAX_AGE = 6 * 60 * 60; // 6 hours — long enough for one browsing 
 const API_PATHS = [/^\/auth\//, /^\/me$/, /^\/checkout$/, /^\/orders\//, /^\/stats\/(data|verify|logout)$/];   // (stats: the owner's page, see /worker)
 const SITE_PAGES = /^\/(pay|terms|privacy|refunds|stats)(\.html)?\/?$/i;
 
+// https only. A plain http:// request is sent to the same address over https (301; 308 keeps a POST a POST), and every answer
+// tells the browser to use https for this site from now on (HSTS), so nobody on the same Wi-Fi can swap the page or the payment
+// script on the way. 30 days to start with; raise it to a year (31536000) once it has run without trouble. (Files this Worker
+// doesn't see get the same header from _headers.)
+const HSTS = 'max-age=2592000';
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.protocol === 'http:') {
+      url.protocol = 'https:';
+      return Response.redirect(url.href, ['GET', 'HEAD'].includes(request.method) ? 301 : 308);
+    }
+    const res = await route(request, env, ctx, url);
+    if (res.headers.has('Strict-Transport-Security')) return res;
+    const out = new Response(res.body, res);
+    out.headers.set('Strict-Transport-Security', HSTS);
+    return out;
+  },
+};
+
+async function route(request, env, ctx, url) {
     if (API_PATHS.some(re => re.test(url.pathname))) {
       const ordersApiBase = (env.ORDERS_API_BASE ?? '').replace(/\/$/, '');
       if (!ordersApiBase) return new Response('Not configured.', { status: 501 });
@@ -100,8 +118,7 @@ export default {
       if (proxied.status !== 404 && !pageForAFile) return proxied;
     }
     return env.ASSETS.fetch(request);
-  },
-};
+}
 
 // Which app the page asking for this file is showing, from its Referer (sent4u.link/?share=<id>). A buyer with several
 // links open in tabs has one cookie but many pages: without this, the tab opened first would load its sounds and pictures

@@ -66,4 +66,14 @@ await test('opening a demo counts as a demo open of that card', async () => {
   assert.equal((await visit({ path: '/?share=test-picnic', cf: { asn: 55805, asOrganization: 'Mobicom Corporation', country: 'MN' } })).hitKind, 'demo');
 });
 
+await test('plain http is sent to https, and every answer asks for https from now on (HSTS)', async () => {
+  const { env } = setup();
+  const r = await gateway.fetch(new Request('http://sent4u.link/?share=test-picnic'), env, { waitUntil() {} });
+  assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://sent4u.link/?share=test-picnic');
+  const post = await gateway.fetch(new Request('http://sent4u.link/checkout', { method: 'POST', body: '{}' }), env, { waitUntil() {} });
+  assert.equal(post.status, 308);   // (a POST stays a POST)
+  const ok = await gateway.fetch(new Request('https://sent4u.link/', { headers: { 'User-Agent': UA } }), env, { waitUntil() {} });
+  assert.match(ok.headers.get('Strict-Transport-Security') || '', /max-age=\d+/);
+});
+
 console.log(`\n${passed} gateway tests passed`);
