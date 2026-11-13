@@ -958,6 +958,104 @@ await test('checking out while signed in adds the order to My links; signed out,
   assert.ok(!orders.some(o => o.token === guestToken));
 });
 
+/* ---------------- the owner's stats page ---------------- */
+{
+  const { createHmac } = await import('node:crypto');
+  // an independent TOTP (RFC 6238, SHA-1) to check the Worker's against
+  const b32 = (bytes) => { const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = 0, v = 0, out = ''; for (const x of bytes) { v = (v << 8) | x; bits += 8; while (bits >= 5) { out += A[(v >>> (bits - 5)) & 31]; bits -= 5; } } if (bits) out += A[(v << (5 - bits)) & 31]; return out; };
+  const totp = (seed, step, digits = 6) => {
+    const msg = Buffer.alloc(8); msg.writeUInt32BE(Math.floor(step / 2 ** 32), 0); msg.writeUInt32BE(step >>> 0, 4);
+    const mac = createHmac('sha1', seed).update(msg).digest(); const o = mac[19] & 15;
+    return String((((mac[o] & 0x7f) << 24) | (mac[o + 1] << 16) | (mac[o + 2] << 8) | mac[o + 3]) % 10 ** digits).padStart(digits, '0');
+  };
+  const SEED = Buffer.from('12345678901234567890');
+  const OWNER = 'owner@example.com';
+  const fakeD1 = (rows) => ({
+    prepare(sql) { return { sql, bind() { return this; } }; },
+    async batch(stmts) { return stmts.map((s) => ({ results: s.sql.includes('FROM hits') ? rows.hits : s.sql.includes('FROM visitors') ? rows.visitors : s.sql.includes('FROM countries') ? rows.countries : rows.referrers })); },
+  });
+  const today = new Date(Date.now()).toISOString().slice(0, 10);
+  const statsEnv = () => ({ ...env(), OWNER_EMAIL: OWNER, STATS_TOTP_SECRET: b32(SEED), STATS_TZ_OFFSET_MIN: '0',
+    STATS: fakeD1({ hits: [{ day: today, kind: 'home', product: '', n: 40 }, { day: today, kind: 'demo', product: 'picnic', n: 7 }, { day: today, kind: 'link', product: 'pixel', n: 3 }],
+      visitors: [{ day: today, n: 25 }], countries: [{ country: 'MN', n: 30 }], referrers: [{ host: 'tiktok.com', n: 9 }] }) });
+  let sessions = 0;
+  const signIn = async (e, email) => { const t = `S${String(++sessions).padStart(21, '0')}`; await e.AUTH.put(`session:${t}`, JSON.stringify({ email, renewedAt: Date.now() })); return t; };
+  const cookies = (...pairs) => ({ Cookie: pairs.filter(Boolean).join('; ') });
+  const verify = (e, session, code) => call(e, '/stats/verify', { method: 'POST', body: { code }, headers: cookies(`s4u_session=${session}`) });
+  const statsCookie = (res) => (res.headers.get('Set-Cookie') || '').match(/s4u_stats=([^;]*)/)?.[1];
+
+  await test('stats: the reference TOTP matches RFC 6238\'s test vectors', async () => {
+    assert.equal(totp(SEED, Math.floor(59 / 30), 8), '94287082');
+    assert.equal(totp(SEED, Math.floor(1111111109 / 30), 8), '07081804');
+  });
+
+  await test('stats: signed out, someone else, and the owner without a code are all kept out', async () => {
+    const e = statsEnv();
+    let res = await call(e, '/stats/data');
+    assert.equal(res.status, 401); assert.equal((await res.json()).need, 'signin');
+    res = await call(e, '/stats/data', { headers: cookies(`s4u_session=${await signIn(e, 'someone@example.com')}`) });
+    assert.equal(res.status, 403);
+    res = await call(e, '/stats/data', { headers: cookies(`s4u_session=${await signIn(e, 'Owner@Example.com')}`) });
+    assert.equal(res.status, 401); assert.equal((await res.json()).need, 'code');
+    // nor does a made-up stats cookie open it
+    res = await call(e, '/stats/data', { headers: cookies(`s4u_session=${await signIn(e, OWNER)}`, `s4u_stats=${'x'.repeat(22)}`) });
+    assert.equal(res.status, 401);
+  });
+
+  await test('stats: a wrong code is refused, five wrong codes lock it for 15 minutes', async () => {
+    const e = statsEnv(), s = await signIn(e, OWNER);
+    const right = totp(SEED, Math.floor(Date.now() / 30000));
+    const wrong = String((Number(right) + 500000) % 1000000).padStart(6, '0');
+    for (let i = 0; i < 5; i++) assert.equal((await verify(e, s, wrong)).status, 401);
+    assert.equal((await verify(e, s, right)).status, 429);   // even the right one, until the 15 minutes are up
+    assert.equal((await verify(e, await signIn(e, 'someone@example.com'), right)).status, 403);
+  });
+
+  await test('stats: the right code opens the page for that sign-in only, and works only once', async () => {
+    const e = statsEnv(), s = await signIn(e, OWNER);
+    const code = totp(SEED, Math.floor(Date.now() / 30000));
+    const res = await verify(e, s, code);
+    assert.equal(res.status, 200);
+    const set = res.headers.get('Set-Cookie');
+    assert.match(set, /Path=\/stats/); assert.match(set, /HttpOnly/); assert.match(set, /SameSite=Strict/); assert.match(set, /Secure/);
+    const token = statsCookie(res);
+    assert.equal((await call(e, '/stats/data', { headers: cookies(`s4u_session=${s}`, `s4u_stats=${token}`) })).status, 200);
+    // the same cookie with another sign-in doesn't open it
+    assert.equal((await call(e, '/stats/data', { headers: cookies(`s4u_session=${await signIn(e, OWNER)}`, `s4u_stats=${token}`) })).status, 401);
+    // the same code again (someone who saw it) doesn't work
+    assert.equal((await verify(e, await signIn(e, OWNER), code)).status, 401);
+    // a POST from another site is refused
+    assert.equal((await call(e, '/stats/verify', { method: 'POST', body: { code }, origin: 'https://evil.example', headers: cookies(`s4u_session=${s}`) })).status, 403);
+    // signing out of the page closes it
+    await call(e, '/stats/logout', { method: 'POST', headers: cookies(`s4u_stats=${token}`) });
+    assert.equal((await call(e, '/stats/data', { headers: cookies(`s4u_session=${s}`, `s4u_stats=${token}`) })).status, 401);
+  });
+
+  await test('stats: visits and purchases add up, refunds apart, and nothing personal is sent', async () => {
+    const e = statsEnv(), s = await signIn(e, OWNER);
+    const now = Date.now();
+    const put = (tok, o) => e.BUCKET.put(`orders/${tok}.json`, JSON.stringify({ token: tok, links: [], userEmail: 'buyer@example.com', ipHash: 'abc', ...o }));
+    await put('A'.repeat(22), { pack: 'single', credits: 1, amount: 399, status: 'paid', createdAt: now, paidAt: now, links: [{ id: 'x', product: 'picnic', at: now }] });
+    await put('B'.repeat(22), { pack: 'pack', credits: 8, amount: 1499, status: 'paid', createdAt: now, paidAt: now, links: [{ id: 'y', product: 'pixel', at: now }, { id: 'z', product: 'picnic', at: now }] });
+    await put('C'.repeat(22), { pack: 'single', credits: 1, amount: 399, status: 'refunded', createdAt: now, paidAt: now, refundedAt: now });
+    await put('D'.repeat(22), { pack: 'pack', credits: 8, amount: 1499, status: 'pending', createdAt: now });
+    const res0 = await verify(e, s, totp(SEED, Math.floor(Date.now() / 30000)));
+    const res = await call(e, '/stats/data', { headers: cookies(`s4u_session=${s}`, `s4u_stats=${statsCookie(res0)}`) });
+    assert.equal(res.status, 200);
+    const d = await res.json();
+    const last = d.days.length - 1;
+    assert.equal(d.days[last], today);
+    assert.equal(d.daily.visitors[last], 25); assert.equal(d.daily.views[last], 50); assert.equal(d.daily.demos[last], 7); assert.equal(d.daily.opens[last], 3);
+    assert.equal(d.daily.checkouts[last], 4); assert.equal(d.daily.purchases[last], 2); assert.equal(d.daily.revenue[last], 1898); assert.equal(d.daily.refunds[last], 1);
+    assert.deepEqual([d.all.purchases, d.all.revenue, d.all.refunds, d.all.refunded, d.all.single, d.all.pack, d.all.links, d.all.unused], [2, 1898, 1, 399, 1, 1, 3, 6]);
+    assert.deepEqual(d.linksByCard, { picnic: 2, pixel: 1 }); assert.deepEqual(d.demoByCard, { picnic: 7 }); assert.deepEqual(d.countries, [['MN', 30]]);
+    assert.equal(d.recent.length, 3);
+    const text = JSON.stringify(d);
+    assert.ok(!text.includes('buyer@example.com') && !text.includes('AAAAAAAAAAAAAAAAAAAAAA') && !text.includes('abc'), 'no emails, order tokens or address hashes');
+    assert.equal(res.headers.get('Cache-Control'), 'no-store');
+  });
+}
+
 globalThis.fetch = realFetch;
 
 console.log(`\n${passed} tests passed`);

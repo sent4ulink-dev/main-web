@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>sent4u stats</title>
+<link rel="icon" href="/assets/brand/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- The owner's stats: visits (counted by the gateway, without cookies) and purchases (from the orders). Only for the owner, signed
+     in and with an authenticator code: see "the owner's stats page" in worker/src/index.js. -->
+<style>
+  :root{ --bg:#08080c; --panel:#11111a; --panel-2:#171722; --line:rgba(255,255,255,.08); --ink:#f4f4f8; --ink-2:#b4b4c6; --ink-3:#7c7c92;
+    --violet:#8b6dff; --pink:#ff6b9d; --good:#3ddc84; --bad:#ff6b6b; --ff-head:'Space Grotesk',system-ui,sans-serif; --ff:'Inter',system-ui,sans-serif; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 var(--ff); -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1180px; margin:0 auto; padding:24px 16px 64px; }
+  header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:28px; }
+  .brand{ display:flex; align-items:center; gap:12px; color:var(--ink); text-decoration:none; }
+  .brand img{ height:28px; width:auto; display:block; }
+  .brand span{ font:600 1rem var(--ff-head); color:var(--ink-2); padding-left:12px; border-left:1px solid var(--line); }
+  .actions{ display:flex; gap:8px; }
+  button, .btn{ appearance:none; border:1px solid var(--line); background:var(--panel-2); color:var(--ink); font:600 .85rem var(--ff); padding:9px 14px; border-radius:10px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+  button:hover, .btn:hover{ border-color:rgba(255,255,255,.2); }
+  .btn.primary, button.primary{ background:var(--violet); border-color:var(--violet); color:#fff; }
+  .gate{ max-width:420px; margin:12vh auto 0; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:28px; text-align:center; }
+  .gate h1{ font:700 1.5rem/1.2 var(--ff-head); margin:0 0 8px; }
+  .gate p{ color:var(--ink-2); margin:0 0 20px; }
+  .code{ width:100%; font:600 1.6rem/1 var(--ff-head); letter-spacing:.35em; text-align:center; padding:14px 10px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--ink); margin-bottom:14px; }
+  .code:focus{ outline:2px solid var(--violet); outline-offset:2px; }
+  .msg{ min-height:1.4em; margin:12px 0 0; color:var(--bad); font-size:.9rem; }
+  h2{ font:600 1.05rem var(--ff-head); margin:0 0 4px; }
+  .sub{ color:var(--ink-3); font-size:.82rem; margin:0 0 14px; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; margin-bottom:28px; }
+  .tile{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .tile b{ display:block; font:700 1.7rem/1.1 var(--ff-head); letter-spacing:-.02em; }
+  .tile small{ display:block; color:var(--ink-2); font-size:.8rem; margin-top:4px; }
+  .tile .note{ color:var(--ink-3); }
+  .section-title{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 0 12px; }
+  .section-title h2{ margin:0; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; margin-bottom:16px; position:relative; }
+  .charts{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+  .charts .panel{ margin:0; }
+  svg.chart{ display:block; width:100%; height:200px; overflow:visible; }
+  .chart .grid-line{ stroke:var(--line); stroke-width:1; }
+  .chart .axis{ fill:var(--ink-3); font:11px var(--ff); }
+  .chart .hit{ fill:transparent; cursor:default; }
+  .chart .bar.on{ filter:brightness(1.25); }
+  .tip{ position:absolute; pointer-events:none; background:#000; border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:.8rem; color:var(--ink); white-space:nowrap; opacity:0; transform:translate(-50%,-100%); transition:opacity .1s; z-index:2; }
+  .tip b{ display:block; font-weight:600; color:var(--ink-2); margin-bottom:2px; }
+  .lists{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; margin-bottom:16px; }
+  .lists .panel{ margin:0; }
+  table{ width:100%; border-collapse:collapse; font-size:.86rem; }
+  th, td{ text-align:left; padding:7px 0; border-bottom:1px solid var(--line); }
+  th{ color:var(--ink-3); font-weight:500; font-size:.76rem; text-transform:uppercase; letter-spacing:.06em; }
+  td.n, th.n{ text-align:right; font-variant-numeric:tabular-nums; }
+  th + th, td + td{ padding-left:12px; }
+  tr:last-child td{ border-bottom:0; }
+  .meter{ display:block; height:4px; margin-top:4px; border-radius:2px; background:var(--violet); opacity:.7; }
+  .empty{ color:var(--ink-3); font-size:.86rem; padding:6px 0; }
+  .status-paid{ color:var(--good); } .status-refunded, .status-refunding{ color:var(--bad); }
+  details summary{ cursor:pointer; color:var(--ink-2); font-size:.85rem; margin-top:10px; }
+  .foot{ color:var(--ink-3); font-size:.8rem; margin-top:24px; }
+  [hidden]{ display:none !important; }
+  @media (min-width:900px){ .lists .wide{ grid-column:span 2; } }
+  @media (max-width:760px){ .charts{ grid-template-columns:1fr; } header{ flex-wrap:wrap; } .tile b{ font-size:1.4rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/"><img src="/assets/brand/logo.webp" width="507" height="120" alt="sent4u"><span>Stats</span></a>
+    <div class="actions" id="actions" hidden>
+      <button type="button" id="refresh">Refresh</button>
+      <button type="button" id="lock">Lock</button>
+    </div>
+  </header>
+
+  <section class="gate" id="loading"><p>Loading…</p></section>
+
+  <section class="gate" id="signin" hidden>
+    <h1>Sign in first</h1>
+    <p>This page is only for the site’s owner. Sign in on the homepage with the owner’s email, then come back to sent4u.link/stats.</p>
+    <a class="btn primary" href="/?signin">Go to sign in</a>
+  </section>
+
+  <section class="gate" id="denied" hidden>
+    <h1>Not available</h1>
+    <p>This page is only for the site’s owner. You’re signed in with another email.</p>
+    <a class="btn" href="/?signin">Switch account</a>
+  </section>
+
+  <form class="gate" id="code" hidden>
+    <h1>Enter your code</h1>
+    <p>Open Google Authenticator and type the 6-digit code for sent4u.</p>
+    <input class="code" id="codeInput" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" aria-label="6-digit code" required>
+    <button class="primary" type="submit" id="codeBtn" style="width:100%;justify-content:center">Open stats</button>
+    <p class="msg" id="codeMsg" role="status"></p>
+  </form>
+
+  <main id="dash" hidden>
+    <div class="section-title"><h2>Last 30 days</h2><span class="sub" id="updated"></span></div>
+    <div class="grid" id="tiles30"></div>
+
+    <div class="charts">
+      <div class="panel"><h2>Visitors per day</h2><p class="sub">Different people each day (bots and link previews aren’t counted)</p><svg class="chart" id="chartVisitors" role="img" aria-label="Visitors per day, last 30 days"></svg><div class="tip"></div></div>
+      <div class="panel"><h2>Purchases per day</h2><p class="sub">Paid orders, not counting refunded ones</p><svg class="chart" id="chartPurchases" role="img" aria-label="Purchases per day, last 30 days"></svg><div class="tip"></div></div>
+    </div>
+
+    <div class="lists">
+      <div class="panel"><h2>Demo opens by card</h2><p class="sub">Last 30 days</p><div id="demoByCard"></div></div>
+      <div class="panel"><h2>Bought links opened</h2><p class="sub">Last 30 days, by card</p><div id="opensByCard"></div></div>
+      <div class="panel"><h2>Where visitors are</h2><p class="sub">Last 30 days, by country</p><div id="countries"></div></div>
+      <div class="panel"><h2>Where they came from</h2><p class="sub">Last 30 days, the site that linked to you</p><div id="referrers"></div></div>
+    </div>
+
+    <div class="section-title" style="margin-top:28px"><h2>All time</h2></div>
+    <div class="grid" id="tilesAll"></div>
+
+    <div class="lists">
+      <div class="panel"><h2>Links made by card</h2><p class="sub">All time, from paid orders</p><div id="linksByCard"></div></div>
+      <div class="panel wide"><h2>Latest purchases</h2><p class="sub">No buyer details are shown here</p><div id="recent" style="overflow-x:auto"></div></div>
+    </div>
+
+    <details class="panel"><summary>Every day as a table</summary><div id="dayTable" style="margin-top:12px;overflow-x:auto"></div></details>
+
+    <p class="foot">Visits are counted on sent4u.link’s own server without cookies, so ad blockers don’t hide anyone. A visitor is counted once per day.
+      Revenue is what buyers paid, before Paddle’s fee and any tax. Days follow <span id="tz"></span>.</p>
+  </main>
+</div>
+<script src="/stats.js" defer></script>
+</body>
+</html>

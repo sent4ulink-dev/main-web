@@ -28,6 +28,7 @@
                                 link in the email), not fetched.
    POST   /auth/logout          clears the session cookie
    GET    /me                   the signed-in visitor's own orders  ->  { email, orders: [...] }, or 401 if not signed in
+   GET    /stats/data, POST /stats/verify, POST /stats/logout   the owner's stats page (see "the owner's stats page" below)
 
    R2 layout
      orders/<token>.json  one object per order (pack, credits, status, the links made, and which signed-in visitor made it, if any); the token is
@@ -89,6 +90,9 @@ export default {
       if (url.pathname === '/webhooks/paddle' && request.method === 'POST') return await paddleWebhook(request, env, cors);
       const link = url.pathname.match(/^\/links\/([A-Za-z0-9_-]{22})$/);
       if (link && request.method === 'GET') return await getLink(env, cors, link[1]);
+      if (url.pathname === '/stats/data' && request.method === 'GET') return await statsData(request, env, cors);
+      if (url.pathname === '/stats/verify' && request.method === 'POST') return await statsVerify(request, env, cors);
+      if (url.pathname === '/stats/logout' && request.method === 'POST') return await statsLogout(request, env, cors);
       if (url.pathname === '/') return reply({ ok: true, service: 'sent4u reviews' }, 200, cors);
       return reply({ error: 'Not found' }, 404, cors);
     } catch (err) {
@@ -972,4 +976,176 @@ async function sha256(text) {
 // compare through hashes so the time taken does not depend on how many characters matched
 async function safeEqual(a, b) {
   return (await sha256(a)) === (await sha256(b));
+}
+
+/* ---------------- the owner's stats page (sent4u.link/stats) ----------------
+   Visits (counted by the gateway into the STATS database) and purchases (read from the orders here; nothing is changed). Only for
+   the owner: signed in on sent4u.link with OWNER_EMAIL, and then a code from an authenticator app (STATS_TOTP_SECRET, the usual
+   30-second, 6-digit kind Google Authenticator makes). A right code opens the page for 12 hours in that browser (a cookie for
+   /stats only, kept in AUTH as stats2fa:<token>, tied to that sign-in). Both secrets: npx wrangler secret put … --config worker/wrangler.toml
+     GET  /stats/data     -> the numbers, or 401 { need: 'signin' | 'code' }, or 403 for anyone else
+     POST /stats/verify   { code }  -> sets the cookie (5 tries per 15 minutes; a code works once)
+     POST /stats/logout   -> forgets it */
+const STATS_COOKIE = 's4u_stats';
+const STATS_TTL_S = 12 * 60 * 60;
+const STATS_DAYS = 30;
+
+async function statsOwner(request, env) {
+  const session = await readSession(request, env);
+  if (!session) return { status: 401, body: { need: 'signin' } };
+  const owner = String(env.OWNER_EMAIL || '').trim().toLowerCase();
+  if (!owner || String(session.email).toLowerCase() !== owner) return { status: 403, body: { error: 'This page is only for the site’s owner.' } };
+  return { session };
+}
+
+async function statsUnlocked(request, env, session) {
+  const token = readCookie(request, STATS_COOKIE);
+  if (!token || !TOKEN_SHAPE.test(token)) return false;
+  const stored = await env.AUTH.get(`stats2fa:${token}`);
+  return !!stored && stored === await sha256(`stats|${session.token}`);
+}
+
+function base32Bytes(text) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567', out = [];
+  let bits = 0, value = 0;
+  for (const c of String(text).toUpperCase().replace(/[\s=-]/g, '')) {
+    const i = A.indexOf(c);
+    if (i < 0) throw new Error('bad base32');
+    value = ((value << 5) | i) & 0x1fff; bits += 5;
+    if (bits >= 8) { out.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
+  }
+  return new Uint8Array(out);
+}
+
+// RFC 6238 (TOTP, HMAC-SHA1): the code for 30-second step `step`
+async function totpCode(secretBase32, step, digits = 6) {
+  const key = await crypto.subtle.importKey('raw', base32Bytes(secretBase32), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const msg = new DataView(new ArrayBuffer(8));
+  msg.setUint32(0, Math.floor(step / 2 ** 32)); msg.setUint32(4, step >>> 0);
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, msg.buffer));
+  const o = mac[mac.length - 1] & 15;
+  const bin = ((mac[o] & 0x7f) << 24) | (mac[o + 1] << 16) | (mac[o + 2] << 8) | mac[o + 3];
+  return String(bin % 10 ** digits).padStart(digits, '0');
+}
+
+async function statsVerify(request, env, cors) {
+  if (!originOk(request, env) || !request.headers.get('Origin')) return reply({ error: 'Not allowed.' }, 403, cors);
+  const who = await statsOwner(request, env);
+  if (!who.session) return reply(who.body, who.status, cors);
+  if (!env.STATS_TOTP_SECRET) return reply({ error: 'The authenticator isn’t set up on the server yet.' }, 503, cors);
+  // 5 tries per 15 minutes for this sign-in
+  const triesKey = `stats2fa:tries:${await sha256(who.session.token)}`;
+  const tries = Number(await env.AUTH.get(triesKey)) || 0;
+  if (tries >= 5) return reply({ error: 'Too many tries. Wait 15 minutes, then try again.' }, 429, cors);
+  const { body, fail } = await readBody(request, cors, 200);
+  if (fail) return fail;
+  const code = String((body && body.code) || '').replace(/\s/g, '');
+  const step = Math.floor(Date.now() / 30000);
+  const last = Number(await env.AUTH.get('stats2fa:last')) || 0;   // a code that has worked once doesn't work again
+  let ok = 0;
+  if (/^\d{6}$/.test(code)) {
+    for (const s of [step - 1, step, step + 1]) {
+      if (s > last && await safeEqual(await totpCode(env.STATS_TOTP_SECRET, s), code)) { ok = s; break; }
+    }
+  }
+  if (!ok) {
+    await env.AUTH.put(triesKey, String(tries + 1), { expirationTtl: 15 * 60 });
+    return reply({ error: 'That code isn’t right. Check the app and try the code it shows now.' }, 401, cors);
+  }
+  await env.AUTH.put('stats2fa:last', String(ok), { expirationTtl: 24 * 60 * 60 });
+  await env.AUTH.delete(triesKey);
+  const token = randomToken();
+  await env.AUTH.put(`stats2fa:${token}`, await sha256(`stats|${who.session.token}`), { expirationTtl: STATS_TTL_S });
+  return reply({ ok: true }, 200, cors, { 'Set-Cookie': `${STATS_COOKIE}=${token}; Path=/stats; Max-Age=${STATS_TTL_S}; SameSite=Strict; HttpOnly; Secure` });
+}
+
+async function statsLogout(request, env, cors) {
+  if (!originOk(request, env)) return reply({ error: 'Not allowed.' }, 403, cors);
+  const token = readCookie(request, STATS_COOKIE);
+  if (token && TOKEN_SHAPE.test(token)) await env.AUTH.delete(`stats2fa:${token}`);
+  return reply({ ok: true }, 200, cors, { 'Set-Cookie': `${STATS_COOKIE}=; Path=/stats; Max-Age=0; SameSite=Strict; HttpOnly; Secure` });
+}
+
+async function statsData(request, env, cors) {
+  const who = await statsOwner(request, env);
+  if (!who.session) return reply(who.body, who.status, cors);
+  if (!await statsUnlocked(request, env, who.session)) return reply({ need: 'code' }, 401, cors);
+
+  const offset = Number(env.STATS_TZ_OFFSET_MIN || 0) * 60000;
+  const dayOf = ms => new Date(ms + offset).toISOString().slice(0, 10);
+  const now = Date.now();
+  const days = Array.from({ length: STATS_DAYS }, (_, i) => dayOf(now - (STATS_DAYS - 1 - i) * 864e5));
+  const from = days[0], at = Object.fromEntries(days.map((d, i) => [d, i]));
+  const zero = () => new Array(STATS_DAYS).fill(0);
+  const daily = { visitors: zero(), views: zero(), home: zero(), demos: zero(), opens: zero(), guests: zero(), pay: zero(), checkouts: zero(), purchases: zero(), revenue: zero(), refunds: zero() };
+  const demoByCard = {}, opensByCard = {};
+  let countries = [], referrers = [];
+
+  // visits (the gateway's counts)
+  if (env.STATS) {
+    const db = env.STATS;
+    const [hits, visitors, ctry, refs] = await db.batch([
+      db.prepare('SELECT day, kind, product, n FROM hits WHERE day >= ?1').bind(from),
+      db.prepare('SELECT day, COUNT(*) AS n FROM visitors WHERE day >= ?1 GROUP BY day').bind(from),
+      db.prepare('SELECT country, SUM(n) AS n FROM countries WHERE day >= ?1 GROUP BY country ORDER BY n DESC LIMIT 12').bind(from),
+      db.prepare('SELECT host, SUM(n) AS n FROM referrers WHERE day >= ?1 GROUP BY host ORDER BY n DESC LIMIT 12').bind(from),
+    ]);
+    for (const r of hits.results || []) {
+      const i = at[r.day]; if (i === undefined) continue;
+      const n = Number(r.n) || 0;
+      daily.views[i] += n;
+      if (r.kind === 'home') daily.home[i] += n;
+      if (r.kind === 'demo') { daily.demos[i] += n; demoByCard[r.product] = (demoByCard[r.product] || 0) + n; }
+      if (r.kind === 'link') { daily.opens[i] += n; opensByCard[r.product] = (opensByCard[r.product] || 0) + n; }
+      if (r.kind === 'guest') daily.guests[i] += n;
+      if (r.kind === 'pay') daily.pay[i] += n;
+    }
+    for (const r of visitors.results || []) { const i = at[r.day]; if (i !== undefined) daily.visitors[i] = Number(r.n) || 0; }
+    countries = (ctry.results || []).map(r => [r.country, Number(r.n) || 0]);
+    referrers = (refs.results || []).map(r => [r.host, Number(r.n) || 0]);
+  }
+
+  // purchases (the orders themselves; the newest 800 by when they last changed)
+  const listed = [];
+  let cursor;
+  do {
+    const page = await env.BUCKET.list({ prefix: 'orders/', cursor, limit: 1000 });
+    listed.push(...page.objects);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor && listed.length < 50000);
+  listed.sort((a, b) => (b.uploaded ? +new Date(b.uploaded) : 0) - (a.uploaded ? +new Date(a.uploaded) : 0));
+  const keys = listed.slice(0, 800).map(o => o.key);
+  const orders = [];
+  for (let i = 0; i < keys.length; i += 50) {
+    const part = await Promise.all(keys.slice(i, i + 50).map(k => env.BUCKET.get(k).then(o => (o ? o.json() : null)).catch(() => null)));
+    orders.push(...part.filter(Boolean));
+  }
+  const all = { purchases: 0, revenue: 0, refunds: 0, refunded: 0, single: 0, pack: 0, links: 0, unused: 0 };
+  const linksByCard = {};
+  const bought = [];
+  for (const o of orders) {
+    const ci = at[dayOf(o.createdAt || 0)];
+    if (ci !== undefined) daily.checkouts[ci] += 1;
+    const wasPaid = !!o.paidAt && ['paid', 'refunded', 'refunding'].includes(o.status);
+    if (!wasPaid) continue;
+    bought.push(o);
+    const refunded = o.status === 'refunded' || o.status === 'refunding';
+    const pi = at[dayOf(o.paidAt)];
+    if (refunded) {
+      all.refunds += 1; all.refunded += o.amount || 0;
+      const ri = at[dayOf(o.refundedAt || o.paidAt)];
+      if (ri !== undefined) daily.refunds[ri] += 1;
+    } else {
+      all.purchases += 1; all.revenue += o.amount || 0;
+      all[o.pack === 'pack' ? 'pack' : 'single'] += 1;
+      if (pi !== undefined) { daily.purchases[pi] += 1; daily.revenue[pi] += o.amount || 0; }
+      const links = Array.isArray(o.links) ? o.links : [];
+      all.links += links.length; all.unused += Math.max(0, (o.credits || 0) - links.length);
+      for (const l of links) linksByCard[l.product] = (linksByCard[l.product] || 0) + 1;
+    }
+  }
+  bought.sort((a, b) => b.paidAt - a.paidAt);
+  const recent = bought.slice(0, 12).map(o => ({ at: o.paidAt, pack: o.pack, amount: o.amount || 0, status: o.status, links: Array.isArray(o.links) ? o.links.length : 0 }));
+  return reply({ days, daily, demoByCard, opensByCard, linksByCard, countries, referrers, all, recent, ordersRead: orders.length, ordersTotal: listed.length,
+    tzOffsetMin: Number(env.STATS_TZ_OFFSET_MIN || 0), updatedAt: now }, 200, cors);
 }

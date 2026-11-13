@@ -2326,6 +2326,9 @@ function initAuth(){
     close();
   });
 
+  // /?signin (the stats page's "Go to sign in"): open the sign-in window straight away
+  if (new URLSearchParams(location.search).has('signin')){ history.replaceState(null, '', location.pathname + location.hash); trigger.click(); }
+
   // Already signed in from an earlier visit? Quietly check once on load — no modal, just updates the header button.
   request('/me').then(signedIn).catch(() => {});
 

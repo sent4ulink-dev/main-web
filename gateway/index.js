@@ -56,11 +56,11 @@ const guestOf = (id) => (id && /^[A-Za-z0-9_-]{16,64}$/.test(id) ? 'thanksgiving
 const DEMO_PRODUCTS = Object.fromEntries(PRODUCTS.map(p => [`test-${p}`, p]));
 const COOKIE_NAME = 's4u_app';
 const COOKIE_MAX_AGE = 6 * 60 * 60; // 6 hours — long enough for one browsing session
-const API_PATHS = [/^\/auth\//, /^\/me$/, /^\/checkout$/, /^\/orders\//];
-const SITE_PAGES = /^\/(pay|terms|privacy|refunds)(\.html)?\/?$/i;
+const API_PATHS = [/^\/auth\//, /^\/me$/, /^\/checkout$/, /^\/orders\//, /^\/stats\/(data|verify|logout)$/];   // (stats: the owner's page, see /worker)
+const SITE_PAGES = /^\/(pay|terms|privacy|refunds|stats)(\.html)?\/?$/i;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (API_PATHS.some(re => re.test(url.pathname))) {
       const ordersApiBase = (env.ORDERS_API_BASE ?? '').replace(/\/$/, '');
@@ -70,12 +70,19 @@ export default {
     // The site's own pages (checkout, legal) are never an app's: an app answers any unknown path with its own page, so a
     // buyer who looked at a card a moment ago would otherwise get that card instead of the payment window. These pages also
     // drop the cookie, like the home page, so the style sheet and scripts they load come from this site too.
-    if (SITE_PAGES.test(url.pathname)) return withClearedAppCookie(await env.ASSETS.fetch(request));
+    if (SITE_PAGES.test(url.pathname)) {
+      if (/^\/pay/i.test(url.pathname)) count(request, env, ctx, 'pay');
+      return withClearedAppCookie(await env.ASSETS.fetch(request));
+    }
     if (url.pathname === '/') {
       const shareId = url.searchParams.get('share');
       const product = shareId ? await resolveProduct(shareId, env) : guestOf(url.searchParams.get('guest'));
       const origin = product && originFor(product, env);
-      if (origin) return withAppCookie(await proxyApp(origin, request), product);
+      if (origin) {
+        if (!url.searchParams.has('embed')) count(request, env, ctx, !shareId ? 'guest' : shareId in DEMO_PRODUCTS ? 'demo' : 'link', product);   // (embed: the step editor's own preview)
+        return withAppCookie(await proxyApp(origin, request), product);
+      }
+      count(request, env, ctx, 'home');
       // No id, an id nobody recognizes, or a recognized product that isn't deployed yet:
       // show the marketing site, and drop any stale app cookie so it can't misroute the
       // asset requests this same page is about to make.
@@ -177,6 +184,38 @@ async function proxyApp(origin, request) {
   const next = new Response(response.body, response);
   next.headers.delete('Set-Cookie');
   return next;
+}
+
+/* ---------------- visit counts for the owner's stats page (sent4u.link/stats) ----------------
+   One batch to the STATS database (D1, see worker/stats-schema.sql) per page a person opens, written after the answer has gone
+   (waitUntil), so no page waits for it. Only real page loads: not files, not prefetches, not bots or the previews chat apps make
+   of a link. No cookies: a visitor is a hash of their address and browser with a secret salt and the day, so a visitor can be
+   counted once a day and never followed from one day to the next. */
+const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|meta-externalagent|embedly|whatsapp|telegram|discord|slack|skype|vkshare|pinterest|snapchat|headless|lighthouse|pagespeed|gtmetrix|curl|wget|python|httpclient|okhttp|java\/|go-http|node-fetch|undici|axios|monitor|uptime|scan|check/i;
+function count(request, env, ctx, kind, product = '') {
+  if (!env.STATS || !ctx || request.method !== 'GET') return;
+  const h = request.headers, dest = h.get('Sec-Fetch-Dest');
+  if (dest ? dest !== 'document' : !(h.get('Accept') || '').includes('text/html')) return;
+  if (/prefetch|prerender/i.test(`${h.get('Sec-Purpose') || ''} ${h.get('Purpose') || ''}`)) return;
+  const ua = h.get('User-Agent') || '';
+  if (!ua || BOTS.test(ua)) return;
+  ctx.waitUntil(recordVisit(request, env, kind, product, ua).catch(err => console.error('stats: not counted', String(err && err.message).slice(0, 80))));
+}
+async function recordVisit(request, env, kind, product, ua) {
+  const day = new Date(Date.now() + Number(env.STATS_TZ_OFFSET_MIN || 0) * 60000).toISOString().slice(0, 10);
+  const raw = new TextEncoder().encode(`${env.STATS_SALT || ''}|${day}|${request.headers.get('CF-Connecting-IP') || ''}|${ua}`);
+  const who = [...new Uint8Array(await crypto.subtle.digest('SHA-256', raw))].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
+  const db = env.STATS;
+  const batch = [
+    db.prepare('INSERT INTO hits (day, kind, product, n) VALUES (?1, ?2, ?3, 1) ON CONFLICT(day, kind, product) DO UPDATE SET n = n + 1').bind(day, kind, product),
+    db.prepare('INSERT OR IGNORE INTO visitors (day, h) VALUES (?1, ?2)').bind(day, who),
+  ];
+  const country = request.cf && typeof request.cf.country === 'string' ? request.cf.country.slice(0, 2) : '';
+  if (country) batch.push(db.prepare('INSERT INTO countries (day, country, n) VALUES (?1, ?2, 1) ON CONFLICT(day, country) DO UPDATE SET n = n + 1').bind(day, country));
+  let from = '';   // the site that sent them: its host only, and not this site's own pages
+  try { const r = new URL(request.headers.get('Referer') || ''); if (/^https?:$/.test(r.protocol) && !/(^|\.)sent4u\.link$/i.test(r.hostname)) from = r.hostname.toLowerCase().replace(/^www\./, '').slice(0, 80); } catch { /* none */ }
+  if (from) batch.push(db.prepare('INSERT INTO referrers (day, host, n) VALUES (?1, ?2, 1) ON CONFLICT(day, host) DO UPDATE SET n = n + 1').bind(day, from));
+  await db.batch(batch);
 }
 
 function readCookie(request, name) {

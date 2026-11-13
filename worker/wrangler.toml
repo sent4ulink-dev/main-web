@@ -14,7 +14,15 @@ bucket_name = "sent4u-reviews"
 binding = "AUTH"
 id = "312c951c20e243a4af1c426e75502bde"
 
+# the owner's stats page reads the visit counts the gateway writes (see worker/stats-schema.sql)
+[[d1_databases]]
+binding = "STATS"
+database_name = "sent4u-stats"
+database_id = "b63e7ff1-2b72-4e38-9e90-084640c812be"
+
 [vars]
+# the owner's time zone for the stats page's days, in minutes from UTC (Ulaanbaatar: +8 hours)
+STATS_TZ_OFFSET_MIN = "480"
 # the sites that may send reviews, comma separated. Put your real address here, e.g. https://sent4u.link
 ALLOWED_ORIGINS = "https://sent4u.link,http://localhost:4173"
 

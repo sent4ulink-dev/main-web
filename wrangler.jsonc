@@ -35,8 +35,13 @@
     // The orders Worker (see /worker), used to look up which product a REAL (paid) share id
     // belongs to. Demo ids (test-pixel, test-picnic, ...) never need this.
     "ORDERS_API_BASE": "https://sent4u-reviews.sent4u-link.workers.dev",
+    // the owner's time zone for the stats page's days, in minutes from UTC (Ulaanbaatar: +8 hours)
+    "STATS_TZ_OFFSET_MIN": "480",
   },
   // The same orders Worker as a service binding: the gateway reaches it through this (not the public address above), so it sees each
   // visitor's own IP for its rate limits. ORDERS_API_BASE is still needed: it is the address the requests are written for.
   "services": [{ "binding": "ORDERS", "service": "sent4u-reviews" }],
+  // visit counts for the owner's stats page (sent4u.link/stats): this Worker writes them, the orders Worker reads them.
+  // Tables: worker/stats-schema.sql. Secret: STATS_SALT (npx wrangler secret put STATS_SALT --config wrangler.jsonc).
+  "d1_databases": [{ "binding": "STATS", "database_name": "sent4u-stats", "database_id": "b63e7ff1-2b72-4e38-9e90-084640c812be" }],
 }
