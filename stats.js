@@ -98,6 +98,7 @@
       tile(num(buys30), 'Purchases', v30 ? `${((buys30 / v30) * 100).toFixed(1)}% of visitors` : ''),
       tile(usd(rev30), 'Revenue', 'before fees'),
       tile(num(sum(D.refunds)), 'Refunds'),
+      tile(num(sum(D.auto || [])), 'Probably automated', 'data centres & VPNs, not in the numbers above'),
     ].join('');
     const A = d.all;
     $('tilesAll').innerHTML = [
@@ -106,17 +107,21 @@
       tile(num(A.refunds), 'Refunds', A.refunded ? usd(A.refunded) : ''),
       tile(num(A.links), 'Links made', `${num(A.unused)} paid for, not made yet`),
     ].join('');
-    bars($('chartVisitors'), d.days, D.visitors, '#8b6dff', (i) => `${num(D.visitors[i])} visitors · ${num(D.views[i])} page views<br>${num(D.demos[i])} demo opens · ${num(D.opens[i])} bought links opened`);
+    bars($('chartVisitors'), d.days, D.visitors, '#8b6dff', (i) => `${num(D.visitors[i])} visitors · ${num(D.views[i])} page views<br>${num(D.demos[i])} demo opens · ${num(D.opens[i])} bought links opened${D.auto && D.auto[i] ? `<br>${num(D.auto[i])} probably automated, not counted` : ''}`);
     bars($('chartPurchases'), d.days, D.purchases, '#ff6b9d', (i) => `${num(D.purchases[i])} purchases · ${usd(D.revenue[i])}<br>${num(D.checkouts[i])} checkouts started${D.refunds[i] ? ` · ${num(D.refunds[i])} refunded` : ''}`);
     list('demoByCard', d.demoByCard, { name: (k) => STYLE[k] || k, empty: 'No demo opens yet.' });
     list('opensByCard', d.opensByCard, { name: (k) => STYLE[k] || k, empty: 'No bought links opened yet.' });
     list('countries', d.countries, { name: country, empty: 'No visits yet.' });
     list('referrers', d.referrers, { empty: 'No links from other sites yet (visits typed in or from apps show no source).' });
+    const nets = d.networks || [];
+    $('networks').innerHTML = nets.length
+      ? `<table><thead><tr><th>Network</th><th>Country</th><th class="n">Visits</th></tr></thead><tbody>${nets.map((x) => `<tr><td>${esc(x.org)}${x.auto ? '<span class="tag">automated</span>' : ''}</td><td>${esc(x.country ? country(x.country) : '—')}</td><td class="n">${num(x.n)}</td></tr>`).join('')}</tbody></table>`
+      : '<p class="empty">No visits recorded with their network yet.</p>';
     list('linksByCard', d.linksByCard, { name: (k) => STYLE[k] || k, empty: 'No links made yet.' });
     $('recent').innerHTML = d.recent.length
       ? `<table><thead><tr><th>Paid</th><th>Pack</th><th class="n">Amount</th><th>Status</th><th class="n">Links made</th></tr></thead><tbody>${d.recent.map((o) => `<tr><td>${esc(new Date(o.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</td><td>${o.pack === 'pack' ? '8 links' : '1 link'}</td><td class="n">${usd(o.amount)}</td><td class="status-${esc(o.status)}">${esc(o.status)}</td><td class="n">${num(o.links)}</td></tr>`).join('')}</tbody></table>`
       : '<p class="empty">No purchases yet.</p>';
-    $('dayTable').innerHTML = `<table><thead><tr><th>Day</th><th class="n">Visitors</th><th class="n">Page views</th><th class="n">Demos</th><th class="n">Links opened</th><th class="n">Checkouts</th><th class="n">Purchases</th><th class="n">Revenue</th></tr></thead><tbody>${d.days.map((day, i) => `<tr><td>${esc(shortDay(day))}</td><td class="n">${num(D.visitors[i])}</td><td class="n">${num(D.views[i])}</td><td class="n">${num(D.demos[i])}</td><td class="n">${num(D.opens[i])}</td><td class="n">${num(D.checkouts[i])}</td><td class="n">${num(D.purchases[i])}</td><td class="n">${usd(D.revenue[i])}</td></tr>`).reverse().join('')}</tbody></table>`;
+    $('dayTable').innerHTML = `<table><thead><tr><th>Day</th><th class="n">Visitors</th><th class="n">Page views</th><th class="n">Demos</th><th class="n">Links opened</th><th class="n">Checkouts</th><th class="n">Purchases</th><th class="n">Revenue</th><th class="n">Automated</th></tr></thead><tbody>${d.days.map((day, i) => `<tr><td>${esc(shortDay(day))}</td><td class="n">${num(D.visitors[i])}</td><td class="n">${num(D.views[i])}</td><td class="n">${num(D.demos[i])}</td><td class="n">${num(D.opens[i])}</td><td class="n">${num(D.checkouts[i])}</td><td class="n">${num(D.purchases[i])}</td><td class="n">${usd(D.revenue[i])}</td><td class="n">${num((D.auto || [])[i])}</td></tr>`).reverse().join('')}</tbody></table>`;
     const off = d.tzOffsetMin || 0;
     $('tz').textContent = `UTC${off >= 0 ? '+' : '−'}${Math.abs(off / 60)}`;
     $('updated').textContent = `Updated ${new Date(d.updatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}${d.ordersRead < d.ordersTotal ? ` · the newest ${num(d.ordersRead)} of ${num(d.ordersTotal)} orders` : ''}`;

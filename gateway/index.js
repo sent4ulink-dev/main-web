@@ -82,7 +82,7 @@ export default {
         if (!url.searchParams.has('embed')) count(request, env, ctx, !shareId ? 'guest' : shareId in DEMO_PRODUCTS ? 'demo' : 'link', product);   // (embed: the step editor's own preview)
         return withAppCookie(await proxyApp(origin, request), product);
       }
-      count(request, env, ctx, 'home');
+      if (!url.searchParams.has('embed')) count(request, env, ctx, 'home');
       // No id, an id nobody recognizes, or a recognized product that isn't deployed yet:
       // show the marketing site, and drop any stale app cookie so it can't misroute the
       // asset requests this same page is about to make.
@@ -192,8 +192,25 @@ async function proxyApp(origin, request) {
    of a link. No cookies: a visitor is a hash of their address and browser with a secret salt and the day, so a visitor can be
    counted once a day and never followed from one day to the next. */
 const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|meta-externalagent|embedly|whatsapp|telegram|discord|slack|skype|vkshare|pinterest|snapchat|headless|lighthouse|pagespeed|gtmetrix|curl|wget|python|httpclient|okhttp|java\/|go-http|node-fetch|undici|axios|monitor|uptime|scan|check/i;
+// The owner's own browsers carry this cookie (the orders Worker sets it whenever the owner is signed in): their visits aren't counted.
+const OWNER_COOKIE = 's4u_owner';
+// Networks of data centres, clouds, hosting companies and VPN services. A "visitor" from one of these is almost always a server: a
+// scanner, a crawler that calls itself Chrome, a site copier, or someone on a VPN. Their visits are counted apart, as probably
+// automated, and stay out of the visitor numbers. Cloudflare gives each request its network (cf.asn, cf.asOrganization), not
+// its kind, so this is a list: by network number, and by words in the network's name. Cloudflare's own network is left out on
+// purpose: its WARP app is a VPN that ordinary phone users run. Google Fiber is a home provider, not Google's servers.
+const HOSTING_ASNS = new Set([16509, 14618, 8987, 15169, 19527, 396982, 8075, 8068, 14061, 16276, 24940, 213230, 63949, 20473, 9009, 60781, 28753,
+  51167, 31898, 45102, 37963, 132203, 12876, 60068, 212238, 199524, 202422, 47583, 8560, 36352, 8100, 21859, 62240, 49981, 43350, 136787,
+  207137, 35916, 54290, 46606, 26496, 398101, 9370]);
+const HOSTING_NAMES = /amazon|\baws\b|google(?! fiber)|microsoft|azure|digitalocean|\bovh|hetzner|linode|akamai|vultr|choopa|constant company|m247|leaseweb|contabo|oracle|alibaba|tencent|huawei cloud|scaleway|online s\.?a\.?s|datacamp|cdn77|g-?core|hostinger|ionos|psychz|colocrossing|quadranet|zenlayer|servers\.com|hostwinds|interserver|nforce|worldstream|clouvider|datapacket|ipxo|packethub|tefincom|proton ?ag|mullvad|nordvpn|expressvpn|surfshark|private internet access|kaopu|byteplus|bytedance|hosting|hosted|\bvps\b|data ?cent(er|re)|\bcolo(cation)?\b|dedicated|\bcloud\b/i;
+function automatedNetwork(cf) {
+  const org = String((cf && cf.asOrganization) || '');
+  if (/cloudflare/i.test(org)) return false;
+  return HOSTING_ASNS.has(Number(cf && cf.asn) || 0) || HOSTING_NAMES.test(org);
+}
 function count(request, env, ctx, kind, product = '') {
   if (!env.STATS || !ctx || request.method !== 'GET') return;
+  if (readCookie(request, OWNER_COOKIE) === '1') return;   // the owner looking at their own site
   const h = request.headers, dest = h.get('Sec-Fetch-Dest');
   if (dest ? dest !== 'document' : !(h.get('Accept') || '').includes('text/html')) return;
   if (/prefetch|prerender/i.test(`${h.get('Sec-Purpose') || ''} ${h.get('Purpose') || ''}`)) return;
@@ -205,12 +222,20 @@ async function recordVisit(request, env, kind, product, ua) {
   const day = new Date(Date.now() + Number(env.STATS_TZ_OFFSET_MIN || 0) * 60000).toISOString().slice(0, 10);
   const raw = new TextEncoder().encode(`${env.STATS_SALT || ''}|${day}|${request.headers.get('CF-Connecting-IP') || ''}|${ua}`);
   const who = [...new Uint8Array(await crypto.subtle.digest('SHA-256', raw))].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
-  const db = env.STATS;
-  const batch = [
+  const db = env.STATS, cf = request.cf || {};
+  const country = typeof cf.country === 'string' ? cf.country.slice(0, 2) : '';
+  const auto = automatedNetwork(cf);
+  const org = String(cf.asOrganization || (cf.asn ? `AS${cf.asn}` : 'Unknown network')).slice(0, 80);
+  const batch = [db.prepare('INSERT INTO networks (day, org, country, auto, n) VALUES (?1, ?2, ?3, ?4, 1) ON CONFLICT(day, org, country, auto) DO UPDATE SET n = n + 1').bind(day, org, country, auto ? 1 : 0)];
+  if (auto) {   // counted apart: which page it loaded, and nothing else
+    batch.push(db.prepare('INSERT INTO hits (day, kind, product, n) VALUES (?1, \'auto\', ?2, 1) ON CONFLICT(day, kind, product) DO UPDATE SET n = n + 1').bind(day, kind));
+    await db.batch(batch);
+    return;
+  }
+  batch.push(
     db.prepare('INSERT INTO hits (day, kind, product, n) VALUES (?1, ?2, ?3, 1) ON CONFLICT(day, kind, product) DO UPDATE SET n = n + 1').bind(day, kind, product),
     db.prepare('INSERT OR IGNORE INTO visitors (day, h) VALUES (?1, ?2)').bind(day, who),
-  ];
-  const country = request.cf && typeof request.cf.country === 'string' ? request.cf.country.slice(0, 2) : '';
+  );
   if (country) batch.push(db.prepare('INSERT INTO countries (day, country, n) VALUES (?1, ?2, 1) ON CONFLICT(day, country) DO UPDATE SET n = n + 1').bind(day, country));
   let from = '';   // the site that sent them: its host only, and not this site's own pages
   try { const r = new URL(request.headers.get('Referer') || ''); if (/^https?:$/.test(r.protocol) && !/(^|\.)sent4u\.link$/i.test(r.hostname)) from = r.hostname.toLowerCase().replace(/^www\./, '').slice(0, 80); } catch { /* none */ }

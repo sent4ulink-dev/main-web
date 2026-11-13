@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "npx serve . -l 4173",
     "build": "node scripts/build.mjs",
-    "test": "node worker/test/worker.test.mjs"
+    "test": "node worker/test/worker.test.mjs && node gateway/gateway.test.mjs"
   },
   "keywords": [],
   "author": "",

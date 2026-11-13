@@ -11,4 +11,8 @@ CREATE TABLE IF NOT EXISTS hits (day TEXT NOT NULL, kind TEXT NOT NULL, product 
 CREATE TABLE IF NOT EXISTS visitors (day TEXT NOT NULL, h TEXT NOT NULL, PRIMARY KEY (day, h)) WITHOUT ROWID;
 -- where visits come from: the country (Cloudflare's) and the site that sent them (its host only)
 CREATE TABLE IF NOT EXISTS countries (day TEXT NOT NULL, country TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, country)) WITHOUT ROWID;
+-- the network each visit came from (Cloudflare's name for it) and its country; auto = 1: a data centre, cloud or VPN network, whose
+-- visits are counted apart as probably automated (hits.kind = 'auto', product = the page they loaded), not as visitors
+CREATE TABLE IF NOT EXISTS networks (day TEXT NOT NULL, org TEXT NOT NULL, country TEXT NOT NULL DEFAULT '', auto INTEGER NOT NULL DEFAULT 0,
+  n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, org, country, auto)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS referrers (day TEXT NOT NULL, host TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, host)) WITHOUT ROWID;

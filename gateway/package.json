@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "The sent4u.link gateway Worker (deployed by the root wrangler.jsonc); this file only lets Node run its tests as a module."
+}

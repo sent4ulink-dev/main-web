@@ -575,7 +575,9 @@ async function logout(request, env, cors) {
   if (token) await env.AUTH.delete(`session:${token}`);
   const headers = {};
   clearSessionCookie(headers);
-  return reply({ ok: true }, 200, cors, headers);
+  const res = reply({ ok: true }, 200, cors, headers);
+  res.headers.append('Set-Cookie', OWNER_SEEN_CLEAR);   // signed out: this browser's visits count again
+  return res;
 }
 
 async function getMe(request, env, cors) {
@@ -590,7 +592,9 @@ async function getMe(request, env, cors) {
   const { user } = await readUser(env, session.email);
   const orders = (await Promise.all(user.orders.map(t => readOrder(env, t)))).filter(Boolean).map(({ order }) => publicOrder(order));
   orders.sort((a, b) => (b.links[0]?.at || 0) - (a.links[0]?.at || 0));
-  return reply({ email: session.email, orders }, 200, cors, extra);
+  const res = reply({ email: session.email, orders }, 200, cors, extra);
+  if (isOwnerEmail(env, session.email)) res.headers.append('Set-Cookie', OWNER_SEEN_COOKIE);   // (the owner's own visits aren't counted)
+  return res;
 }
 
 /* ---------------- orders: packs of links ----------------
@@ -987,14 +991,17 @@ async function safeEqual(a, b) {
      POST /stats/verify   { code }  -> sets the cookie (5 tries per 15 minutes; a code works once)
      POST /stats/logout   -> forgets it */
 const STATS_COOKIE = 's4u_stats';
+// on the owner's own signed-in browsers: the gateway doesn't count their visits (see gateway/index.js, OWNER_COOKIE)
+const OWNER_SEEN_COOKIE = 's4u_owner=1; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly; Secure';
+const OWNER_SEEN_CLEAR = 's4u_owner=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure';
+const isOwnerEmail = (env, email) => { const owner = String(env.OWNER_EMAIL || '').trim().toLowerCase(); return !!owner && String(email || '').toLowerCase() === owner; };
 const STATS_TTL_S = 12 * 60 * 60;
 const STATS_DAYS = 30;
 
 async function statsOwner(request, env) {
   const session = await readSession(request, env);
   if (!session) return { status: 401, body: { need: 'signin' } };
-  const owner = String(env.OWNER_EMAIL || '').trim().toLowerCase();
-  if (!owner || String(session.email).toLowerCase() !== owner) return { status: 403, body: { error: 'This page is only for the site’s owner.' } };
+  if (!isOwnerEmail(env, session.email)) return { status: 403, body: { error: 'This page is only for the site’s owner.' } };
   return { session };
 }
 
@@ -1056,7 +1063,9 @@ async function statsVerify(request, env, cors) {
   await env.AUTH.delete(triesKey);
   const token = randomToken();
   await env.AUTH.put(`stats2fa:${token}`, await sha256(`stats|${who.session.token}`), { expirationTtl: STATS_TTL_S });
-  return reply({ ok: true }, 200, cors, { 'Set-Cookie': `${STATS_COOKIE}=${token}; Path=/stats; Max-Age=${STATS_TTL_S}; SameSite=Strict; HttpOnly; Secure` });
+  const res = reply({ ok: true }, 200, cors, { 'Set-Cookie': `${STATS_COOKIE}=${token}; Path=/stats; Max-Age=${STATS_TTL_S}; SameSite=Strict; HttpOnly; Secure` });
+  res.headers.append('Set-Cookie', OWNER_SEEN_COOKIE);
+  return res;
 }
 
 async function statsLogout(request, env, cors) {
@@ -1077,22 +1086,24 @@ async function statsData(request, env, cors) {
   const days = Array.from({ length: STATS_DAYS }, (_, i) => dayOf(now - (STATS_DAYS - 1 - i) * 864e5));
   const from = days[0], at = Object.fromEntries(days.map((d, i) => [d, i]));
   const zero = () => new Array(STATS_DAYS).fill(0);
-  const daily = { visitors: zero(), views: zero(), home: zero(), demos: zero(), opens: zero(), guests: zero(), pay: zero(), checkouts: zero(), purchases: zero(), revenue: zero(), refunds: zero() };
+  const daily = { visitors: zero(), views: zero(), home: zero(), demos: zero(), opens: zero(), guests: zero(), pay: zero(), auto: zero(), checkouts: zero(), purchases: zero(), revenue: zero(), refunds: zero() };
   const demoByCard = {}, opensByCard = {};
-  let countries = [], referrers = [];
+  let countries = [], referrers = [], networks = [];
 
   // visits (the gateway's counts)
   if (env.STATS) {
     const db = env.STATS;
-    const [hits, visitors, ctry, refs] = await db.batch([
+    const [hits, visitors, ctry, refs, nets] = await db.batch([
       db.prepare('SELECT day, kind, product, n FROM hits WHERE day >= ?1').bind(from),
       db.prepare('SELECT day, COUNT(*) AS n FROM visitors WHERE day >= ?1 GROUP BY day').bind(from),
       db.prepare('SELECT country, SUM(n) AS n FROM countries WHERE day >= ?1 GROUP BY country ORDER BY n DESC LIMIT 12').bind(from),
       db.prepare('SELECT host, SUM(n) AS n FROM referrers WHERE day >= ?1 GROUP BY host ORDER BY n DESC LIMIT 12').bind(from),
+      db.prepare('SELECT org, country, auto, SUM(n) AS n FROM networks WHERE day >= ?1 GROUP BY org, country, auto ORDER BY n DESC LIMIT 15').bind(from),
     ]);
     for (const r of hits.results || []) {
       const i = at[r.day]; if (i === undefined) continue;
       const n = Number(r.n) || 0;
+      if (r.kind === 'auto') { daily.auto[i] += n; continue; }   // probably automated: not a page view of a person
       daily.views[i] += n;
       if (r.kind === 'home') daily.home[i] += n;
       if (r.kind === 'demo') { daily.demos[i] += n; demoByCard[r.product] = (demoByCard[r.product] || 0) + n; }
@@ -1103,6 +1114,7 @@ async function statsData(request, env, cors) {
     for (const r of visitors.results || []) { const i = at[r.day]; if (i !== undefined) daily.visitors[i] = Number(r.n) || 0; }
     countries = (ctry.results || []).map(r => [r.country, Number(r.n) || 0]);
     referrers = (refs.results || []).map(r => [r.host, Number(r.n) || 0]);
+    networks = ((nets && nets.results) || []).map(r => ({ org: r.org, country: r.country, auto: !!r.auto, n: Number(r.n) || 0 }));
   }
 
   // purchases (the orders themselves; the newest 800 by when they last changed)
@@ -1146,6 +1158,6 @@ async function statsData(request, env, cors) {
   }
   bought.sort((a, b) => b.paidAt - a.paidAt);
   const recent = bought.slice(0, 12).map(o => ({ at: o.paidAt, pack: o.pack, amount: o.amount || 0, status: o.status, links: Array.isArray(o.links) ? o.links.length : 0 }));
-  return reply({ days, daily, demoByCard, opensByCard, linksByCard, countries, referrers, all, recent, ordersRead: orders.length, ordersTotal: listed.length,
+  return reply({ days, daily, demoByCard, opensByCard, linksByCard, countries, referrers, networks, all, recent, ordersRead: orders.length, ordersTotal: listed.length,
     tzOffsetMin: Number(env.STATS_TZ_OFFSET_MIN || 0), updatedAt: now }, 200, cors);
 }

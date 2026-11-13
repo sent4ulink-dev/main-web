@@ -972,12 +972,14 @@ await test('checking out while signed in adds the order to My links; signed out,
   const OWNER = 'owner@example.com';
   const fakeD1 = (rows) => ({
     prepare(sql) { return { sql, bind() { return this; } }; },
-    async batch(stmts) { return stmts.map((s) => ({ results: s.sql.includes('FROM hits') ? rows.hits : s.sql.includes('FROM visitors') ? rows.visitors : s.sql.includes('FROM countries') ? rows.countries : rows.referrers })); },
+    async batch(stmts) { return stmts.map((s) => ({ results: s.sql.includes('FROM hits') ? rows.hits : s.sql.includes('FROM visitors') ? rows.visitors : s.sql.includes('FROM countries') ? rows.countries : s.sql.includes('FROM networks') ? rows.networks : rows.referrers })); },
   });
   const today = new Date(Date.now()).toISOString().slice(0, 10);
   const statsEnv = () => ({ ...env(), OWNER_EMAIL: OWNER, STATS_TOTP_SECRET: b32(SEED), STATS_TZ_OFFSET_MIN: '0',
-    STATS: fakeD1({ hits: [{ day: today, kind: 'home', product: '', n: 40 }, { day: today, kind: 'demo', product: 'picnic', n: 7 }, { day: today, kind: 'link', product: 'pixel', n: 3 }],
-      visitors: [{ day: today, n: 25 }], countries: [{ country: 'MN', n: 30 }], referrers: [{ host: 'tiktok.com', n: 9 }] }) });
+    STATS: fakeD1({ hits: [{ day: today, kind: 'home', product: '', n: 40 }, { day: today, kind: 'demo', product: 'picnic', n: 7 }, { day: today, kind: 'link', product: 'pixel', n: 3 },
+        { day: today, kind: 'auto', product: 'home', n: 11 }],
+      visitors: [{ day: today, n: 25 }], countries: [{ country: 'MN', n: 30 }], referrers: [{ host: 'tiktok.com', n: 9 }],
+      networks: [{ org: 'M247 Europe SRL', country: 'RO', auto: 1, n: 11 }, { org: 'Mobicom Corporation', country: 'MN', auto: 0, n: 30 }] }) });
   let sessions = 0;
   const signIn = async (e, email) => { const t = `S${String(++sessions).padStart(21, '0')}`; await e.AUTH.put(`session:${t}`, JSON.stringify({ email, renewedAt: Date.now() })); return t; };
   const cookies = (...pairs) => ({ Cookie: pairs.filter(Boolean).join('; ') });
@@ -1031,6 +1033,18 @@ await test('checking out while signed in adds the order to My links; signed out,
     assert.equal((await call(e, '/stats/data', { headers: cookies(`s4u_session=${s}`, `s4u_stats=${token}`) })).status, 401);
   });
 
+  await test("stats: the owner's signed-in browser is marked so its visits aren't counted, and unmarked on signing out", async () => {
+    const e = statsEnv();
+    const mine = await call(e, '/me', { headers: cookies(`s4u_session=${await signIn(e, OWNER)}`) });
+    assert.equal(mine.status, 200);
+    assert.match(mine.headers.get('Set-Cookie') || '', /s4u_owner=1;[^,]*HttpOnly/);
+    const theirs = await call(e, '/me', { headers: cookies(`s4u_session=${await signIn(e, 'someone@example.com')}`) });
+    assert.equal(theirs.status, 200);
+    assert.ok(!(theirs.headers.get('Set-Cookie') || '').includes('s4u_owner'));
+    const out = await call(e, '/auth/logout', { method: 'POST' });
+    assert.match(out.headers.get('Set-Cookie') || '', /s4u_owner=; Path=\/; Max-Age=0/);
+  });
+
   await test('stats: visits and purchases add up, refunds apart, and nothing personal is sent', async () => {
     const e = statsEnv(), s = await signIn(e, OWNER);
     const now = Date.now();
@@ -1048,6 +1062,8 @@ await test('checking out while signed in adds the order to My links; signed out,
     assert.equal(d.daily.visitors[last], 25); assert.equal(d.daily.views[last], 50); assert.equal(d.daily.demos[last], 7); assert.equal(d.daily.opens[last], 3);
     assert.equal(d.daily.checkouts[last], 4); assert.equal(d.daily.purchases[last], 2); assert.equal(d.daily.revenue[last], 1898); assert.equal(d.daily.refunds[last], 1);
     assert.deepEqual([d.all.purchases, d.all.revenue, d.all.refunds, d.all.refunded, d.all.single, d.all.pack, d.all.links, d.all.unused], [2, 1898, 1, 399, 1, 1, 3, 6]);
+    assert.equal(d.daily.auto[last], 11);   // the probably automated visits stay out of the page views above
+    assert.deepEqual(d.networks[0], { org: 'M247 Europe SRL', country: 'RO', auto: true, n: 11 });
     assert.deepEqual(d.linksByCard, { picnic: 2, pixel: 1 }); assert.deepEqual(d.demoByCard, { picnic: 7 }); assert.deepEqual(d.countries, [['MN', 30]]);
     assert.equal(d.recent.length, 3);
     const text = JSON.stringify(d);

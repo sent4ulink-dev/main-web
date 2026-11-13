@@ -60,6 +60,7 @@
   tr:last-child td{ border-bottom:0; }
   .meter{ display:block; height:4px; margin-top:4px; border-radius:2px; background:var(--violet); opacity:.7; }
   .empty{ color:var(--ink-3); font-size:.86rem; padding:6px 0; }
+  .tag{ display:inline-block; margin-left:8px; padding:1px 7px; border-radius:99px; font-size:.7rem; color:var(--ink-2); border:1px solid var(--line); vertical-align:1px; }
   .status-paid{ color:var(--good); } .status-refunded, .status-refunding{ color:var(--bad); }
   details summary{ cursor:pointer; color:var(--ink-2); font-size:.85rem; margin-top:10px; }
   .foot{ color:var(--ink-3); font-size:.8rem; margin-top:24px; }
@@ -114,6 +115,7 @@
       <div class="panel"><h2>Bought links opened</h2><p class="sub">Last 30 days, by card</p><div id="opensByCard"></div></div>
       <div class="panel"><h2>Where visitors are</h2><p class="sub">Last 30 days, by country</p><div id="countries"></div></div>
       <div class="panel"><h2>Where they came from</h2><p class="sub">Last 30 days, the site that linked to you</p><div id="referrers"></div></div>
+      <div class="panel wide"><h2>Networks</h2><p class="sub">Last 30 days: the internet provider each visit came from. Data centres, clouds and VPNs are marked “automated” and aren’t counted as visitors.</p><div id="networks"></div></div>
     </div>
 
     <div class="section-title" style="margin-top:28px"><h2>All time</h2></div>
@@ -126,7 +128,8 @@
 
     <details class="panel"><summary>Every day as a table</summary><div id="dayTable" style="margin-top:12px;overflow-x:auto"></div></details>
 
-    <p class="foot">Visits are counted on sent4u.link’s own server without cookies, so ad blockers don’t hide anyone. A visitor is counted once per day.
+    <p class="foot">Visits are counted on sent4u.link’s own server without cookies, so ad blockers don’t hide anyone. A visitor is counted once per day. Your own visits aren’t counted while you’re signed in.
+      Visits from data centres, clouds and VPN networks are counted apart as probably automated: scanners, crawlers that pretend to be a browser, and people on a VPN. That comes from a list of known networks, so it can miss some.
       Revenue is what buyers paid, before Paddle’s fee and any tax. Days follow <span id="tz"></span>.</p>
   </main>
 </div>
