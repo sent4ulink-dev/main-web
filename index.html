@@ -318,6 +318,7 @@
           <div class="tg-ground"></div>
           <svg class="tg-side tg-left" viewBox="0 0 700 420" preserveAspectRatio="xMinYMax meet"></svg>
           <svg class="tg-side tg-right" viewBox="0 0 700 420" preserveAspectRatio="xMaxYMax meet"></svg>
+          <div class="tg-side tg-smoke"><i></i><i></i><i></i></div><!-- the chimney's smoke, over the right-hand SVG (moved on the GPU, not drawn in the SVG) -->
           <svg class="tg-ball" viewBox="0 0 48 28"><ellipse cx="24" cy="14" rx="22" ry="12.5"/><path class="tg-ball-end" d="M7 7.5q-2 6.5 0 13M41 7.5q2 6.5 0 13"/><path class="tg-lace" d="M16 14h16M19 11v6M22.3 11v6M25.6 11v6M29 11v6"/></svg>
           <div class="tg-leaves"></div>
           <div class="tg-burst"></div>
@@ -472,6 +473,7 @@
       <div class="pricing-grid">
         <article class="price-card" style="--n:0; --side:-1; --c1:#5ce1ff; --c2:#7c5cff">
           <div class="pc-fan"><div class="pc-inner">
+            <span class="pc-ring" aria-hidden="true"></span>
             <div class="pc-body">
               <div class="pc-fx" aria-hidden="true"><span class="pc-glow"></span><span class="pc-foil"></span></div>
               <h3>1 link</h3>
@@ -485,6 +487,7 @@
         </article>
         <article class="price-card featured" style="--n:1; --side:1; --c1:#7c5cff; --c2:#ff6b9d">
           <div class="pc-fan"><div class="pc-inner">
+            <span class="pc-ring" aria-hidden="true"></span>
             <span class="pc-halo" aria-hidden="true"></span><svg class="pc-seal" viewBox="0 0 120 120" aria-hidden="true">
               <defs>
                 <linearGradient id="sealGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#ff6b9d"/></linearGradient>
@@ -492,9 +495,8 @@
               </defs>
               <circle cx="60" cy="60" r="58" fill="url(#sealGrad)"/>
               <circle cx="60" cy="60" r="53" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="2 4"/>
-              <g class="seal-ring"><text><textPath href="#sealPath" id="sealText" textLength="268" lengthAdjust="spacing">BEST VALUE ✦ BEST VALUE ✦ </textPath></text></g>
               <path class="seal-star" d="M60 44 L65 55 L77 56.5 L68 65 L70.5 77 L60 71 L49.5 77 L52 65 L43 56.5 L55 55 Z"/>
-            </svg><span class="pc-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>Best value</span>
+            </svg><svg class="pc-seal-ring" viewBox="0 0 120 120" aria-hidden="true"><text><textPath href="#sealPath" id="sealText" textLength="268" lengthAdjust="spacing">BEST VALUE ✦ BEST VALUE ✦ </textPath></text></svg><span class="pc-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>Best value</span>
             <div class="pc-body">
               <div class="pc-fx" aria-hidden="true"><span class="pc-glow"></span><span class="pc-foil"></span></div>
               <h3>8 links</h3>

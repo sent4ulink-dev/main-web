@@ -349,8 +349,11 @@ main{ position:relative; overflow-x:clip; } /* slide-in reveals must not widen t
 /* everything behind the cards is one scene that fades in and out with the section, and to nothing at its top and bottom edge */
 .pr-scene{
   position:absolute; inset:0; z-index:0; pointer-events:none; opacity:var(--pfade,1);
-  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.04) 5%,rgba(0,0,0,.14) 10%,rgba(0,0,0,.34) 15%,rgba(0,0,0,.6) 20%,rgba(0,0,0,.84) 25%,rgba(0,0,0,.96) 30%,#000 34%,#000 66%,rgba(0,0,0,.96) 70%,rgba(0,0,0,.84) 75%,rgba(0,0,0,.6) 80%,rgba(0,0,0,.34) 85%,rgba(0,0,0,.14) 90%,rgba(0,0,0,.04) 95%,rgba(0,0,0,0) 100%);
-  mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.04) 5%,rgba(0,0,0,.14) 10%,rgba(0,0,0,.34) 15%,rgba(0,0,0,.6) 20%,rgba(0,0,0,.84) 25%,rgba(0,0,0,.96) 30%,#000 34%,#000 66%,rgba(0,0,0,.96) 70%,rgba(0,0,0,.84) 75%,rgba(0,0,0,.6) 80%,rgba(0,0,0,.34) 85%,rgba(0,0,0,.14) 90%,rgba(0,0,0,.04) 95%,rgba(0,0,0,0) 100%);
+}
+.pr-scene::after{ /* the fade at the top and bottom (the same as fading the scene out over the page's own background) */
+  content:""; position:absolute; inset:0; z-index:5; pointer-events:none;
+  background:linear-gradient(to bottom,rgb(8 8 12) 0%,rgb(8 8 12/.96) 5%,rgb(8 8 12/.86) 10%,rgb(8 8 12/.66) 15%,rgb(8 8 12/.4) 20%,rgb(8 8 12/.16) 25%,rgb(8 8 12/.04) 30%,rgb(8 8 12/0) 34%,
+    rgb(8 8 12/0) 66%,rgb(8 8 12/.04) 70%,rgb(8 8 12/.16) 75%,rgb(8 8 12/.4) 80%,rgb(8 8 12/.66) 85%,rgb(8 8 12/.86) 90%,rgb(8 8 12/.96) 95%,rgb(8 8 12) 100%);
 }
 .pr-cursor{ /* a soft light that follows the cursor across the whole stage; moved with a transform, so it costs almost nothing */
   position:absolute; left:0; top:0; width:920px; height:920px; margin:-460px 0 0 -460px; border-radius:50%; pointer-events:none; opacity:0; transition:opacity .5s; will-change:transform;
@@ -456,13 +459,16 @@ main{ position:relative; overflow-x:clip; } /* slide-in reveals must not widen t
   position:relative; height:100%; padding:1.5px; border-radius:28px; background:rgba(255,255,255,.1); transform-style:preserve-3d;
   transform:perspective(800px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)); transition:transform .3s ease-out; will-change:transform;
 }
-.pc-inner::before{ /* the gradient border: it spins on the popular plan, and on the others when you hover */
-  content:""; position:absolute; inset:0; border-radius:inherit; opacity:0; transition:opacity .4s;
-  background:conic-gradient(from var(--ang),var(--c1),var(--c2),var(--c1));
-  animation:prSpin 4.5s linear infinite;
+/* the gradient border: it spins on the popular plan, and on the others when you hover. A square of conic gradient turns inside a
+   clipped layer of its own (turning it moves a layer on the GPU; animating the gradient's angle repainted the card every frame) */
+.pc-ring{ position:absolute; inset:0; border-radius:inherit; overflow:hidden; opacity:0; transition:opacity .4s; pointer-events:none; }
+.pc-ring::before{
+  content:""; position:absolute; left:50%; top:50%; width:220%; aspect-ratio:1; translate:-50% -50%;
+  background:conic-gradient(var(--c1),var(--c2),var(--c1)); animation:prSpin 4.5s linear infinite; will-change:rotate;
 }
-.price-card:hover .pc-inner::before, .price-card.featured .pc-inner::before{ opacity:1; }
-@keyframes prSpin{ to{ --ang:360deg; } }
+.price-card:hover .pc-ring, .price-card.featured .pc-ring{ opacity:1; }
+.price-card:not(.featured):not(:hover) .pc-ring::before{ animation-play-state:paused; }
+@keyframes prSpin{ to{ rotate:360deg; } }
 .pc-halo{
   position:absolute; inset:-14%; border-radius:50%; pointer-events:none;
   background:radial-gradient(closest-side,rgba(124,92,255,.55),rgba(255,107,157,.18) 60%,transparent);
@@ -503,18 +509,26 @@ main{ position:relative; overflow-x:clip; } /* slide-in reveals must not widen t
 .pc-badge{
   position:absolute; top:-15px; left:50%; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
   padding:8px 15px; border-radius:99px; color:#fff; font:700 .74rem/1 var(--ff-body); letter-spacing:.03em; transform:translateX(-50%) translateZ(70px);
-  background:linear-gradient(100deg,#7c5cff,#ff6b9d,#ffc94d,#7c5cff); background-size:300% 100%; animation:prShimmer 4s linear infinite;
+  background:#7c5cff; overflow:hidden; isolation:isolate;
   box-shadow:0 10px 26px -8px rgba(255,107,157,.8);
 }
+/* the badge's shimmer: a strip of gradient twice the badge's width slides across it, on the GPU */
+.pc-badge::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:200%; z-index:-1; will-change:transform;
+  background:linear-gradient(100deg,#7c5cff,#ff6b9d,#ffc94d,#7c5cff,#ff6b9d,#ffc94d,#7c5cff); animation:prBadge 8s linear infinite; }
+@keyframes prBadge{ to{ transform:translateX(-50%); } }
 /* a seal that spins on the corner of the popular plan; it says "save 20%" when you pick yearly */
 .pc-seal{
   position:absolute; top:-52px; right:-46px; width:118px; height:118px; pointer-events:none; transform:translateZ(90px) rotate(10deg);
   filter:drop-shadow(0 14px 22px rgba(255,107,157,.55));
 }
 .pc-seal text{ font:700 10.5px var(--ff-head); fill:#fff; letter-spacing:.06em; }
-.seal-ring{ transform-origin:60px 60px; animation:prSpinSeal 16s linear infinite; }
+/* its words turn as a picture of their own on top (a whole element turning moves on the GPU; turning part of an SVG redrew the seal,
+   and its shadow, every frame) */
+.pc-seal-ring{ position:absolute; top:-52px; right:-46px; width:118px; height:118px; pointer-events:none; transform:translateZ(91px) rotate(10deg);
+  animation:prSpinSeal 16s linear infinite; will-change:rotate; }
+.pc-seal-ring text{ font:700 10.5px var(--ff-head); fill:#fff; letter-spacing:.06em; }
 .seal-star{ fill:#fff; }
-@keyframes prSpinSeal{ to{ transform:rotate(360deg); } }
+@keyframes prSpinSeal{ to{ rotate:360deg; } }
 .price-card h3{ position:relative; margin:0 0 4px; font-size:1.5rem; letter-spacing:-.03em; color:#fff; }
 .pc-tag{ position:relative; margin:0 0 22px; font-size:.86rem; color:var(--fg-dim); }
 .pc-price{
@@ -555,10 +569,10 @@ main{ position:relative; overflow-x:clip; } /* slide-in reveals must not widen t
   .pc-fan{ transform:none; }
   .price-card.featured .pc-fan{ --s:1; }
   .pr-row{ font-size:clamp(5rem,26vw,9rem); }
-  .pc-seal{ width:92px; height:92px; top:-40px; right:-10px; }
+  .pc-seal, .pc-seal-ring{ width:92px; height:92px; top:-40px; right:-10px; }
 }
 @media (prefers-reduced-motion:reduce){
-  .pr-row, .pr-fly, .pr-plane i, .pr-aurora i, .pc-halo, .pc-inner::before, .pc-badge, .pc-free span, .price-card.featured .pc-fx::after, .seal-ring{ animation:none; }
+  .pr-row, .pr-fly, .pr-plane i, .pr-aurora i, .pc-halo, .pc-ring::before, .pc-badge::before, .pc-free span, .price-card.featured .pc-fx::after, .pc-seal-ring{ animation:none; }
   .price-card{ opacity:1; }
   .pr-inner > :not(.pricing-grid), .pricing-section h2{ opacity:1; transform:none; filter:none; transition:none; }
   .pc-list li{ opacity:1; transform:none; transition:none; }
@@ -999,7 +1013,7 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .tg-bulb b{ position:absolute; inset:0; border-radius:inherit; background:var(--c); box-shadow:0 0 10px 3px var(--c); opacity:clamp(0, calc(var(--l,0) * 16 - var(--i)), 1); }
 .tg-ground{ position:absolute; left:0; right:0; bottom:0; height:calc(min(46vh,430px) * .1); border-radius:50% 50% 0 0 / 100% 100% 0 0; background:linear-gradient(180deg,#5b5426,#2f2514 80%); }
 .tg-side{ position:absolute; bottom:0; height:min(46vh,430px); width:calc(min(46vh,430px) * 5 / 3); overflow:visible; }
-.tg-left{ left:0; } .tg-right{ right:0; }
+.tg-left{ left:0; } .tg-right, .tg-smoke{ right:0; }
 .tg-side .far{ fill:#6e3448; } .tg-side .mid{ fill:#5b5426; } .tg-side .near{ fill:#2f2514; }
 .tg-win{ fill:#ffcf73; opacity:calc(.28 + var(--w,0) * .72); }
 .tg-doorway{ fill:#ffdf9a; opacity:calc(.3 + var(--w,0) * .7); }
@@ -1016,8 +1030,11 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .tg-rail{ fill:none; stroke:#f1dfbf; stroke-width:3; stroke-linecap:round; }
 .tg-porch{ fill:#6b4a32; } .tg-step{ fill:#7a5a3e; }
 .tg-trunk{ fill:#4a2e1e; }
-.tg-smoke{ fill:rgba(240,226,236,.4); transform-box:fill-box; transform-origin:50% 50%; animation:tgSmoke 4.5s linear infinite; }
-@keyframes tgSmoke{ from{ opacity:0; transform:translate(0,0) scale(.6); } 20%{ opacity:.9; } to{ opacity:0; transform:translate(16px,-60px) scale(1.9); } }
+.tg-smoke{ pointer-events:none; }
+.tg-smoke i{ position:absolute; left:74.43%; top:43.33%; width:2%; aspect-ratio:1; margin:-1% 0 0 -1%; border-radius:50%; opacity:0;
+  background:rgba(240,226,236,.42); animation:tgSmoke 4.5s linear infinite; will-change:transform,opacity; }
+.tg-smoke i:nth-child(2){ animation-delay:-1.5s; } .tg-smoke i:nth-child(3){ animation-delay:-3s; }
+@keyframes tgSmoke{ from{ opacity:0; transform:translate(0,0) scale(.6); } 20%{ opacity:.9; } to{ opacity:0; transform:translate(114%,-430%) scale(1.9); } }
 .tg-barn path{ fill:#8e2f2a; } .tg-barn .tg-barn-roof{ fill:#5a1f1c; }
 .tg-fence{ fill:none; stroke:#6b4426; stroke-width:6; stroke-linecap:round; }
 .tg-corn path{ fill:#c9a24a; } .tg-corn .tg-corn-l{ fill:none; stroke:#a07c30; stroke-width:3; stroke-linecap:round; }
@@ -1029,8 +1046,6 @@ body.menu-open .site-header .header-actions .btn{ opacity:0; pointer-events:none
 .tg-body{ fill:#8a4b2a; } .tg-belly{ fill:#a8643a; } .tg-wing{ fill:#6e3a20; } .tg-neck{ fill:#9b5a35; }
 .tg-eye{ fill:#fff; } .tg-pupil{ fill:#241208; } .tg-cheek{ fill:#ff8a8a; opacity:.55; }
 .tg-beak{ fill:#f2a93b; } .tg-wattle{ fill:#d6343c; }
-.tg-head{ transform-box:fill-box; transform-origin:50% 100%; animation:tgNod 1.5s ease-in-out infinite alternate; }
-@keyframes tgNod{ from{ transform:rotate(-7deg); } to{ transform:rotate(7deg); } }
 .tg-ball{ position:absolute; left:0; top:0; width:46px; height:27px; opacity:0; will-change:transform,opacity; }
 .tg-ball ellipse{ fill:#7a3b1e; stroke:#4a2210; stroke-width:1.5; }
 .tg-lace, .tg-ball-end{ fill:none; stroke:#fff; stroke-width:1.6; stroke-linecap:round; }
@@ -1398,7 +1413,7 @@ body:not(.tide-on) .tide{ display:none; }
 .is-off, .is-off *, .is-off *::before, .is-off *::after{ animation-play-state:paused !important; }
 /* on a slow machine (initPerfGuard adds .lite) the pure decoration goes: the rest of the page looks the same */
 .lite .pr-marquee, .lite .pr-fly, .lite .pr-floor, .lite .rv-aurora, .lite .pr-aurora, .lite .pc-halo, .lite .pc-foil{ display:none; }
-.lite .tide-layer svg, .lite .pc-inner::before, .lite .price-card.featured .pc-fx::after, .lite .pc-badge, .lite .seal-ring, .lite .pc-free span{ animation:none; }
+.lite .tide-layer svg, .lite .pc-ring::before, .lite .price-card.featured .pc-fx::after, .lite .pc-badge::before, .lite .pc-seal-ring, .lite .pc-free span{ animation:none; }
 /* no 3D on a slow or touch screen: every depth layer is one more surface for the phone's GPU to composite */
 .lite .rv-stage, .lite .pricing-grid{ perspective:none; }
 .lite .rv-wall, .lite .pc-inner, .lite .pc-body{ transform-style:flat; }

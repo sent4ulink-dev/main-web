@@ -211,20 +211,23 @@ function initHow(){
     endX = -N * vw;                                     // every slide is one screen wide: the intro plus N panels
     range = Math.max(wrap.offsetHeight - 120 - vh, 1);  // the wrapper keeps 120px below the pinned part
   }
+  // what was last written to each element: a value is written only when it changes (an unchanged write still costs a style pass)
+  const was = new Map();
+  const put = (el, key, v, write) => { const m = was.get(el) || {}; if (m[key] !== v){ m[key] = v; was.set(el, m); write(v); } };
   function render(p, now = 0){
-    track.style.transform = `translate3d(${(endX * p).toFixed(1)}px,0,0)`;
+    put(track, 't', `translate3d(${(endX * p).toFixed(1)}px,0,0)`, v => { track.style.transform = v; });
     const s = p * N; // slide position: 0 = the intro is centred, k = panel k is centred
     panels.forEach((_, k) => {
       const off = clamp(s - (k + 1), -1.2, 1.2); // -1 entering from the right … 0 centred … +1 leaving on the left
       // the cards move a little faster than their page and tilt as they pass: a bit of depth
-      cards[k].style.transform = `translate3d(${(-off * vw * 0.08).toFixed(1)}px,0,0) rotate(${(off * 2.2).toFixed(2)}deg)`;
+      put(cards[k], 't', `translate3d(${(-off * vw * 0.08).toFixed(1)}px,0,0) rotate(${(off * 2.2).toFixed(2)}deg)`, v => { cards[k].style.transform = v; });
       const f = clamp(s - k, 0, 1);
-      bars[k].style.setProperty('--f', f.toFixed(3));
+      put(bars[k], 'f', f.toFixed(3), v => bars[k].style.setProperty('--f', v));
       segs[k].classList.toggle('is-done', f >= 0.999);
       segs[k].classList.toggle('is-active', f > 0 && (f < 0.999 || k === N - 1));
       revealItems[k].forEach((item, i) => {
         const r = reduceMotion ? 1 : easeOutBack((f - i * STAGGER) / (1 - i * STAGGER));
-        item.style.setProperty('--r', r.toFixed(3));
+        put(item, 'r', r.toFixed(3), v => item.style.setProperty('--r', v));
       });
     });
   }
@@ -799,6 +802,8 @@ function initBridge(){
     ctx.restore();
   }
 
+  let ribbonW = -1, ribbonGrads = [];
+  const RIBBON_ORDER = Array.from({ length: RIBBONS }, (_, i) => i).sort((p, q) => Math.abs(q - MID) - Math.abs(p - MID));
   function draw(t, p, dt){
     const cy = H / 2, lam = Math.max(W * 0.6, 520), K = Math.PI * 2 / lam;
     const scrub = p * Math.PI * 5;                                    // scrolling moves the wave
@@ -865,12 +870,19 @@ function initBridge(){
     }
 
     // nine ribbons weave the wave, outer ones first so the middle one lies on top; they reach almost to both edges
-    const order = Array.from({ length: RIBBONS }, (_, i) => i).sort((p, q) => Math.abs(q - MID) - Math.abs(p - MID));
-    for (const i of order){
-      const d = Math.abs(i - MID), a = 0.86 - d * 0.1, g = ctx.createLinearGradient(0, 0, W, 0);
-      g.addColorStop(0, rgba(tint(0), 0)); g.addColorStop(0.06, rgba(tint(0.06), a)); g.addColorStop(0.3, rgba(tint(0.3), a)); g.addColorStop(0.5, rgba(tint(0.5), a));
-      g.addColorStop(0.7, rgba(tint(0.7), a)); g.addColorStop(0.94, rgba(tint(0.94), a)); g.addColorStop(1, rgba(tint(1), 0));
-      ctx.strokeStyle = g; ctx.lineWidth = 2.7 - d * 0.36;
+    // (their gradients depend only on the band's width: made once per width, not every frame)
+    if (ribbonW !== W){
+      ribbonW = W;
+      ribbonGrads = RIBBON_ORDER.map(i => {
+        const d = Math.abs(i - MID), a = 0.86 - d * 0.1, g = ctx.createLinearGradient(0, 0, W, 0);
+        g.addColorStop(0, rgba(tint(0), 0)); g.addColorStop(0.06, rgba(tint(0.06), a)); g.addColorStop(0.3, rgba(tint(0.3), a)); g.addColorStop(0.5, rgba(tint(0.5), a));
+        g.addColorStop(0.7, rgba(tint(0.7), a)); g.addColorStop(0.94, rgba(tint(0.94), a)); g.addColorStop(1, rgba(tint(1), 0));
+        return g;
+      });
+    }
+    for (let j = 0; j < RIBBON_ORDER.length; j++){
+      const i = RIBBON_ORDER[j], d = Math.abs(i - MID);
+      ctx.strokeStyle = ribbonGrads[j]; ctx.lineWidth = 2.7 - d * 0.36;
       ctx.beginPath();
       for (let x = -8; x <= W + 8; x += 8) x < 0 ? ctx.moveTo(x, ribbonY(x, i)) : ctx.lineTo(x, ribbonY(x, i));
       ctx.stroke();
@@ -904,8 +916,10 @@ function initBridge(){
     const r = sec.getBoundingClientRect(), vh = window.innerHeight;
     return clamp((vh - r.top) / (vh + r.height), 0, 1);
   };
-  let minGap = 15;                                          // 60 fps at most, even on a 120-165 Hz screen
-  window.addEventListener('sent4u:lite', () => { minGap = 33; resize(); });
+  // 30 fps: the band is a layer of its own, so the page still scrolls at the screen's full rate past it; its slow wave looks the
+  // same, and the hundreds of dots it draws cost half as much (they were most of the work near the reviews and the prices)
+  let minGap = 30;
+  window.addEventListener('sent4u:lite', () => { minGap = 40; resize(); });
   function frame(now){
     if (!active){ raf = 0; return; }
     if (minGap && last && now - last < minGap){ raf = requestAnimationFrame(frame); return; }
@@ -1348,12 +1362,16 @@ function initSnake(){
     body.style.strokeDasharray = `${bodyLen} ${total + bodyLen}`;
     if (glow) glow.style.strokeDasharray = body.style.strokeDasharray;
 
-    // path length ↔ y lookup (monotonic in y because the line is a graph of y)
+    // path length ↔ y lookup (monotonic in y because the line is a graph of y), and the points themselves every LUT px of
+    // length: the frame reads them from here (getPointAtLength on a path this long costs a lot, three times a frame)
     sampleLen = []; sampleY = [];
+    const n = Math.ceil(total / LUT) + 1;
+    lutX = new Float32Array(n); lutY = new Float32Array(n);
     let maxY = -1;
-    for (let L = 0; L <= total; L += 16){
-      maxY = Math.max(maxY, body.getPointAtLength(L).y);
-      sampleLen.push(L); sampleY.push(maxY);
+    for (let i = 0; i < n; i++){
+      const L = Math.min(i * LUT, total), pt = body.getPointAtLength(L);
+      lutX[i] = pt.x; lutY[i] = pt.y;
+      if (i % 2 === 0 || L === total){ maxY = Math.max(maxY, pt.y); sampleLen.push(L); sampleY.push(maxY); }
     }
     sampleLen.push(total); sampleY.push(Math.max(maxY, H));
 
@@ -1366,8 +1384,16 @@ function initSnake(){
   function readTarget(){
     const yWanted = clamp(window.scrollY + window.innerHeight * 0.7 - top, 0, H);
     target = yWanted >= H ? total + bodyLen * 0.2 : yToLen(yWanted);
-    wake();
+    if (running || Math.abs(target - cur) > 0.05) wake();   // (a scroll further down the page, with the line long settled, changes nothing)
   }
+  const LUT = 8;
+  let lutX = new Float32Array(1), lutY = new Float32Array(1);
+  const pointAt = len => {
+    const f = clamp(len, 0, total) / LUT, i = Math.min(Math.floor(f), lutX.length - 2), k = f - i;
+    if (i < 0) return { x: lutX[0], y: lutY[0] };
+    return { x: lutX[i] + (lutX[i + 1] - lutX[i]) * k, y: lutY[i] + (lutY[i + 1] - lutY[i]) * k };
+  };
+  const shown = { dash: '', head: '', plane: '', op: '' };   // what was last written: nothing is written again unchanged
   // the line only draws while it is still moving; once it has settled it stops until the next scroll
   function wake(){ if (!running){ running = true; calm = 0; lastT = 0; requestAnimationFrame(frame); } }
 
@@ -1382,12 +1408,12 @@ function initSnake(){
     const maxStep = 1700 * dt / 1000;
     cur += clamp((target - cur) * (1 - Math.exp(-dt / 230)), -maxStep, maxStep);
     const headPos = clamp(cur, 0, total);
-    body.style.strokeDashoffset = -(cur - bodyLen);
-    if (glow) glow.style.strokeDashoffset = body.style.strokeDashoffset;
-    const pt = body.getPointAtLength(headPos);
+    const dash = (-(cur - bodyLen)).toFixed(1);
+    if (dash !== shown.dash){ shown.dash = dash; body.style.strokeDashoffset = dash; if (glow) glow.style.strokeDashoffset = dash; }
+    const pt = pointAt(headPos);
 
     // tangent from a short look-ahead / look-behind; face backwards while scrolling up
-    const a1 = body.getPointAtLength(Math.max(0, headPos - 44)), a2 = body.getPointAtLength(Math.min(total, headPos + 44));
+    const a1 = pointAt(Math.max(0, headPos - 44)), a2 = pointAt(Math.min(total, headPos + 44));
     vel += ((cur - prev) / dt * 16.7 - vel) * 0.12; // px moved per 60fps frame, smoothed
     if (Math.abs(vel) > 0.8) dirSign = vel > 0 ? 1 : -1;
     const want = Math.atan2(a2.y - a1.y, a2.x - a1.x) + (dirSign < 0 ? Math.PI : 0);
@@ -1397,10 +1423,15 @@ function initSnake(){
     ang += clamp(diff * (1 - Math.exp(-dt / 240)), -maxTurn, maxTurn);
     bank += (clamp(diff * 1.4, -0.7, 0.7) - bank) * (1 - Math.exp(-dt / 300)); // lean into the sweep
     const grow = smooth(clamp(cur / 90, 0, 1)) * smooth(clamp((total - cur) / 90, 0, 1)); // eases in at the start, out at the end
-    head.setAttribute('transform', `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`);
-    plane.setAttribute('transform', `rotate(${(ang * 180 / Math.PI).toFixed(2)}) scale(${grow.toFixed(3)} ${(grow * Math.cos(bank)).toFixed(3)})`);
     const inPin = pin0 >= 0 && pt.y > pin0 - 40 && pt.y < pin1 + 40; // the pinned page has its own plane
-    head.style.opacity = cur <= 1 || cur >= total || inPin ? 0 : 1;
+    const op = cur <= 1 || cur >= total || inPin ? '0' : '1';
+    if (op !== shown.op){ shown.op = op; head.style.opacity = op; }
+    if (op === '1'){   // (a hidden plane needs no moving)
+      const ht = `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`;
+      const pl = `rotate(${(ang * 180 / Math.PI).toFixed(1)}) scale(${grow.toFixed(3)} ${(grow * Math.cos(bank)).toFixed(3)})`;
+      if (ht !== shown.head){ shown.head = ht; head.setAttribute('transform', ht); }
+      if (pl !== shown.plane){ shown.plane = pl; plane.setAttribute('transform', pl); }
+    }
 
     for (const h of hits){
       if (!h.on && cur >= h.len - 40){
@@ -1557,7 +1588,6 @@ function initPhoneSection(){
       <g class="tg-crown"><circle cx="602" cy="206" r="50" fill="#d9542a"/><circle cx="664" cy="174" r="58" fill="#e8843c"/><circle cx="694" cy="236" r="46" fill="#c0392b"/>
         <circle cx="630" cy="146" r="40" fill="#f2b33d"/><circle cx="566" cy="244" r="32" fill="#e8843c"/><circle cx="650" cy="238" r="36" fill="#f2a03d"/></g>
       <rect class="tg-chimney" x="512" y="190" width="18" height="46"/>
-      <circle class="tg-smoke" cx="521" cy="182" r="7"/><circle class="tg-smoke" cx="521" cy="182" r="7" style="animation-delay:-1.5s"/><circle class="tg-smoke" cx="521" cy="182" r="7" style="animation-delay:-3s"/>
       <rect class="tg-wall" x="360" y="252" width="200" height="100"/>
       <path class="tg-roof" d="M344 258L460 182L576 258Z"/><path class="tg-trim" d="M344 258L460 182L576 258"/><circle class="tg-win" cx="460" cy="228" r="11"/><path class="tg-mull" d="M449 228h22M460 217v22"/>
       <rect class="tg-eave" x="350" y="252" width="220" height="10"/>
