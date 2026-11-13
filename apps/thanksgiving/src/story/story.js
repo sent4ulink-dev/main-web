@@ -403,7 +403,10 @@ export class Story {
   async shareGuestLink() {
     try {
       const url = this.roster.guestLink || await this.roster.makeGuestLink();
-      this.ui.showLink(url, { title: 'The guest link', note: 'Send this one link to the whole family (a group chat is perfect). Each person taps their own name, dresses up their character and answers yes or no.' });
+      const demo = this.repo?.mode.kind === 'test';
+      this.ui.showLink(url, demo
+        ? { title: 'The guest link', note: 'Send this one link to the whole family (a group chat is perfect). In this demo it opens right here, so you can try it: tap a name, dress up your character and answer yes or no.', open: 'Open it as a guest' }
+        : { title: 'The guest link', note: 'Send this one link to the whole family (a group chat is perfect). Each person taps their own name, dresses up their character and answers yes or no.' });
       if (this.current?.id === 'you') this.refreshCard();
     } catch (err) { this.ui.toast(`Couldn’t make the link — ${err.message}`); }
   }

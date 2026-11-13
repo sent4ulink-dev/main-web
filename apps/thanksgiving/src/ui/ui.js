@@ -277,8 +277,11 @@ export class UI {
   }
 
   /** A link to copy or share (the studio's new card, the host's guest link). */
-  showLink(url, { title = 'Your link', note = '' } = {}) {
+  /** open: a button that opens the link here (the demo's guest link, which works on this device). */
+  showLink(url, { title = 'Your link', note = '', open = null } = {}) {
     const dlg = $('#share-link-dialog');
+    const openBtn = dlg.querySelector('[data-open-link]');
+    openBtn.hidden = !open; if (open) { openBtn.textContent = open; openBtn.onclick = () => { location.href = url; }; }
     dlg.querySelector('#share-link-title').textContent = title;
     if (note) dlg.querySelector('.link-note').textContent = note;
     dlg.querySelector('#share-url').textContent = url;

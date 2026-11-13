@@ -6,7 +6,7 @@
 //   [data-tk="text"]  a built-in label; its edited wording is kept in content.texts under its original text
 // The guest list is not edited here: it has its own panel (src/party/hostpanel.js).
 import { setPath, replaceContent } from './content-core.js';
-import { validShareID } from './repository.js';
+import { validShareID, DEMO_SHARE } from './repository.js';
 import { openEasyEditor, saveKeepingLatest, shrinkImage } from './easy-editor.js';
 import { makeSteps, title as easyTitle } from './easy-steps.js';
 import { LivePreview } from './live-preview.js';
@@ -46,10 +46,12 @@ export class CardEditor {
     if (kind === 'test') {
       this.viewAs.hidden = false;
       this.viewAs.textContent = this.repo.mode.asGuest ? '👀 View as host' : '👀 View as a guest';
-      this.viewAs.onclick = () => { location.search = this.repo.mode.asGuest ? '?share=test' : '?share=test&as=guest'; };
+      this.viewAs.onclick = () => { location.search = this.repo.mode.asGuest ? `?share=${DEMO_SHARE}` : `?share=${DEMO_SHARE}&as=guest`; };
     }
     if (kind === 'unavailable') return this.state('Link not found', 'This link isn’t right. Please check the whole link.');
     if (kind === 'studio') await this.passwordGate();
+    // a slow phone network: say that it's still trying (the request repeats by itself)
+    if (kind !== 'studio') this.repo.onRetry = () => this.state(kind === 'test' ? 'Setting up the demo…' : 'Opening the invitation…', 'The internet is slow, still trying…', false, true);
     for (;;) {
       try {
         if (kind !== 'studio') this.state(kind === 'test' ? 'Setting up the demo…' : 'Opening the invitation…', '', false, true);
@@ -210,7 +212,10 @@ export class CardEditor {
       }),
       canFinish: repo.mode.kind === 'invitation',
       deadlineText: () => (repo.mode.kind === 'invitation' && deadline ? `You can edit the wording until ${new Date(deadline).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}.` : test ? 'This is a demo: what you write is kept on this device only.' : ''),
-      end: this.guestLink ? { title: 'Send it to the family', text: 'One link for the whole family (a group chat is perfect): each person taps their own name, dresses up their character and answers.', button: 'Get the guest link', run: () => this.guestLink() } : null,
+      end: this.guestLink ? { title: 'Send it to the family', button: 'Get the guest link', run: () => this.guestLink(),
+        ...(this.repo.mode.kind === 'test'
+          ? { text: 'One link for the whole family (a group chat is perfect). In this demo it opens right here: try it as a guest, tap a name, dress up your character and answer.', open: 'Open it as a guest' }
+          : { text: 'One link for the whole family (a group chat is perfect): each person taps their own name, dresses up their character and answers.' }) } : null,
       onOpen: () => this.release3d?.(),
       done: () => location.reload(),
     });

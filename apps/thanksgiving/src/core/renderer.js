@@ -54,8 +54,9 @@ export class Renderer {
     // No depth-of-field blur at any level: every object stays sharp.
     this.isMobile = isMobile;
     const sys = devicePixelRatio || 1;
-    this.dprCap = Math.min(sys, 2);                       // HD everywhere, never more than 2× (phones stay cool)
-    this.dprFloor = Math.min(this.dprCap, isMobile ? 1.5 : 1);
+    // computers up to 2×; phones up to 1.5× (at a phone's size it looks as sharp, with about half the pixels of 2×: a cooler phone)
+    this.dprCap = Math.min(sys, isMobile ? 1.5 : 2);
+    this.dprFloor = Math.min(this.dprCap, 1);
     this.dpr = this.dprCap;
     // Feature tiers, lightest first. Phones skip MSAA (at 2.5-3x pixel density edges are already
     // smooth, and resolving multisampled float buffers is costly on mobile GPUs), draw a thinner meadow
@@ -70,6 +71,10 @@ export class Renderer {
         { msaa: 2, dof: false, grass: 0.7, shadow: 2048, shadowEvery: 2 },
         { msaa: 4, dof: false, grass: 1.0, shadow: 2048, shadowEvery: 2 },
       ];
+    if (window.__cardLite) {   // this phone ran out of memory on a card before (see the guard in index.html): the lightest card
+      this.dprCap = Math.min(this.dprCap, 1.25); this.dprFloor = Math.min(this.dprFloor, 1);
+      this.levels = this.levels.slice(0, 1);
+    }
     this.level = this.levels.length - 1;
     this._slowChecks = 0;
     this._goodChecks = 0;
@@ -138,6 +143,7 @@ export class Renderer {
       return;
     }
     this._slowChecks = 0;
+    if (this.isMobile) return;   // phones only ever step down: every step re-sizes the big 3D buffers, and up-and-down again and again runs a phone out of memory
     if (p75 < 0.0125) {
       if (++this._goodChecks < 3) return;
       this._goodChecks = 0;

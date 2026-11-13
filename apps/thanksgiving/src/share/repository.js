@@ -14,6 +14,8 @@ import { demoRoster } from './demo.js';
 
 export const DEMO_PREFIX = 'thanksgiving:demo:v1:';
 export const DEMO_ID = 'THANKSGIVINGtestcardTHANKSGIVING';
+// The demo's own address: sent4u.link knows the demo by this id (a plain ?share=test there opens the homepage), and so does this card.
+export const DEMO_SHARE = 'test-thanksgiving';
 export const validShareID = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(id);   // (sent4u's link ids)
 export function selectMode(search) {
   const p = new URLSearchParams(search);
@@ -70,19 +72,39 @@ export class ModeRepository {
   clearAccess() { this.token = null; }
 
   async request(path, { method = 'GET', body, patient = false, headers = {} } = {}) {
-    let response; const started = Date.now();
+    const started = Date.now(), PATIENCE = 60000;
     const init = { method, cache: 'no-store', headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) };
     for (let attempt = 0; ; attempt++) {
+      // each try has a time limit that covers the whole answer, not just its first bytes: an answer that stops halfway (it happens
+      // on phone networks) counts as failed and is asked for again, quickly
+      const stop = new AbortController(), timer = patient ? setTimeout(() => stop.abort(), 8000 + attempt * 4000) : 0;
+      let response, text;
       try {
-        response = this._api ? await this._api.fetch(new Request(new URL(path, location.origin), init), this._env) : await this.fetcher(path, init);
-        if (!patient || !(response.status >= 500 || response.status === 408 || response.status === 429) || Date.now() - started > 30000) break;
-      } catch { if (!patient || Date.now() - started > 30000) throw new RequestError('Connection problem. Check your internet and try again.'); }
-      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, 6000)));
+        const req = { ...init, signal: stop.signal };
+        response = this._api ? await this._api.fetch(new Request(new URL(path, location.origin), req), this._env) : await this.fetcher(path, req);
+        text = await response.text();
+      } catch {
+        clearTimeout(timer);
+        if (!patient || Date.now() - started > PATIENCE) throw new RequestError('Connection problem. Check your internet and try again.');
+        this.onRetry?.(attempt + 1);
+        await new Promise((r) => setTimeout(r, Math.min(500 * 2 ** attempt, 4000)));
+        continue;
+      }
+      clearTimeout(timer);
+      if (patient && (response.status >= 500 || response.status === 408 || response.status === 429) && Date.now() - started <= PATIENCE) {
+        this.onRetry?.(attempt + 1);
+        await new Promise((r) => setTimeout(r, Math.min(500 * 2 ** attempt, 4000)));
+        continue;
+      }
+      let data; try { data = JSON.parse(text); } catch { throw new RequestError('Could not read the server’s answer.', response.status); }
+      if (!response.ok) throw new RequestError(data.error || 'Could not load.', response.status, data);
+      // the demo runs this card's own server code in the browser, so its guest link would be a real ?guest= address that only this
+      // browser knows (anyone else: "link not found"): in the demo it is the demo's own guest view instead
+      if (this.mode.kind === 'test' && typeof data?.guestLink === 'string') return { ...data, guestLink: this.demoGuestURL };
+      return data;
     }
-    let data; try { data = await response.json(); } catch { throw new RequestError('Could not read the server’s answer.', response.status); }
-    if (!response.ok) throw new RequestError(data.error || 'Could not load.', response.status, data);
-    return data;
   }
+  get demoGuestURL() { return `${location.origin}${location.pathname}?share=${DEMO_SHARE}&as=guest`; }
   async login(password) { const d = await this.request('/api/studio/login', { method: 'POST', body: { password } }); this.token = d.token; }
 
   // where the host's things live, per mode
@@ -123,7 +145,7 @@ export class ModeRepository {
   hostGuest(id, changes) { return this.request(this.mode.kind === 'studio' ? `/api/studio/guest/${id}` : `${this._hostBase}/guest/${id}`, { method: 'PUT', body: changes }); }
   async createGuestLink() {
     const d = await this.request(`${this._hostBase}/guestlink`, { method: 'POST' });
-    if (this.mode.kind === 'test') return { guestLink: `${location.origin}${location.pathname}?share=test&as=guest` };
+    if (this.mode.kind === 'test') return { guestLink: this.demoGuestURL };
     return d;
   }
 

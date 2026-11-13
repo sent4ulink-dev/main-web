@@ -320,16 +320,21 @@ export function openEasyEditor(cfg) {
 
   function endHTML() {
     const e = cfg.end;
-    return `${cfg.deadlineText?.() ? `<p class="ez-help" style="margin-top:12px">${esc(cfg.deadlineText())}</p>` : ''}${e ? `<section class="ez-card"><h4>${esc(e.title)}</h4><p>${esc(e.text)}</p><div class="ez-end"><button type="button" class="ez-btn dark" data-end="link">${esc(e.button)}</button></div><div class="ez-copy" hidden><input type="text" readonly aria-label="Link"><button type="button" class="ez-btn dark" data-end="copy">Copy</button></div></section>` : ''}${cfg.canFinish ? '<section class="ez-card"><h4>Finish for good</h4><p>Once finished, the wording can’t be edited again (the guest list stays yours to run). Only press this when everything is ready.</p><div class="ez-end"><button type="button" class="ez-btn" data-end="finish">Finish for good</button></div></section>' : ''}`;
+    return `${cfg.deadlineText?.() ? `<p class="ez-help" style="margin-top:12px">${esc(cfg.deadlineText())}</p>` : ''}${e ? `<section class="ez-card"><h4>${esc(e.title)}</h4><p>${esc(e.text)}</p><div class="ez-end"><button type="button" class="ez-btn dark" data-end="link">${esc(e.button)}</button></div><div class="ez-copy" hidden><input type="text" readonly aria-label="Link"><button type="button" class="ez-btn dark" data-end="copy">Copy</button></div>${e.open ? `<div class="ez-end" data-open-row hidden><button type="button" class="ez-btn main" data-end="open">${esc(e.open)}</button></div>` : ''}</section>` : ''}${cfg.canFinish ? '<section class="ez-card"><h4>Finish for good</h4><p>Once finished, the wording can’t be edited again (the guest list stays yours to run). Only press this when everything is ready.</p><div class="ez-end"><button type="button" class="ez-btn" data-end="finish">Finish for good</button></div></section>' : ''}`;
   }
   function bindEnd() {
     const scroll = $('.ez-scroll');
     scroll.querySelector('[data-end="link"]')?.addEventListener('click', async (e) => {
       const b = e.currentTarget, row = scroll.querySelector('.ez-copy');
       b.disabled = true;
-      try { row.querySelector('input').value = await cfg.end.run(); row.hidden = false; b.hidden = true; }
+      try {
+        row.querySelector('input').value = await cfg.end.run(); row.hidden = false; b.hidden = true;
+        const open = scroll.querySelector('[data-open-row]'); if (open) open.hidden = false;
+      }
       catch (err) { status(err.message || 'Couldn’t make the link.', 'bad'); b.disabled = false; }
     });
+    // (the demo: its guest link opens here, as a guest of the same demonstration)
+    scroll.querySelector('[data-end="open"]')?.addEventListener('click', () => { location.href = scroll.querySelector('.ez-copy input').value; });
     scroll.querySelector('[data-end="copy"]')?.addEventListener('click', async (e) => {
       const input = scroll.querySelector('.ez-copy input');
       try { await navigator.clipboard.writeText(input.value); } catch { input.select(); document.execCommand('copy'); }

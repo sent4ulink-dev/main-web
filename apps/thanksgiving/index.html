@@ -9,6 +9,85 @@
     <link rel="icon" href="/brand/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="/brand/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <script>
+      // Keeps a card from ever leaving a visitor stuck, and a phone from crashing on it twice. It sits here, ahead of everything, so it
+      // works even when the main code can't load.
+      // - Loading stalled (no file finished and the percent stayed put): tries once more by itself, then offers a button.
+      // - The phone ended the page while it was on screen (out of memory: phones then reload or close it): the visits of the next week
+      //   get a lighter card (window.__cardLite, read by the renderer).
+      // (Not inside the step editor's live preview: that small copy is set up lightly already, and the editor watches it.)
+      (function () {
+        if (/[?&]embed=1(&|$)/.test(location.search)) { window.__cardReady = window.__cardFailed = function () {}; return; }
+        var OPEN = 'sent4u:card:open', LITE = 'sent4u:card:lite', RETRY = 'sent4u:card:retry', WEEK = 7 * 864e5;
+        function get(s, k) { try { return s.getItem(k); } catch (e) { return null; } }
+        function put(s, k, v) { try { if (v === null) s.removeItem(k); else s.setItem(k, v); } catch (e) { /* no storage: nothing to remember */ } }
+        var local = null, session = null;
+        try { local = window.localStorage; session = window.sessionStorage; } catch (e) { /* blocked */ }
+
+        // still marked open from a visit that was on screen and never closed: the phone ended it
+        if (local && +get(local, OPEN) > Date.now() - 6e5) put(local, LITE, String(Date.now()));
+        window.__cardLite = !!local && +get(local, LITE) > Date.now() - WEEK;
+        function mark() { if (local) put(local, OPEN, document.hidden ? null : String(Date.now())); }
+        mark();
+        document.addEventListener('visibilitychange', mark);
+        addEventListener('pagehide', function () { if (local) put(local, OPEN, null); });
+
+        var ready = false, failed = false, box = null, signal = '', changed = Date.now();
+        function show(title) {
+          if (box || !document.body) return;
+          box = document.createElement('div');
+          box.setAttribute('role', 'alert');
+          box.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:2147483600;max-width:420px;margin:0 auto;padding:16px;border-radius:14px;background:#141310;color:#f3efe7;box-shadow:0 14px 40px rgba(0,0,0,.45);font:500 15px/1.4 system-ui,-apple-system,sans-serif;text-align:center';
+          var h = document.createElement('div'); h.textContent = title; h.style.cssText = 'font-weight:700;margin-bottom:4px';
+          var p = document.createElement('div'); p.textContent = 'The internet may be slow. Try loading it again.'; p.style.cssText = 'opacity:.8;font-size:14px;margin-bottom:12px';
+          var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Load it again';
+          b.style.cssText = 'width:100%;padding:12px;border:0;border-radius:10px;background:#f0a35a;color:#141310;font:700 15px system-ui,-apple-system,sans-serif;cursor:pointer';
+          b.onclick = function () { location.reload(); };
+          box.append(h, p, b);
+          document.body.append(box);
+        }
+        function hide() { if (box) box.remove(); box = null; }
+        function retry(title) {
+          if (session && !get(session, RETRY)) { put(session, RETRY, '1'); location.reload(); return; }
+          failed = true;   // tried again already: the button stays until it is pressed
+          show(title);
+        }
+        window.__cardReady = function () { ready = true; if (session) put(session, RETRY, null); hide(); };
+        window.__cardFailed = function () { if (!ready) retry('It didn’t load'); };
+
+        // the main code itself didn't arrive
+        addEventListener('error', function (e) {
+          var t = e.target;
+          if (!ready && t && t.tagName === 'SCRIPT' && /\/assets\//.test(t.src || '')) retry('It didn’t load');
+        }, true);
+
+        // nothing has moved for a while: no file finished and the percent stayed the same
+        var watch = setInterval(function () {
+          if (ready || failed) { clearInterval(watch); return; }
+          var loader = document.getElementById('loader'), gate = document.getElementById('mode-gate');
+          if (document.readyState !== 'loading' && !loader) { clearInterval(watch); return; }
+          var pct = loader && loader.querySelector('.loader-pct');
+          var now = performance.getEntriesByType('resource').length + '|' + (pct ? pct.textContent : '');
+          if (document.hidden || (gate && !gate.hidden && !gate.classList.contains('quiet')) || now !== signal) { signal = now; changed = Date.now(); hide(); return; }
+          var still = Date.now() - changed;
+          if (still > 40000) retry('It’s taking a long time');
+          else if (still > 20000) show('It’s taking a long time');
+        }, 1000);
+
+        // the phone took the 3D away while the card was open (short of memory)
+        addEventListener('DOMContentLoaded', function () {
+          var canvas = document.getElementById('scene');
+          if (!canvas) return;
+          var wait = 0;
+          canvas.addEventListener('webglcontextlost', function () {
+            if (window.__card3dReleased) return;   // the card gave its 3D up itself (the step editor frees it for its preview)
+            if (local) put(local, LITE, String(Date.now()));
+            wait = setTimeout(function () { show('The picture paused for a moment'); }, 3000);
+          });
+          canvas.addEventListener('webglcontextrestored', function () { clearTimeout(wait); hide(); });
+        });
+      })();
+    </script>
   </head>
   <body>
     <!-- inline editing toolbar: its own strip at the top (the scene moves down; nothing is covered) -->
@@ -125,7 +204,7 @@
       <h2 id="share-link-title" class="display">Your link</h2>
       <p class="link-note">Whoever has this link can edit the card’s wording for 5 days (unless you finish it permanently), and run the guest list until the big day.</p>
       <output id="share-url"></output>
-      <div class="tb-row"><button type="button" class="btn-float primary" data-copy-link>Copy</button><button type="button" class="btn-float" data-share-link hidden>Share…</button><button type="button" class="btn-float" data-close-link>Close</button></div>
+      <div class="tb-row"><button type="button" class="btn-float primary" data-copy-link>Copy</button><button type="button" class="btn-float" data-share-link hidden>Share…</button><button type="button" class="btn-float" data-open-link hidden>Open it as a guest</button><button type="button" class="btn-float" data-close-link>Close</button></div>
       <p class="link-status" role="status"></p>
     </dialog>
     <noscript>This card needs JavaScript and WebGL.</noscript>

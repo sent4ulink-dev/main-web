@@ -52,7 +52,9 @@ async function boot() {
   const contentReady = editor.boot();
   await Promise.all([
     contentReady, loadAll(setProgress),
-    ...["700 30px 'Playfair Display'", "600 30px 'Playfair Display'", "400 30px 'Great Vibes'", "700 30px 'Caveat'", "800 30px 'Nunito'", "600 30px 'Nunito'"].map((f) => document.fonts.load(f).catch(() => {})),
+    // (a font that never arrives must not hold the card up)
+    ...["700 30px 'Playfair Display'", "600 30px 'Playfair Display'", "400 30px 'Great Vibes'", "700 30px 'Caveat'", "800 30px 'Nunito'", "600 30px 'Nunito'"]
+      .map((f) => Promise.race([document.fonts.load(f).catch(() => {}), new Promise((res) => setTimeout(res, 6000))])),
   ]);
   const data = await contentReady;
   if (!data) { loaderEl.remove(); return; }
@@ -97,7 +99,7 @@ async function boot() {
   editor.story = story; editor.roster = roster;
   editor.guestLink = repo.mode.kind === 'studio' ? null : () => roster.guestLink || roster.makeGuestLink();
   // the editor runs the card live in its own frame: this page's scene steps aside meanwhile (one 3D card at a time)
-  editor.release3d = () => { R.renderer.setAnimationLoop(null); try { R.renderer.dispose(); R.renderer.forceContextLoss(); } catch { /* already gone */ } };
+  editor.release3d = () => { window.__card3dReleased = true; R.renderer.setAnimationLoop(null); try { R.renderer.dispose(); R.renderer.forceContextLoss(); } catch { /* already gone */ } };   // (the flag: the loading guard must not take this for a crash)
   editor.apply = (paths) => {
     if (paths.some((p) => /^(family|date|place|letter|host)/.test(p)) && o.sign.shown) o.sign.paint(content, o.sign.shown);
     if (paths.includes('family')) o.wall.setFamily(content.family);
@@ -170,8 +172,12 @@ async function boot() {
   gsap.ticker.remove(gsap.updateRoot);
   const timer = new THREE.Timer();
   timer.connect(document);
-  let lastTs = 0;
+  let lastTs = 0, drawnAt = -1e9;
+  // phones: at most 60 frames a second (a 120 Hz phone would otherwise draw twice as many, for nothing but heat)
+  const minGap = R.isMobile ? 1000 / 60 - 2.5 : 0;
   const frame = (ts) => {
+    if (ts - drawnAt < minGap) return;
+    drawnAt = ts;
     lastTs = ts;
     timer.update(ts);
     const dt = Math.max(0, Math.min(timer.getDelta(), 1 / 15)), t = timer.getElapsed();
@@ -213,6 +219,7 @@ async function boot() {
   if (DEBUG) window.__frame = (n = 1, ms = 16.7) => { timer.disconnect?.(); for (let i = 0; i < n; i++) frame(lastTs + ms); };
 
   // ── the porch ──
+  window.__cardReady?.();
   loaderEl.classList.add('done');
   setTimeout(() => loaderEl.remove(), 1000);
   if (EMBED) { startPreview({ R, story, ui, o, content, roster, repo, photos, director, world, camera, capture }); return; }
@@ -225,4 +232,4 @@ async function boot() {
   void FLOOR;
 }
 
-boot().catch((e) => { console.error(e); loaderText.textContent = 'Something went wrong while setting up. Please reload the page.'; });
+boot().catch((e) => { console.error(e); loaderText.textContent = 'Something went wrong while setting up. Please reload the page.'; window.__cardFailed?.(); });
